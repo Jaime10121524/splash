@@ -26,6 +26,19 @@ $routes->group('api', static function ($routes): void {
     $routes->post('pessoas/(:num)/vincular', 'Api\UsuariosController::link/$1', ['filter'=>'csrf']);
     $routes->post('usuarios/(:num)/editar', 'Api\UsuariosController::update/$1', ['filter'=>'csrf']);
     $routes->post('usuarios/(:num)/situacao', 'Api\UsuariosController::state/$1', ['filter'=>'csrf']);
+    // Clientes e visitas: dados pessoais liberados SOMENTE na API administrativa.
+    $routes->get('comercial/opcoes', 'Api\CatalogosController::index');
+    $routes->post('comercial/origens', 'Api\CatalogosController::criarOrigem', ['filter'=>'csrf']);
+    $routes->post('comercial/origens/(:num)/editar', 'Api\CatalogosController::editarOrigem/$1', ['filter'=>'csrf']);
+    $routes->post('comercial/motivos', 'Api\CatalogosController::criarMotivo', ['filter'=>'csrf']);
+    $routes->post('comercial/motivos/(:num)/editar', 'Api\CatalogosController::editarMotivo/$1', ['filter'=>'csrf']);
+    $routes->get('clientes', 'Api\ClientesController::index');
+    $routes->post('clientes', 'Api\ClientesController::create', ['filter'=>'csrf']);
+    $routes->post('clientes/(:num)/editar', 'Api\ClientesController::update/$1', ['filter'=>'csrf']);
+    $routes->get('atendimentos', 'Api\VisitasController::index');
+    $routes->post('atendimentos/chegada', 'Api\VisitasController::chegada', ['filter'=>'csrf']);
+    $routes->post('atendimentos/(:num)/iniciar', 'Api\VisitasController::iniciar/$1', ['filter'=>'csrf']);
+    $routes->post('atendimentos/(:num)/finalizar', 'Api\VisitasController::finalizar/$1', ['filter'=>'csrf']);
 });
 
 // Rotas internas do Shield: recuperação de acesso e gestão de sessão tradicional.
