@@ -12,6 +12,11 @@ class SessionController extends BaseController
     public function show()
     {
         $user = auth('session')->user();
+        // Se o administrador bloqueou a conta, derruba também a sessão antiga.
+        if ($user !== null && $user->isBanned()) {
+            auth('session')->logout();
+            $user = null;
+        }
 
         return $this->response->setJSON([
             'authenticated' => $user !== null,
@@ -61,6 +66,13 @@ class SessionController extends BaseController
 
         // Mantém sessão no servidor: o frontend nunca armazena credenciais/tokens de autenticação.
         $user = auth('session')->user();
+        if ($user === null || $user->isBanned()) {
+            auth('session')->logout();
+            return $this->response->setStatusCode(403)->setJSON([
+                'message' => 'Acesso bloqueado ou sessão inválida.',
+                'csrf' => $this->csrf(),
+            ]);
+        }
 
         return $this->response->setJSON([
             'authenticated' => true,
