@@ -112,7 +112,7 @@ class PlanosController extends BaseController
         }
     }
 
-    public function novaVersao(int $planoId): ResponseInterface
+    public function novaVersao(int|string $planoId): ResponseInterface
     {
         if ($denied = $this->guard()) {
             return $denied;
@@ -124,6 +124,7 @@ class PlanosController extends BaseController
             return $this->failInput($validated['error']);
         }
 
+        $planoId = (int) $planoId;
         $db = db_connect();
         if ($db->table('planos')->where('id', $planoId)->countAllResults() === 0) {
             return $this->response->setStatusCode(404)->setJSON(['message' => 'Plano não encontrado.']);
@@ -171,7 +172,7 @@ class PlanosController extends BaseController
         }
     }
 
-    public function status(int $planoId, int $versaoId): ResponseInterface
+    public function status(int|string $planoId, int|string $versaoId): ResponseInterface
     {
         if ($denied = $this->guard()) {
             return $denied;
@@ -182,6 +183,8 @@ class PlanosController extends BaseController
             return $this->failInput('Informe a situação ativa ou inativa.');
         }
 
+        $planoId = (int) $planoId;
+        $versaoId = (int) $versaoId;
         $db = db_connect();
         $db->transBegin();
         try {
@@ -264,9 +267,12 @@ class PlanosController extends BaseController
             }
         }
 
+        $partes = explode('.', $valor, 2);
+        $valorDecimal = $partes[0] . '.' . str_pad($partes[1] ?? '', 2, '0');
+
         return [
             'codigo' => $codigo,
-            'valor' => number_format((float) $valor, 2, '.', ''),
+            'valor' => $valorDecimal,
             'duracao_meses' => $duracao,
             'ativo' => $data['ativo'] ? 1 : 0,
             'vigencia_inicio' => $vigencia,
