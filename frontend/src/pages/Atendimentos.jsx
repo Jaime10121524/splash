@@ -209,6 +209,7 @@ export default function Atendimentos() {
         {modal.type==='start'&&<>
           <label>Atendente principal <em>*</em>
             <FormControl type="select" value={attendant} onChange={setAttendant} options={attOptions}
+              disabled={!!modal.visit.atendente_pessoa_id}
               placeholder="Escolha o atendente" ariaLabel="Atendente principal"/></label>
           <label>Segundo atendente (opcional)
             <FormControl type="select" value={additional} onChange={setAdditional}
