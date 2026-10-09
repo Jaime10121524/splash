@@ -1,3 +1,4 @@
+<?php helper('splash'); ?>
 <?= $this->extend(config('Auth')->views['layout']) ?>
 <?= $this->section('title') ?>Entrar<?= $this->endSection() ?>
 <?= $this->section('main') ?>
@@ -15,6 +16,6 @@
   <div class="field"><span class="field-icon">⌘</span><input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha" required></div>
   <button class="button-primary" type="submit">Acessar sistema <span aria-hidden="true">→</span></button>
 </form>
-<p class="bottom-link"><a href="<?= esc($appUrl, 'attr') ?>">Voltar ao aplicativo SPLASH</a></p>
+<p class="bottom-link"><a href="<?= esc(splash_frontend_url(), 'attr') ?>">Voltar ao aplicativo SPLASH</a></p>
 <p class="security-note"><span aria-hidden="true">♢</span> Seu acesso é individual e protegido.</p>
 <?= $this->endSection() ?>
