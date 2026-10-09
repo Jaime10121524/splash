@@ -15,9 +15,16 @@ class AjustaSiglasAuditoriaPlanos extends Migration
 {
     public function up()
     {
-        $indexes = $this->db->query("SHOW INDEX FROM plano_versoes WHERE Key_name = 'uq_plano_versao_codigo'")->getResultArray();
-        if ($indexes !== []) {
-            $this->db->query('ALTER TABLE plano_versoes DROP INDEX uq_plano_versao_codigo');
+        // Busca o índice único real da coluna: o nome pode variar entre versões do CI4.
+        $indexes = $this->db->query('SHOW INDEX FROM plano_versoes')->getResultArray();
+        foreach ($indexes as $index) {
+            if (($index['Column_name'] ?? '') === 'codigo'
+                && (int) ($index['Non_unique'] ?? 1) === 0
+                && ($index['Key_name'] ?? '') !== 'PRIMARY') {
+                $name = str_replace('\\`', '', (string) $index['Key_name']);
+                $this->db->query('ALTER TABLE plano_versoes DROP INDEX `' . str_replace('`', '', $name) . '`');
+                break;
+            }
         }
         $this->forge->addField([
             'id' => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
