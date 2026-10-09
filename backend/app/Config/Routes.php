@@ -17,6 +17,15 @@ $routes->group('api', static function ($routes): void {
     $routes->post('planos/(:num)/versoes/(:num)/status', 'Api\PlanosController::status/$1/$2', ['filter' => 'csrf']);
     $routes->post('planos/(:num)/versoes/(:num)/editar', 'Api\PlanosController::atualizar/$1/$2', ['filter' => 'csrf']);
     $routes->post('planos/(:num)/excluir', 'Api\PlanosController::excluir/$1', ['filter' => 'csrf']);
+    // Participantes e contas Shield: sempre validados novamente por permissão no servidor.
+    $routes->get('pessoas', 'Api\\PessoasController::index');
+    $routes->post('pessoas', 'Api\\PessoasController::create', ['filter'=>'csrf']);
+    $routes->post('pessoas/(:num)/editar', 'Api\\PessoasController::update/$1', ['filter'=>'csrf']);
+    $routes->get('usuarios', 'Api\\UsuariosController::index');
+    $routes->post('pessoas/(:num)/acesso', 'Api\\UsuariosController::create/$1', ['filter'=>'csrf']);
+    $routes->post('pessoas/(:num)/vincular', 'Api\\UsuariosController::link/$1', ['filter'=>'csrf']);
+    $routes->post('usuarios/(:num)/editar', 'Api\\UsuariosController::update/$1', ['filter'=>'csrf']);
+    $routes->post('usuarios/(:num)/situacao', 'Api\\UsuariosController::state/$1', ['filter'=>'csrf']);
 });
 
 // Rotas internas do Shield: recuperação de acesso e gestão de sessão tradicional.
