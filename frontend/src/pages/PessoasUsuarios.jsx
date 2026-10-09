@@ -284,7 +284,7 @@ export default function PessoasUsuarios({tab='pessoas'}) {
         <p className="pu-intro">{modal.kind==='newLogin'
           ? 'Crie um acesso individual para '+modal.person.nome+'. A senha deve ser informada com segurança diretamente ao usuário.'
           : 'Atualize o login sem modificar registros e comissões da pessoa vinculada.'}</p>
-        <label>Nome de usuário <em>*</em><input autoFocus required minLength={3} maxLength={50} value={loginForm.username}
+        <label>Nome de usuário <em>*</em><input autoFocus required minLength={3} maxLength={30} value={loginForm.username}
           onChange={e=>setLoginForm(f=>({...f,username:e.target.value}))} placeholder="Ex.: vendedor01"/></label>
         <label>E-mail de recuperação <em>*</em><input type="email" required maxLength={254} value={loginForm.email}
           onChange={e=>setLoginForm(f=>({...f,email:e.target.value}))} placeholder="nome@exemplo.com"/></label>
