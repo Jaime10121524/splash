@@ -106,7 +106,7 @@ class PessoasController extends BaseController
                 ->update([...$clean, 'atualizado_em'=>date('Y-m-d H:i:s')]);
             $this->saveRoles($db, $personId, $roles);
             if ($user && $clean['ativo'] === 0) {
-                auth()->getProvider()->deactivate($user);
+                $user->deactivate();
             }
             $this->audit($db,$personId,'EDITAR',$old,[...$clean,'papeis'=>$roles]);
             $this->commit($db);
