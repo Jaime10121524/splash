@@ -1,8 +1,7 @@
 <?php
 // As views nativas do Shield também usam esta estrutura visual.
-$host = service('request')->getUri()->getHost();
-$host = in_array($host, ['127.0.0.1', 'localhost'], true) ? $host : 'localhost';
-$defaultAppUrl = ENVIRONMENT === 'development' ? 'http://' . $host . ':5173/' : base_url('/');
+// Usamos o mesmo host do frontend do Vite para compartilhar a sessão de login.
+$defaultAppUrl = ENVIRONMENT === 'development' ? 'http://localhost:5173/' : base_url('/');
 $appUrl = trim((string) env('SPLASH_FRONTEND_URL', $defaultAppUrl));
 if (! filter_var($appUrl, FILTER_VALIDATE_URL) || ! in_array(parse_url($appUrl, PHP_URL_SCHEME), ['http', 'https'], true)) {
     $appUrl = $defaultAppUrl;
