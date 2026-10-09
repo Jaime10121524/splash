@@ -54,6 +54,9 @@ final class ClienteRules
         if ($originId===false || $referrerId===false || $ownerId===false) {
             return ['error'=>'Origem, indicação ou dono da corrente inválido.'];
         }
+        if ($existing===null && $originId===null) {
+            return ['error'=>'Informe a origem do lead. Quando não souber, escolha Outro.'];
+        }
         if ($originId!==null && !$db->table('lead_origens')->where('id',$originId)->countAllResults()) {
             return ['error'=>'Origem do lead não encontrada.'];
         }
