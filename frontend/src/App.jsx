@@ -174,11 +174,21 @@ function Sidebar({ user, current, navigate, open, close, logout }) {
 function NoData({ icon = 'clipboard', title = 'Nenhum registro por enquanto', description = 'Os dados aparecerão aqui assim que o módulo estiver disponível.' }) {
   return <div className="no-data"><span className="no-data-icon"><Icon name={icon} size={28}/></span><strong>{title}</strong><p>{description}</p></div>
 }
-function DataCard({ label, icon, tone, detail }) {
-  return <div className="stat-card"><div className="stat-top"><span>{label}</span><span className={'stat-icon ' + (tone || '')}><Icon name={icon} size={19}/></span></div><strong className="stat-value">—</strong><div className="stat-foot"><span className="mini-dot"/> {detail || 'Aguardando dados do módulo'}</div></div>
+function DataCard({ label, icon, tone, detail, value = '—' }) {
+  return <div className="stat-card"><div className="stat-top"><span>{label}</span><span className={'stat-icon ' + (tone || '')}><Icon name={icon} size={19}/></span></div><strong className="stat-value">{value}</strong><div className="stat-foot"><span className="mini-dot"/> {detail || 'Aguardando dados do módulo'}</div></div>
 }
 function Dashboard({ user, navigate }) {
   const admin = user.role === 'admin'
+  const [visitSummary, setVisitSummary] = useState(null)
+  useEffect(() => {
+    if (!admin) return undefined
+    let active = true
+    fetch('/api/atendimentos', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (active && data?.indicadores) setVisitSummary(data.indicadores) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [admin])
   return <>
     <div className="welcome-row"><div><span className="eyebrow">VISÃO GERAL</span><h1>Olá, {user.username}! <span className="wave">✳</span></h1><p>Seu espaço de trabalho, organizado em um só lugar.</p></div><div className="today-pill"><Icon name="calendar" size={17}/>{formatToday()}</div></div>
     <div className="hero-panel">
@@ -188,9 +198,9 @@ function Dashboard({ user, navigate }) {
     <div className="section-heading"><div><h2>Resumo {admin ? 'da operação' : 'pessoal'}</h2><p>Indicadores atualizados a partir dos seus lançamentos.</p></div><span className="hint-badge">Sem dados conectados</span></div>
     <div className="stats-grid">
       {admin ? <>
-        <DataCard label="Visitas realizadas" icon="users" tone="violet" detail="Aguardando atendimentos"/>
+        <DataCard label="Visitas registradas" icon="users" tone="violet" detail="Total registrado no clube" value={visitSummary?.total ?? "—"}/>
         <DataCard label="Vendas concluídas" icon="bag" tone="mint" detail="Aguardando vendas"/>
-        <DataCard label="Pendências abertas" icon="clock" tone="amber" detail="Aguardando pendências"/>
+        <DataCard label="Pendências de atendimento" icon="clock" tone="amber" detail="Sem lançamento financeiro nesta etapa" value={visitSummary?.pendencia ?? "—"}/>
         <DataCard label="Acertos financeiros" icon="wallet" tone="sky" detail="Aguardando fechamentos"/>
       </> : <>
         <DataCard label="Minhas vendas" icon="bag" tone="violet"/>
