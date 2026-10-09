@@ -15,6 +15,8 @@ $routes->group('api', static function ($routes): void {
     $routes->post('planos', 'Api\PlanosController::create', ['filter' => 'csrf']);
     $routes->post('planos/(:num)/versoes', 'Api\PlanosController::novaVersao/$1', ['filter' => 'csrf']);
     $routes->post('planos/(:num)/versoes/(:num)/status', 'Api\PlanosController::status/$1/$2', ['filter' => 'csrf']);
+    $routes->post('planos/(:num)/versoes/(:num)/editar', 'Api\PlanosController::atualizar/$1/$2', ['filter' => 'csrf']);
+    $routes->post('planos/(:num)/excluir', 'Api\PlanosController::excluir/$1', ['filter' => 'csrf']);
 });
 
 // Rotas internas do Shield: recuperação de acesso e gestão de sessão tradicional.
