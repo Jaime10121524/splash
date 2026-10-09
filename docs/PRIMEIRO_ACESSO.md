@@ -80,3 +80,24 @@ Execute `npm.cmd run build` no frontend e `php spark routes` no backend antes do
 ## Hospedagem HostGator
 
 Publique os arquivos de `frontend/dist` como estáticos e a aplicação PHP sob um `public/` protegido corretamente; o document root público jamais deve permitir baixar `.env`, `writable/` ou código PHP do backend.
+
+
+## Ajustes de autenticação — 09/10/2026
+
+- Corrigido o erro PHP \`SessionController::show()\` herdando de \`ResourceController\`: agora usa \`BaseController\`.
+- Tela \`/login/magic-link\` usa visual do SPLASH, em português, com o formulário do próprio Shield, preservando proteção CSRF.
+- A página exibida após solicitar o link e a tela \`/login\` tradicional também usam o mesmo layout e CSS.
+- O link **Voltar ao login** retorna à SPA React, em vez de abrir a página padrão do Shield.
+- Login tradicional usa \`username\` e \`password\`. Cadastro público continua desabilitado.
+- Na autenticação concluída pelo Shield em ambiente de desenvolvimento, a rota raiz do backend redireciona à SPA.
+- O frontend distingue erro HTTP do backend de falha de conexão.
+
+Para personalizar a origem do frontend, configure no \`backend/.env\` (opcional):
+\`\`\`ini
+SPLASH_FRONTEND_URL = 'http://localhost:5173/'
+\`\`\`
+Se não especificada, a origem é esta no ambiente development.
+
+**E-mail:** o Shield envia um **link temporário de acesso**, não uma alteração automática de senha. O envio requer configurar \`backend/app/Config/Email.php\` ou parâmetros SMTP no \`.env\`; não coloque senha SMTP no Git.
+
+**Teste local:** rode \`php spark routes\`, abra \`http://localhost:8080/api/session\` sem caracteres extras, depois \`http://localhost:5173/\` e teste \`Esqueceu a senha?\`. Os e-mails reais dependem de SMTP configurado.
