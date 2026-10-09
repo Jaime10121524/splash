@@ -187,7 +187,7 @@ export function DateInput({value='',onChange,placeholder='dd/mm/aaaa',disabled=f
         aria-label={'Abrir calendário: '+ariaLabel} aria-expanded={open} disabled={disabled}><CalendarIcon/></button>
     </div>
     {open&&createPortal(<div className="ui-floating ui-calendar" ref={popup}
-      style={{top:position.top,left:position.left,width:Math.max(278,position.width),maxHeight:position.maxHeight}}
+      style={{top:position.top,left:Math.max(10,Math.min(position.left,window.innerWidth-Math.max(278,position.width)-10)),width:Math.max(278,position.width),maxHeight:position.maxHeight}}
       onKeyDown={e=>{if(e.key==='Escape'){setOpen(false);anchor.current?.querySelector('input')?.focus()}}}>
       <div className="ui-calendar-head">
         <button type="button" onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Mês anterior">‹</button>
