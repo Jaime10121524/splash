@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api;
 
-use CodeIgniter\RESTful\ResourceController;
+use App\Controllers\BaseController;
 
-class SessionController extends ResourceController
+class SessionController extends BaseController
 {
-    protected $format = 'json';
 
     public function show()
     {
