@@ -119,8 +119,8 @@ function Login({ onLogin, error, busy, offline, onRetry }) {
       <div className="auth-mobile-brand"><Brand /></div>
       <div className="auth-form-wrap">
         <div className="auth-welcome"><span className="eyebrow">BEM-VINDO AO SPLASH</span><h1>Entre na sua conta</h1><p>Acesse seu espaço de trabalho com segurança.</p></div>
-        {offline && <div className="feedback error" role="alert"><Icon name="alert" size={18}/><span>Não foi possível conectar ao CodeIgniter. Confira se o backend está rodando na porta 8080.</span><button type="button" className="inline-button" onClick={onRetry}>Tentar novamente</button></div>}
-        {error && <div className="feedback error" role="alert"><Icon name="alert" size={18}/><span>{error}</span></div>}
+        {offline && <div className="feedback error" role="alert"><Icon name="alert" size={18}/><span>{error || 'Não foi possível comunicar com o CodeIgniter. Verifique se o servidor está ativo na porta 8080.'}</span><button type="button" className="inline-button" onClick={onRetry}>Tentar novamente</button></div>}
+        {error && !offline && <div className="feedback error" role="alert"><Icon name="alert" size={18}/><span>{error}</span></div>}
         <form onSubmit={submit} className="auth-fields">
           <label htmlFor="username">Nome de usuário</label>
           <div className="input-wrap"><Icon name="user" size={19}/><input id="username" autoComplete="username" placeholder="Digite seu usuário" value={username} onChange={e => setUsername(e.target.value)} required maxLength={100}/></div>
@@ -240,7 +240,10 @@ function App() {
       const data = await getJSON('/api/session')
       setSession({status: data.authenticated ? 'in' : 'out', user: data.user, csrf: data.csrf})
       setError('')
-    } catch (e) { setSession({status:'offline',user:null,csrf:null}) }
+    } catch (e) {
+      setError(e.status ? 'O servidor CodeIgniter respondeu com erro HTTP ' + e.status + '. Verifique o terminal do PHP e os logs do backend.' : 'Não foi possível conectar ao CodeIgniter. Verifique se o servidor está ativo na porta 8080.')
+      setSession({status:'offline',user:null,csrf:null})
+    }
   }
   useEffect(() => { refresh() }, [])
   useEffect(() => { document.documentElement.dataset.theme = theme; document.title = 'SPLASH · Gestão de títulos' }, [theme])
