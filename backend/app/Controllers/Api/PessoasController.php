@@ -97,6 +97,15 @@ class PessoasController extends BaseController
             // Não permitir inativar o administrador logado.
             if ($old['user_id']) {
                 $user = auth()->getProvider()->findById($old['user_id']);
+                if ($user && ! $user->inGroup('admin')) {
+                    foreach ($user->getGroups() as $group) {
+                        if (in_array($group, ['corretor','vendedor','gerente'], true)
+                            && ! in_array($group, $roles, true)) {
+                            $db->transRollback();
+                            return $this->error(409, 'O papel vinculado ao acesso precisa permanecer marcado ou ser alterado antes no cadastro de usuários.');
+                        }
+                    }
+                }
                 if ($user && $user->inGroup('admin') && $clean['ativo'] === 0) {
                     $db->transRollback();
                     return $this->error(409, 'O administrador não pode ser inativado.');
@@ -106,7 +115,7 @@ class PessoasController extends BaseController
                 ->update([...$clean, 'atualizado_em'=>date('Y-m-d H:i:s')]);
             $this->saveRoles($db, $personId, $roles);
             if ($user && $clean['ativo'] === 0) {
-                $user->deactivate();
+                $user->ban('Pessoa inativada pelo administrador SPLASH.');
             }
             $this->audit($db,$personId,'EDITAR',$old,[...$clean,'papeis'=>$roles]);
             $this->commit($db);
@@ -132,6 +141,7 @@ class PessoasController extends BaseController
             return ['error'=>'Telefone ou observações ultrapassam o limite permitido.'];
         }
         if (!is_array($roles) || count($roles)<1 || count($roles)>3
+            || count(array_filter($roles,'is_string'))!==count($roles)
             || count($roles)!==count(array_unique($roles))
             || array_diff($roles, ['corretor','vendedor','gerente'])!==[]) {
             return ['error'=>'Marque pelo menos um papel válido: corretor, vendedor ou gerente.'];
