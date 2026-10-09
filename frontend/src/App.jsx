@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import Planos from './pages/Planos.jsx'
 import PessoasUsuarios from './pages/PessoasUsuarios.jsx'
+import Clientes from './pages/Clientes.jsx'
+import Atendimentos from './pages/Atendimentos.jsx'
+import OrigensMotivos from './pages/OrigensMotivos.jsx'
 
 const paths = {
   grid: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
@@ -62,6 +65,7 @@ const nav = [
   { id: 'fechamentos', label: 'Fechamentos', icon: 'arrows', roles: ['admin'], section: 'Gestão' },
   { id: 'relatorios', label: 'Relatórios', icon: 'chart', roles: ['admin','corretor','vendedor','gerente'], section: 'Gestão' },
   { id: 'usuarios', label: 'Usuários', icon: 'shield', roles: ['admin'], section: 'Sistema' },
+  { id: 'origens', label: 'Origens e motivos', icon: 'tag', roles: ['admin'], section: 'Sistema' },
   { id: 'configuracoes', label: 'Configurações', icon: 'settings', roles: ['admin'], section: 'Sistema' },
 ]
 const descriptions = {
@@ -69,6 +73,7 @@ const descriptions = {
   planos: 'Gerencie códigos, valores, prazos e versões históricas dos planos.',
   pessoas: 'Cadastre corretores, gerentes e atendentes com múltiplos papéis.',
   usuarios: 'Gerencie login e permissões dos participantes.',
+  origens: 'Configure as origens dos leads e motivos de não venda.',
   clientes: 'Histórico do associado, contatos e vínculo com a corrente.',
   vendas: 'Acompanhe suas vendas, participantes e comissões.',
   pendencias: 'Retornos, antecipações e pagamentos pendentes.',
@@ -301,7 +306,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos/>:active==='origens'?<OrigensMotivos/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
