@@ -25,10 +25,12 @@ class ClientesController extends CommercialBaseController
             ->join('pessoas p','p.id=c.dono_corrente_pessoa_id','left')
             ->join('clientes i','i.id=c.indicador_cliente_id','left');
         if($q!=='') {
-            $builder->groupStart()->like('c.nome',$q)
-                ->orLike('c.telefone',preg_replace('/\D/','',$q))
-                ->orLike('c.cpf',preg_replace('/\D/','',$q))
-                ->groupEnd();
+            $digits=preg_replace('/\D/','',$q);
+            $builder->groupStart()->like('c.nome',$q);
+            if(strlen($digits)>=3) {
+                $builder->orLike('c.telefone',$digits)->orLike('c.cpf',$digits);
+            }
+            $builder->groupEnd();
         }
         $total=$builder->countAllResults(false);
         $rows=$builder->orderBy('c.id','DESC')->limit($limit,($page-1)*$limit)
