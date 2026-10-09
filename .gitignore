@@ -1,0 +1,37 @@
+# PHP / CodeIgniter
+/backend/vendor/
+/backend/.env
+/backend/.env.*
+!/backend/.env.example
+/backend/writable/*
+!/backend/writable/.gitkeep
+/backend/.phpunit.cache/
+/backend/phpunit.xml
+
+# React / Vite
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env
+/frontend/.env.*
+!/frontend/.env.example
+/frontend/.vite/
+
+# Android / Capacitor (arquivos locais)
+**/android/.gradle/
+**/android/local.properties
+**/android/**/build/
+
+# Segredos / temporários / editor
+.env
+.env.*
+!.env.example
+*.log
+*.sql
+*.sql.gz
+*.bak
+*.zip
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
