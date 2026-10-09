@@ -10,6 +10,11 @@ $routes->group('api', static function ($routes): void {
     $routes->get('session', 'Api\\SessionController::show');
     $routes->post('session/login', 'Api\\SessionController::login', ['filter' => 'csrf']);
     $routes->post('session/logout', 'Api\\SessionController::logout', ['filter' => 'csrf']);
+    // Cadastros comerciais: as autorizações são conferidas também no controller.
+    $routes->get('planos', 'Api\PlanosController::index');
+    $routes->post('planos', 'Api\PlanosController::create', ['filter' => 'csrf']);
+    $routes->post('planos/(:num)/versoes', 'Api\PlanosController::novaVersao/$1', ['filter' => 'csrf']);
+    $routes->post('planos/(:num)/versoes/(:num)/status', 'Api\PlanosController::status/$1/$2', ['filter' => 'csrf']);
 });
 
 // Rotas internas do Shield: recuperação de acesso e gestão de sessão tradicional.
