@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import Planos from './pages/Planos.jsx'
 
 const paths = {
   grid: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
@@ -48,6 +49,7 @@ function Icon({ name, size = 20, stroke = 1.8, ...props }) {
 const nav = [
   { id: 'dashboard', label: 'Visão geral', icon: 'grid', roles: ['admin','corretor','vendedor','gerente'], section: 'Principal' },
   { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin'], section: 'Operação' },
+  { id: 'planos', label: 'Planos', icon: 'tag', roles: ['admin'], section: 'Operação' }
   { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin'], section: 'Operação' },
   { id: 'vendas', label: 'Vendas', icon: 'bag', roles: ['admin','corretor','vendedor','gerente'], section: 'Operação' },
   { id: 'pendencias', label: 'Pendências', icon: 'clock', roles: ['admin'], section: 'Operação' },
@@ -61,6 +63,7 @@ const nav = [
 ]
 const descriptions = {
   atendimentos: 'Organize chegadas, atendentes e resultados de cada visita.',
+  planos: 'Gerencie códigos, valores, prazos e versões históricas dos planos.',
   clientes: 'Histórico do associado, contatos e vínculo com a corrente.',
   vendas: 'Acompanhe suas vendas, participantes e comissões.',
   pendencias: 'Retornos, antecipações e pagamentos pendentes.',
@@ -293,7 +296,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
