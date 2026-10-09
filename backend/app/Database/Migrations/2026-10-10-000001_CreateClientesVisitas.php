@@ -66,6 +66,7 @@ class CreateClientesVisitas extends Migration
             'dono_anterior_pessoa_id' => ['type'=>'INT','unsigned'=>true,'null'=>true],
             'dono_novo_pessoa_id' => ['type'=>'INT','unsigned'=>true],
             'origem' => ['type'=>'VARCHAR','constraint'=>30],
+            'justificativa' => ['type'=>'VARCHAR','constraint'=>300,'null'=>true],
             'usuario_id' => ['type'=>'INT','unsigned'=>true],
             'criado_em' => ['type'=>'DATETIME'],
         ]);
