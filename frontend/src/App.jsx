@@ -49,7 +49,7 @@ function Icon({ name, size = 20, stroke = 1.8, ...props }) {
 const nav = [
   { id: 'dashboard', label: 'Visão geral', icon: 'grid', roles: ['admin','corretor','vendedor','gerente'], section: 'Principal' },
   { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin'], section: 'Operação' },
-  { id: 'planos', label: 'Planos', icon: 'tag', roles: ['admin'], section: 'Operação' }
+  { id: 'planos', label: 'Planos', icon: 'tag', roles: ['admin'], section: 'Operação' },
   { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin'], section: 'Operação' },
   { id: 'vendas', label: 'Vendas', icon: 'bag', roles: ['admin','corretor','vendedor','gerente'], section: 'Operação' },
   { id: 'pendencias', label: 'Pendências', icon: 'clock', roles: ['admin'], section: 'Operação' },
