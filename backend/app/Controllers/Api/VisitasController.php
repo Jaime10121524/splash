@@ -100,7 +100,7 @@ class VisitasController extends CommercialBaseController
                     $db->transRollback();
                     return $this->errorResponse(422,'Escolha um cliente ou informe os dados da chegada.');
                 }
-                $clean=ClienteRules::validate($db,['ativo'=>true,...$fresh]);
+                $clean=ClienteRules::validate($db,[...$fresh,'ativo'=>true]);
                 if(isset($clean['error'])){
                     $db->transRollback();
                     return $this->errorResponse(422,$clean['error']);
