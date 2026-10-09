@@ -1,3 +1,4 @@
+<?php helper('splash'); ?>
 <?= $this->extend(config('Auth')->views['layout']) ?>
 <?= $this->section('title') ?>Recuperar acesso<?= $this->endSection() ?>
 <?= $this->section('main') ?>
@@ -15,5 +16,5 @@
   <button class="button-primary" type="submit">Enviar link de acesso <span aria-hidden="true">→</span></button>
 </form>
 <div class="info-note"><span aria-hidden="true">ⓘ</span><p>O link é de uso único e tem prazo de validade. O envio depende do e-mail estar configurado no sistema.</p></div>
-<p class="bottom-link"><a href="<?= esc($appUrl, 'attr') ?>"><span aria-hidden="true">←</span> Voltar ao login</a></p>
+<p class="bottom-link"><a href="<?= esc(splash_frontend_url(), 'attr') ?>"><span aria-hidden="true">←</span> Voltar ao login</a></p>
 <?= $this->endSection() ?>
