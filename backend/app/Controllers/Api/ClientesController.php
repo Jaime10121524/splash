@@ -110,6 +110,23 @@ class ClientesController extends CommercialBaseController
         }
     }
 
+    public function corrente(int|string $id): ResponseInterface
+    {
+        if ($denied=$this->authorizeAdmin()) return $denied;
+        $db=db_connect();
+        if (!$db->table('clientes')->where('id',(int)$id)->countAllResults()) {
+            return $this->errorResponse(404,'Cliente não encontrado.');
+        }
+        $history=$db->table('cliente_corrente_historico h')
+            ->select('h.*, p.nome AS dono_anterior_nome, n.nome AS dono_novo_nome')
+            ->join('pessoas p','p.id=h.dono_anterior_pessoa_id','left')
+            ->join('pessoas n','n.id=h.dono_novo_pessoa_id','left')
+            ->where('h.cliente_id',(int)$id)
+            ->orderBy('h.id','DESC')->get()->getResultArray();
+        return $this->response->setJSON(['historico'=>$history])
+            ->setHeader('Cache-Control','no-store');
+    }
+
     private function insertOwnerEvent($db,int $id,?int $before,int $after,string $reason,?string $justification): void
     {
         $db->table('cliente_corrente_historico')->insert([
