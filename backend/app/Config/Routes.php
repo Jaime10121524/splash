@@ -35,6 +35,7 @@ $routes->group('api', static function ($routes): void {
     $routes->get('clientes', 'Api\ClientesController::index');
     $routes->post('clientes', 'Api\ClientesController::create', ['filter'=>'csrf']);
     $routes->post('clientes/(:num)/editar', 'Api\ClientesController::update/$1', ['filter'=>'csrf']);
+    $routes->get('clientes/(:num)/corrente', 'Api\ClientesController::corrente/$1');
     $routes->get('atendimentos', 'Api\VisitasController::index');
     $routes->post('atendimentos/chegada', 'Api\VisitasController::chegada', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/iniciar', 'Api\VisitasController::iniciar/$1', ['filter'=>'csrf']);
