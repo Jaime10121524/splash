@@ -41,4 +41,17 @@ class Validation extends BaseConfig
     // --------------------------------------------------------------------
     // Rules
     // --------------------------------------------------------------------
+
+    // O login exige somente usuário e senha; a recuperação usa o e-mail do Shield.
+    // Não se aplica validação de força a senhas antigas na hora de autenticar.
+    public array $login = [
+        'username' => [
+            'label' => 'Usuário',
+            'rules' => ['required', 'max_length[100]'],
+        ],
+        'password' => [
+            'label' => 'Senha',
+            'rules' => ['required'],
+        ],
+    ];
 }
