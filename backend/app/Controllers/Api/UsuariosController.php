@@ -212,8 +212,8 @@ class UsuariosController extends BaseController
         $email=trim((string)($data['email']??''));
         $password=(string)($data['password']??'');
         $group=(string)($data['group']??'');
-        if(!preg_match('/^[A-Za-z0-9._-]{3,50}$/D',$name)){
-            return ['error'=>'Usuário deve ter 3 a 50 caracteres: letras sem espaço, números, ponto, traço ou sublinhado.'];
+        if(!preg_match('/^[A-Za-z0-9._-]{3,30}$/D',$name)){
+            return ['error'=>'Usuário deve ter 3 a 30 caracteres: letras sem espaço, números, ponto, traço ou sublinhado.'];
         }
         if(strlen($email)>254||!filter_var($email,FILTER_VALIDATE_EMAIL)){
             return ['error'=>'Informe um e-mail válido para recuperar o acesso.'];
