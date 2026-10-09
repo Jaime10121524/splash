@@ -16,6 +16,7 @@ export default function Clientes({navigate}) {
   const [modal,setModal]=useState(null)
   const [fields,setFields]=useState(normalizeClient())
   const [formError,setFormError]=useState('')
+  const [history,setHistory]=useState([])
   const [saving,setSaving]=useState(false)
 
   useEffect(()=>{
@@ -44,6 +45,13 @@ export default function Clientes({navigate}) {
     setModal(client||'new')
     setFormError('')
     setNotice('')
+  }
+  async function openHistory(client) {
+    setModal({kind:'history',client})
+    setFormError('')
+    setHistory([])
+    try {const r=await comercialGet('/api/clientes/'+client.id+'/corrente');setHistory(r.historico||[])}
+    catch(e){setFormError(e.message)}
   }
   async function save(event) {
     event.preventDefault()
@@ -98,6 +106,7 @@ export default function Clientes({navigate}) {
             </div>
             <div className="com-actions">
               <button type="button" onClick={()=>openClient(c)}>Editar</button>
+              <button type="button" onClick={()=>openHistory(c)}>Corrente</button>
               <button type="button" className="primary" disabled={saving || !c.ativo}
                 onClick={()=>register(c)}>Registrar chegada</button>
             </div>
@@ -109,17 +118,26 @@ export default function Clientes({navigate}) {
         <button disabled={page>=pages} onClick={()=>setPage(v=>Math.min(pages,v+1))}>Próxima</button>
       </div>}
     </section>
-    {modal&&<SurfaceModal title={modal==='new'?'Novo cliente':'Editar cliente'}
-      subtitle="Dados do associado e responsável pela corrente."
+    {modal&&<SurfaceModal title={modal?.kind==='history'?'Histórico da corrente':modal==='new'?'Novo cliente':'Editar cliente'}
+      subtitle={modal?.kind==='history'?modal.client.nome:'Dados do associado e responsável pela corrente.'}
       busy={saving} onClose={()=>setModal(null)}>
-      <form className="cm-form" onSubmit={save}>
+      {modal?.kind==='history'?<div className="cm-form">
+        {history.length?history.map(item=><div className="com-history-row" key={item.id}>
+          <strong>{item.dono_novo_nome}</strong>
+          <small>{item.origem==='INDICACAO'?'Herdado por indicação':item.origem==='CADASTRO'?'Responsável inicial':'Alteração manual'} · {dateBR(item.criado_em,true)}</small>
+          {item.dono_anterior_nome&&<p>Anterior: {item.dono_anterior_nome}</p>}
+          {item.justificativa&&<p>Justificativa: {item.justificativa}</p>}
+        </div>):<p className="com-disclaimer">Nenhuma alteração registrada.</p>}
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="cm-form-actions"><button type="button" className="cm-button" onClick={()=>setModal(null)}>Fechar</button></div>
+      </div>:<form className="cm-form" onSubmit={save}>
         <ClientFields key={modal==='new'?'new':modal.id} fields={fields} onChange={setFields}
           original={modal==='new'?null:modal} catalogs={catalogs}/>
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions"><button type="button" className="cm-button" disabled={saving}
           onClick={()=>setModal(null)}>Cancelar</button><button type="submit" className="cm-button primary" disabled={saving}>
           {saving?'Salvando...':'Salvar cliente'}</button></div>
-      </form>
+      </form>}
     </SurfaceModal>}
   </div>
 }
