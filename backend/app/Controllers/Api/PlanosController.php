@@ -9,8 +9,9 @@ use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
 /**
- * Cadastro de planos e versões. Os valores comerciais antigos nunca são editados:
- * reajuste = nova versão. Controle de acesso exclusivamente no servidor.
+ * Planos: sigla (P/T) não é número de título. Cada reajuste cria uma versão.
+ * Alterações são correções auditadas e nunca são permitidas se a versão
+ * estiver referenciada em vendas. A numeração individual será gerada na venda.
  */
 class PlanosController extends BaseController
 {
@@ -18,286 +19,284 @@ class PlanosController extends BaseController
     {
         $user = auth('session')->user();
         if ($user === null) {
-            return $this->response->setStatusCode(401)->setJSON([
-                'message' => 'Sua sessão expirou. Faça login novamente.',
-            ]);
+            return $this->respondError(401, 'Sua sessão expirou. Faça login novamente.');
         }
-
         if (! $user->inGroup('admin') || ! $user->can('settings.manage')) {
-            return $this->response->setStatusCode(403)->setJSON([
-                'message' => 'Você não tem permissão para gerenciar planos.',
-            ]);
+            return $this->respondError(403, 'Você não tem permissão para gerenciar planos.');
         }
-
         return null;
     }
 
     public function index(): ResponseInterface
     {
-        if ($denied = $this->guard()) {
-            return $denied;
-        }
+        if ($denied = $this->guard()) return $denied;
 
         $db = db_connect();
-        $planos = $db->table('planos')
-            ->orderBy('id', 'DESC')->get()->getResultArray();
-        $versoes = $db->table('plano_versoes')
-            ->orderBy('plano_id', 'DESC')
-            ->orderBy('versao', 'DESC')
-            ->get()->getResultArray();
+        $plans = $db->table('planos')->orderBy('id', 'DESC')->get()->getResultArray();
+        $versions = $db->table('plano_versoes')->orderBy('plano_id','DESC')
+            ->orderBy('versao','DESC')->get()->getResultArray();
 
-        $porPlano = [];
-        foreach ($versoes as $versao) {
-            $versao['ativo'] = (bool) $versao['ativo'];
-            $porPlano[(int) $versao['plano_id']][] = $versao;
+        $grouped = [];
+        foreach ($versions as $version) {
+            $version['ativo'] = (bool) $version['ativo'];
+            $grouped[(int) $version['plano_id']][] = $version;
         }
-        foreach ($planos as &$plano) {
-            $plano['versoes'] = $porPlano[(int) $plano['id']] ?? [];
-        }
-        unset($plano);
+        foreach ($plans as &$plan) $plan['versoes'] = $grouped[(int) $plan['id']] ?? [];
+        unset($plan);
 
-        return $this->response->setJSON(['planos' => $planos])
-            ->setHeader('Cache-Control', 'no-store');
+        return $this->response->setJSON(['planos' => $plans])->setHeader('Cache-Control', 'no-store');
     }
 
     public function create(): ResponseInterface
     {
-        if ($denied = $this->guard()) {
-            return $denied;
-        }
-
-        $data = $this->request->getJSON(true);
-        $validated = $this->validateVersion(is_array($data) ? $data : []);
-        if (isset($validated['error'])) {
-            return $this->failInput($validated['error']);
-        }
+        if ($denied = $this->guard()) return $denied;
+        $payload = $this->request->getJSON(true);
+        $valid = $this->validateVersion(is_array($payload) ? $payload : []);
+        if (isset($valid['error'])) return $this->respondError(422, $valid['error']);
 
         $db = db_connect();
-        if ($db->table('plano_versoes')->where('codigo', $validated['codigo'])->countAllResults() > 0) {
-            return $this->conflict('Já existe uma versão cadastrada com esse código.');
-        }
-
         $db->transBegin();
         try {
-            $db->table('planos')->insert(['criado_em' => date('Y-m-d H:i:s')]);
+            $now = date('Y-m-d H:i:s');
+            $db->table('planos')->insert(['criado_em' => $now]);
             $id = (int) $db->insertID();
-            if (! $id) {
-                throw new \RuntimeException('Não foi possível criar o plano.');
-            }
-
-            $db->table('plano_versoes')->insert([
-                'plano_id' => $id,
-                'versao' => 1,
-                ...$validated,
-                'criado_em' => date('Y-m-d H:i:s'),
-            ]);
-
-            if ($db->transStatus() === false) {
-                throw new \RuntimeException('Não foi possível concluir o cadastro.');
-            }
-            $db->transCommit();
-
-            return $this->response->setStatusCode(201)->setJSON([
-                'message' => 'Plano cadastrado com sucesso.',
-                'plano_id' => $id,
-                'csrf' => $this->csrfData(),
-            ]);
+            if ($id < 1) throw new \RuntimeException('Falha ao criar plano.');
+            $db->table('plano_versoes')->insert(['plano_id'=>$id, 'versao'=>1, ...$valid, 'criado_em'=>$now]);
+            $versaoId = (int) $db->insertID();
+            $this->audit($db, $id, $versaoId, 'CRIAR', null, $valid);
+            $this->commit($db);
+            return $this->respondOK('Plano cadastrado.', 201);
         } catch (Throwable $e) {
             $db->transRollback();
-            log_message('error', 'SPLASH plano create: {message}', ['message' => $e->getMessage()]);
-            return $this->response->setStatusCode(500)->setJSON([
-                'message' => 'Não foi possível cadastrar o plano. Confira os dados e tente novamente.',
-                'csrf' => $this->csrfData(),
-            ]);
+            return $this->unexpected($e);
         }
     }
 
     public function novaVersao(int|string $planoId): ResponseInterface
     {
-        if ($denied = $this->guard()) {
-            return $denied;
-        }
+        if ($denied = $this->guard()) return $denied;
+        $payload = $this->request->getJSON(true);
+        $valid = $this->validateVersion(is_array($payload) ? $payload : []);
+        if (isset($valid['error'])) return $this->respondError(422, $valid['error']);
 
-        $data = $this->request->getJSON(true);
-        $validated = $this->validateVersion(is_array($data) ? $data : []);
-        if (isset($validated['error'])) {
-            return $this->failInput($validated['error']);
-        }
-
-        $planoId = (int) $planoId;
+        $id = (int) $planoId;
         $db = db_connect();
-        if ($db->table('planos')->where('id', $planoId)->countAllResults() === 0) {
-            return $this->response->setStatusCode(404)->setJSON(['message' => 'Plano não encontrado.']);
-        }
-        if ($db->table('plano_versoes')->where('codigo', $validated['codigo'])->countAllResults() > 0) {
-            return $this->conflict('Este código já pertence a outra versão de plano.');
-        }
-
         $db->transBegin();
         try {
-            // Bloqueia a família para serializar revisões concorrentes.
-            $db->query('SELECT id FROM planos WHERE id = ? FOR UPDATE', [$planoId]);
-            $ultima = $db->table('plano_versoes')
-                ->selectMax('versao')->where('plano_id', $planoId)->get()->getRowArray();
-            $numero = ((int) ($ultima['versao'] ?? 0)) + 1;
-
-            if ($validated['ativo'] === 1) {
-                $db->table('plano_versoes')->where('plano_id', $planoId)
-                    ->update(['ativo' => 0]);
+            $plan = $db->query('SELECT id FROM planos WHERE id = ? FOR UPDATE', [$id])->getRowArray();
+            if (! $plan) {
+                $db->transRollback();
+                return $this->respondError(404, 'Plano não encontrado.');
             }
+            $max = $db->table('plano_versoes')->selectMax('versao')
+                ->where('plano_id', $id)->get()->getRowArray();
+            $num = (int) ($max['versao'] ?? 0) + 1;
+            if ($valid['ativo'] === 1) {
+                $db->table('plano_versoes')->where('plano_id', $id)->update(['ativo' => 0]);
+            }
+            $now = date('Y-m-d H:i:s');
             $db->table('plano_versoes')->insert([
-                'plano_id' => $planoId,
-                'versao' => $numero,
-                ...$validated,
-                'criado_em' => date('Y-m-d H:i:s'),
+                'plano_id'=>$id, 'versao'=>$num, ...$valid, 'criado_em'=>$now,
             ]);
-
-            if ($db->transStatus() === false) {
-                throw new \RuntimeException('Falha ao inserir nova versão.');
-            }
-            $db->transCommit();
-
-            return $this->response->setStatusCode(201)->setJSON([
-                'message' => 'Nova versão cadastrada. O histórico foi preservado.',
-                'plano_id' => $planoId,
-                'csrf' => $this->csrfData(),
-            ]);
+            $versionId = (int) $db->insertID();
+            $this->audit($db, $id, $versionId, 'REAJUSTE', null, $valid);
+            $this->commit($db);
+            return $this->respondOK('Nova versão criada; o histórico foi mantido.', 201);
         } catch (Throwable $e) {
             $db->transRollback();
-            log_message('error', 'SPLASH plano versao: {message}', ['message' => $e->getMessage()]);
-            return $this->response->setStatusCode(500)->setJSON([
-                'message' => 'Não foi possível salvar a versão. Verifique se o código já está em uso.',
-                'csrf' => $this->csrfData(),
-            ]);
+            return $this->unexpected($e);
+        }
+    }
+
+    public function atualizar(int|string $planoId, int|string $versaoId): ResponseInterface
+    {
+        if ($denied = $this->guard()) return $denied;
+        $payload = $this->request->getJSON(true);
+        $valid = $this->validateVersion(is_array($payload) ? $payload : []);
+        if (isset($valid['error'])) return $this->respondError(422, $valid['error']);
+
+        $id = (int) $planoId;
+        $versionId = (int) $versaoId;
+        $db = db_connect();
+        $db->transBegin();
+        try {
+            $plan = $db->query('SELECT id FROM planos WHERE id = ? FOR UPDATE', [$id])->getRowArray();
+            $before = $db->table('plano_versoes')->where('plano_id',$id)
+                ->where('id',$versionId)->get()->getRowArray();
+            if (! $plan || ! $before) {
+                $db->transRollback();
+                return $this->respondError(404, 'Versão não encontrada.');
+            }
+            if ($this->hasSales($db, $versionId)) {
+                $db->transRollback();
+                return $this->respondError(409, 'Esta versão já está vinculada a vendas. Para alterar as condições, crie um reajuste.');
+            }
+            // Edição é correção do cadastro, não reajuste. Registra o antes/depois.
+            if ($valid['ativo'] === 1) {
+                $db->table('plano_versoes')->where('plano_id', $id)->update(['ativo'=>0]);
+            }
+            $db->table('plano_versoes')->where('id',$versionId)->update($valid);
+            $this->audit($db, $id, $versionId, 'EDITAR', $before, $valid);
+            $this->commit($db);
+            return $this->respondOK('Dados da versão atualizados.');
+        } catch (Throwable $e) {
+            $db->transRollback();
+            return $this->unexpected($e);
         }
     }
 
     public function status(int|string $planoId, int|string $versaoId): ResponseInterface
     {
-        if ($denied = $this->guard()) {
-            return $denied;
+        if ($denied = $this->guard()) return $denied;
+        $payload = $this->request->getJSON(true);
+        if (!is_array($payload) || !isset($payload['ativo']) || !is_bool($payload['ativo'])) {
+            return $this->respondError(422, 'Informe a situação da versão.');
         }
 
-        $data = $this->request->getJSON(true);
-        if (! is_array($data) || ! array_key_exists('ativo', $data) || ! is_bool($data['ativo'])) {
-            return $this->failInput('Informe a situação ativa ou inativa.');
-        }
-
-        $planoId = (int) $planoId;
-        $versaoId = (int) $versaoId;
-        $db = db_connect();
+        $id=(int) $planoId;
+        $vid=(int) $versaoId;
+        $db=db_connect();
         $db->transBegin();
         try {
-            $parent = $db->query('SELECT id FROM planos WHERE id = ? FOR UPDATE', [$planoId])->getRowArray();
-            $version = $db->table('plano_versoes')
-                ->where('plano_id', $planoId)->where('id', $versaoId)->get()->getRowArray();
-
-            if (! $parent || ! $version) {
+            $plan=$db->query('SELECT id FROM planos WHERE id = ? FOR UPDATE', [$id])->getRowArray();
+            $before=$db->table('plano_versoes')->where('plano_id',$id)
+                ->where('id',$vid)->get()->getRowArray();
+            if (!$plan || !$before) {
                 $db->transRollback();
-                return $this->response->setStatusCode(404)->setJSON([
-                    'message' => 'Versão do plano não encontrada.',
-                ]);
+                return $this->respondError(404, 'Versão não encontrada.');
             }
-
-            if ($data['ativo']) {
-                $db->table('plano_versoes')->where('plano_id', $planoId)->update(['ativo' => 0]);
+            if ($payload['ativo']) {
+                $db->table('plano_versoes')->where('plano_id', $id)->update(['ativo'=>0]);
             }
-            $db->table('plano_versoes')->where('id', $versaoId)
-                ->update(['ativo' => $data['ativo'] ? 1 : 0]);
-
-            if ($db->transStatus() === false) {
-                throw new \RuntimeException('Falha ao alterar situação.');
-            }
-            $db->transCommit();
-
-            return $this->response->setJSON([
-                'message' => $data['ativo'] ? 'Versão ativada.' : 'Versão inativada.',
-                'csrf' => $this->csrfData(),
-            ]);
+            $db->table('plano_versoes')->where('id',$vid)->update(['ativo'=>$payload['ativo']?1:0]);
+            $this->audit($db, $id, $vid, 'STATUS', $before, ['ativo'=>$payload['ativo']]);
+            $this->commit($db);
+            return $this->respondOK($payload['ativo'] ? 'Plano ativado.' : 'Plano inativado.');
         } catch (Throwable $e) {
             $db->transRollback();
-            log_message('error', 'SPLASH plano status: {message}', ['message' => $e->getMessage()]);
-            return $this->response->setStatusCode(500)->setJSON([
-                'message' => 'Não foi possível alterar a situação.',
-                'csrf' => $this->csrfData(),
-            ]);
+            return $this->unexpected($e);
         }
     }
 
-    /**
-     * @param array<string, mixed> $data
-     * @return array<string, mixed>
-     */
+    public function excluir(int|string $planoId): ResponseInterface
+    {
+        if ($denied = $this->guard()) return $denied;
+        $id=(int) $planoId;
+        $db=db_connect();
+        $db->transBegin();
+        try {
+            $plan=$db->query('SELECT id FROM planos WHERE id = ? FOR UPDATE', [$id])->getRowArray();
+            if (!$plan) {
+                $db->transRollback();
+                return $this->respondError(404, 'Plano não encontrado.');
+            }
+            $versions=$db->table('plano_versoes')->where('plano_id',$id)
+                ->orderBy('versao')->get()->getResultArray();
+            foreach ($versions as $version) {
+                if ($this->hasSales($db, (int) $version['id'])) {
+                    $db->transRollback();
+                    return $this->respondError(409, 'Há vendas vinculadas a este plano. Inative-o em vez de excluir.');
+                }
+            }
+            $this->audit($db, $id, null, 'EXCLUIR', $versions, null);
+            $db->table('plano_versoes')->where('plano_id',$id)->delete();
+            $db->table('planos')->where('id',$id)->delete();
+            $this->commit($db);
+            return $this->respondOK('Plano excluído.');
+        } catch (Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'SPLASH exclusao plano: {msg}', ['msg'=>$e->getMessage()]);
+            return $this->respondError(409, 'Não foi possível excluir. Se existir movimentação vinculada, inative o plano.');
+        }
+    }
+
+    private function hasSales($db, int $versionId): bool
+    {
+        // Validação preventiva para a implementação futura de vendas.
+        // As FKs de vendas/títulos também deverão ser RESTRICT na exclusão.
+        return $db->tableExists('vendas')
+            && $db->fieldExists('plano_versao_id', 'vendas')
+            && $db->table('vendas')->where('plano_versao_id',$versionId)->countAllResults() > 0;
+    }
+
     private function validateVersion(array $data): array
     {
-        $codigo = trim(preg_replace('/\s+/u', ' ', (string) ($data['codigo'] ?? '')) ?? '');
-        $valor = $data['valor'] ?? '';
-        $duracao = filter_var($data['duracao_meses'] ?? null, FILTER_VALIDATE_INT, [
-            'options' => ['min_range' => 1, 'max_range' => 2400],
+        // Código agora é somente sigla. Números (ex.: 1567) pertencem ao título de cada venda.
+        $sigla=mb_strtoupper(trim((string)($data['codigo']??'')));
+        $sigla=preg_replace('/\s*\/\s*/u','/',$sigla) ?? '';
+        $valor=$data['valor']??'';
+        $meses=filter_var($data['duracao_meses']??null,FILTER_VALIDATE_INT,[
+            'options'=>['min_range'=>1,'max_range'=>2400],
         ]);
-
-        if ($codigo === '' || mb_strlen($codigo) > 40 || ! preg_match('/^[\pL\pN\s\/._-]+$/u', $codigo)) {
-            return ['error' => 'Informe um código de até 40 caracteres (letras, números, espaço, barra, ponto ou hífen).'];
+        if (!preg_match('/^\p{L}{1,8}\/\p{L}{1,8}$/uD',$sigla)) {
+            return ['error'=>'Informe somente a sigla do plano, como P/T ou R/T. A numeração é por venda.'];
         }
-        if (! is_string($valor) && ! is_numeric($valor)) {
-            return ['error' => 'Informe um valor válido.'];
+        if (!is_string($valor)&&!is_numeric($valor))return ['error'=>'Valor do plano inválido.'];
+        $valor=(string)$valor;
+        if (!preg_match('/^(?:0|[1-9]\d{0,10})(?:\.\d{1,2})?$/D',$valor)
+            || !preg_match('/[1-9]/',str_replace('.','',$valor))) {
+            return ['error'=>'Informe valor positivo, com até duas casas decimais.'];
         }
-        $valor = (string) $valor;
-        if (! preg_match('/^(?:0|[1-9]\d{0,10})(?:\.\d{1,2})?$/D', $valor) || (float) $valor <= 0) {
-            return ['error' => 'Informe um valor positivo com até duas casas decimais.'];
+        if ($meses===false)return ['error'=>'Informe prazo em meses, entre 1 e 2400.'];
+        if (!isset($data['ativo'])||!is_bool($data['ativo']))return ['error'=>'Informe se o plano está ativo.'];
+        $vigencia=$data['vigencia_inicio']??null;
+        if ($vigencia==='')$vigencia=null;
+        if ($vigencia!==null) {
+            if (!is_string($vigencia))return ['error'=>'Data de vigência inválida.'];
+            $dt=\DateTimeImmutable::createFromFormat('!Y-m-d',$vigencia);
+            if (!$dt||$dt->format('Y-m-d')!==$vigencia)return ['error'=>'Data de vigência inválida.'];
         }
-        if ($duracao === false) {
-            return ['error' => 'Informe a duração do plano em meses (1 a 2400).'];
-        }
-        if (! array_key_exists('ativo', $data) || ! is_bool($data['ativo'])) {
-            return ['error' => 'Informe se a versão está ativa ou inativa.'];
-        }
-
-        $vigencia = $data['vigencia_inicio'] ?? null;
-        if ($vigencia === '') {
-            $vigencia = null;
-        }
-        if ($vigencia !== null) {
-            if (! is_string($vigencia)) {
-                return ['error' => 'Data de vigência inválida.'];
-            }
-            $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $vigencia);
-            if (! $dt || $dt->format('Y-m-d') !== $vigencia) {
-                return ['error' => 'Data de vigência inválida.'];
-            }
-        }
-
-        $partes = explode('.', $valor, 2);
-        $valorDecimal = $partes[0] . '.' . str_pad($partes[1] ?? '', 2, '0');
-
+        $parts=explode('.',$valor,2);
         return [
-            'codigo' => $codigo,
-            'valor' => $valorDecimal,
-            'duracao_meses' => $duracao,
-            'ativo' => $data['ativo'] ? 1 : 0,
-            'vigencia_inicio' => $vigencia,
+            'codigo'=>$sigla,
+            'valor'=>$parts[0].'.'.str_pad($parts[1]??'',2,'0'),
+            'duracao_meses'=>$meses,
+            'ativo'=>$data['ativo']?1:0,
+            'vigencia_inicio'=>$vigencia,
         ];
+    }
+
+    private function audit($db,int $planId,?int $versionId,string $action,?array $before,?array $after): void
+    {
+        $db->table('plano_alteracoes')->insert([
+            'plano_id'=>$planId,
+            'versao_id'=>$versionId,
+            'acao'=>$action,
+            'antes'=>$before===null?null:json_encode($before,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+            'depois'=>$after===null?null:json_encode($after,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+            'usuario_id'=>(int) auth('session')->user()->id,
+            'criado_em'=>date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function commit($db): void
+    {
+        if ($db->transStatus() === false) throw new \RuntimeException('Falha ao gravar dados do plano.');
+        $db->transCommit();
+    }
+
+    private function respondOK(string $message,int $status=200): ResponseInterface
+    {
+        return $this->response->setStatusCode($status)->setJSON([
+            'message'=>$message,'csrf'=>$this->csrfData(),
+        ])->setHeader('Cache-Control','no-store');
+    }
+
+    private function respondError(int $status,string $message): ResponseInterface
+    {
+        return $this->response->setStatusCode($status)->setJSON([
+            'message'=>$message,'csrf'=>$this->csrfData(),
+        ]);
     }
 
     private function csrfData(): array
     {
-        return [
-            'header' => config('Security')->headerName,
-            'hash' => csrf_hash(),
-        ];
+        return ['header'=>config('Security')->headerName,'hash'=>csrf_hash()];
     }
 
-    private function failInput(string $message): ResponseInterface
+    private function unexpected(Throwable $e): ResponseInterface
     {
-        return $this->response->setStatusCode(422)->setJSON([
-            'message' => $message, 'csrf' => $this->csrfData(),
-        ]);
-    }
-
-    private function conflict(string $message): ResponseInterface
-    {
-        return $this->response->setStatusCode(409)->setJSON([
-            'message' => $message, 'csrf' => $this->csrfData(),
-        ]);
+        log_message('error','SPLASH Plano: {msg}',['msg'=>$e->getMessage()]);
+        return $this->respondError(500,'Não foi possível salvar o plano. Verifique o log do servidor.');
     }
 }
