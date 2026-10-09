@@ -86,3 +86,37 @@
 .planos-history{margin:0 12px 13px;padding:13px 12px}.planos-version{flex-wrap:wrap;gap:9px}.planos-version>div:first-child{flex:1 1 48%}.planos-version-price{flex:1;text-align:right;min-width:85px}.planos-version>.planos-tag{margin-right:auto}
 .planos-modal-header{padding:21px 19px 8px}.planos-modal-header h2{font-size:20px}.planos-form{padding:8px 19px 20px;gap:13px}.planos-form-row{gap:10px}.planos-modal-actions .planos-primary{flex:1}
 }
+
+
+/* Ajustes de consistência: rótulos sem quebra, controles padronizados e ações */
+.planos-field-title{display:inline-flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start;gap:5px;width:100%;color:var(--text)!important;line-height:1.35;white-space:normal}
+.planos-field-title em{font-style:normal;color:#da5769;font-weight:800}
+.planos-field-title small{font-size:10px;color:var(--muted);font-weight:500}
+.planos-form>label>small{display:block;line-height:1.45;margin-top:-3px}
+.planos-form .ui-input{min-height:46px;width:100%;color:var(--text);border:1px solid var(--border);border-radius:11px;background:var(--surface-alt);font-size:12px}
+.planos-form .ui-select-trigger{padding:0 13px;display:flex;font-weight:650}
+.planos-form .ui-date-wrap .ui-input{padding-right:43px}
+.planos-toolbar>.ui-select-trigger{min-width:180px;width:205px;min-height:44px;padding:0 12px}
+.planos-toolbar .ui-input{background:var(--surface-alt);font-size:12px}
+.planos-form-row>label{min-width:0;align-content:start}
+.planos-form-row .ui-input{min-width:0}
+.planos-item-top{min-width:0}
+.planos-item-info{flex-shrink:0}
+.planos-actions{flex-wrap:wrap;justify-content:flex-end}
+.planos-danger{border-color:rgba(220,70,90,.25);color:#c04d60}
+.planos-danger:hover{border-color:#d64b64;color:#b7324d;background:rgba(220,70,90,.06)}
+.planos-history-actions{display:flex;align-items:center;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+.planos-history-actions .planos-link{padding:7px 9px}
+.planos-delete-confirm{background:#d44a61;box-shadow:0 7px 17px rgba(212,74,97,.14)}
+.planos-delete-confirm:hover{background:#b9384f}
+.planos-modal .planos-check>span{color:var(--text)}
+.planos-modal .planos-check>span small{color:var(--muted)}
+@media(max-width:700px){
+  .planos-toolbar>.ui-select-trigger{width:100%;min-width:0}
+  .planos-item-top{gap:10px}
+  .planos-actions{width:100%;flex:1 1 100%;justify-content:flex-start;gap:7px;border-top:1px solid var(--border);padding-top:10px}
+  .planos-actions .planos-outline{min-height:34px}
+  .planos-actions .planos-round{margin-left:auto}
+  .planos-item-top>.planos-tag{margin-left:0}
+  .planos-history-actions{flex:1 1 100%;justify-content:flex-start}
+}
