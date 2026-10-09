@@ -96,3 +96,7 @@
 .com-filter-select{width:100%}.com-config-tabs{margin:15px 14px 0;width:auto;max-width:calc(100% - 28px)}
 .com-config-tabs button{font-size:10px}
 }
+
+.com-history-row{padding:12px 13px;border:1px solid var(--border);border-radius:12px;display:grid;gap:5px;background:var(--surface-alt)}
+.com-history-row strong{font-size:12px}.com-history-row small{font-size:10px;color:var(--muted)}
+.com-history-row p{font-size:11px;color:var(--muted-dark);line-height:1.5}
