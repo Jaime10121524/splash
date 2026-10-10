@@ -2,7 +2,6 @@ import {useEffect,useState} from 'react'
 import {comercialGet,comercialPost,dateBR,localDateISO} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
 import {SurfaceModal} from '../components/ComercialForms.jsx'
-import FechamentosLegado from './Fechamentos.jsx'
 import AuditoriaRateios from './AuditoriaRateios.jsx'
 import './FechamentosPeriodos.css'
 
@@ -71,7 +70,6 @@ export default function FechamentosPeriodos({role='admin'}){
   const [payMethods,setPayMethods]=useState([{forma_id:'',valor:''}])
   const [payee,setPayee]=useState(null)
   const [link,setLink]=useState({child:'',boss:''})
-  const [legacy,setLegacy]=useState(false)
   const [salesReviewed,setSalesReviewed]=useState(false)
   const [showAudit,setShowAudit]=useState(false)
 
@@ -225,13 +223,11 @@ export default function FechamentosPeriodos({role='admin'}){
         <p>Concilie o dinheiro recebido pelo responsável do grupo, sem transferir a titularidade das comissões. Depois registre os pagamentos efetivamente realizados.</p>
       </div>
       <div className="fpw-head-actions">
-        {admin&&<button className="vd-outline" type="button" onClick={()=>setLegacy(v=>!v)}>
-          {legacy?'Voltar ao fechamento':'Regras e ajustes anteriores'}</button>}
         {admin&&<button className="vd-outline" type="button" onClick={()=>setModal('vinculos')}>Responsabilidades</button>}
-        {current&&<button className="vd-outline" type="button" onClick={()=>{setCurrent(null);setLegacy(false);setSalesReviewed(false);setShowAudit(false)}}>Voltar ao histórico</button>}
+        {current&&<button className="vd-outline" type="button" onClick={()=>{setCurrent(null);setSalesReviewed(false);setShowAudit(false)}}>Voltar ao histórico</button>}
       </div>
     </header>
-    {legacy&&admin?<FechamentosLegado role={role}/>:<>
+    <>
       {notice&&<div className="com-alert success" role="status">{notice}
         <button type="button" onClick={()=>setNotice('')}>Fechar</button></div>}
       {error&&<div className="com-alert error" role="alert">{error}
