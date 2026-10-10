@@ -3,6 +3,7 @@ import { ClientFinder, SurfaceModal } from '../components/ComercialForms.jsx'
 import { FormControl } from '../components/UiFields.jsx'
 import { comercialGet, comercialPost, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
+import RateiosVenda from './RateiosVenda.jsx'
 import './ComercialPages.css'
 import './Vendas.css'
 
@@ -48,6 +49,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [settingForm,setSettingForm]=useState(null)
   const [applying,setApplying]=useState({codigo:'',regra_comissao_id:''})
   const [adjustment,setAdjustment]=useState({valor:'',justificativa:''})
+  const [showRateios,setShowRateios]=useState(false)
 
   async function loadOptions() {
     const [opt,catalogs,visitsResponse]=await Promise.all([
@@ -153,6 +155,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     setClient(null);setLinkedVisit(null);setDetail(null);setFormError('');setDialog({type:'new'})
   }
   async function openDetail(op,type='details'){
+    setShowRateios(false)
     setBusy(true);setFormError('')
     try{
       const data=await comercialGet('/api/vendas/'+op.id)
@@ -519,6 +522,13 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
         <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada (a apurar)':'Comissão prevista (não paga)'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'Após quitação':currency(detail.operacao.comissao_prevista)}</strong></span></div>
         {detail.operacao.ajuste_motivo&&<div className="com-inform">Justificativa do ajuste: {detail.operacao.ajuste_motivo}</div>}
+        <div className="vd-rateios-toggle">
+          <button type="button" className="vd-outline" onClick={()=>setShowRateios(x=>!x)}
+            aria-expanded={showRateios}>{showRateios?'Ocultar participações':'Conferir / ajustar participações'}</button>
+          <small>Atendimento, gerência, corretor e arredondamentos antes do fechamento semanal.</small>
+        </div>
+        {showRateios&&<RateiosVenda operacaoId={dialog.op.id} pessoas={people}
+          onSaved={async()=>{await refresh();setDetail(await comercialGet('/api/vendas/'+dialog.op.id))}}/>
         {!!detail.historico_correcoes?.length&&<div className="vd-corrections">
           <strong>Histórico de correções</strong>
           {detail.historico_correcoes.map(h=><div key={h.id}>
