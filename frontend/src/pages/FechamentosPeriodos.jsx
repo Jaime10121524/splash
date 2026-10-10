@@ -16,6 +16,8 @@ const monthRange=()=>{
   return [iso(new Date(n.getFullYear(),n.getMonth(),1)),iso(new Date(n.getFullYear(),n.getMonth()+1,0))]
 }
 const emptyEntry=()=>({pessoa_id:'',forma_id:'',valor:'',data:localDateISO(),obs:''})
+const requestKey=()=>typeof crypto!=='undefined'&&crypto.randomUUID
+  ?crypto.randomUUID():String(Date.now())+'_'+Math.random().toString(36).slice(2,15)
 
 export default function FechamentosPeriodos({role='admin'}){
   const admin=role==='admin'
@@ -31,6 +33,7 @@ export default function FechamentosPeriodos({role='admin'}){
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [modal,setModal]=useState(null)
+  const [nonce,setNonce]=useState(requestKey())
   const [record,setRecord]=useState(emptyEntry)
   const [payMethods,setPayMethods]=useState([{forma_id:'',valor:''}])
   const [payee,setPayee]=useState(null)
@@ -102,15 +105,18 @@ export default function FechamentosPeriodos({role='admin'}){
     finally{setLoading(false)}
   }
   function openEntry(){
+    setNonce(requestKey())
     setRecord({pessoa_id:String(current?.corretores?.[0]?.pessoa_id||''),
       forma_id:String(methods[0]?.id||''),valor:'',data:localDateISO(),obs:''})
     setModal('entrada')
   }
   function openAbate(){
+    setNonce(requestKey())
     setRecord({emprestimo_id:'',valor:'',data:localDateISO()})
     setModal('abate')
   }
   function openPay(person){
+    setNonce(requestKey())
     setPayee(person)
     setRecord({data:localDateISO()})
     setPayMethods([{forma_id:String(methods[0]?.id||''),valor:''}])
@@ -122,7 +128,7 @@ export default function FechamentosPeriodos({role='admin'}){
     if(!amount)return setError('Informe um valor de recebimento válido.')
     action('/api/fechamentos-periodos/'+current.id+'/receber',{
       corretor_pessoa_id:Number(record.pessoa_id),forma_id:Number(record.forma_id),
-      valor:amount,data_recebimento:record.data,observacoes:record.obs||'',
+      valor:amount,data_recebimento:record.data,observacoes:record.obs||'',chave_requisicao:nonce,
     })
   }
   function saveAbate(e){
@@ -130,7 +136,7 @@ export default function FechamentosPeriodos({role='admin'}){
     const amount=cleanMoney(record.valor)
     if(!amount)return setError('Informe um valor de abatimento válido.')
     action('/api/fechamentos-periodos/'+current.id+'/abater',{
-      emprestimo_id:Number(record.emprestimo_id),valor:amount,data_abate:record.data,
+      emprestimo_id:Number(record.emprestimo_id),valor:amount,data_abate:record.data,chave_requisicao:nonce,
     })
   }
   function savePay(e){
@@ -141,7 +147,7 @@ export default function FechamentosPeriodos({role='admin'}){
     if(sum>Number(payee.pendente)+.00001)return setError('Total maior que o saldo pendente.')
     action('/api/fechamentos-periodos/'+current.id+'/pagar',{
       beneficiario_pessoa_id:Number(payee.pessoa_id),
-      data_pagamento:record.data,formas:forms,
+      data_pagamento:record.data,formas:forms,chave_requisicao:nonce,
     })
   }
   function saveLink(e){
