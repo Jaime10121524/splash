@@ -147,3 +147,8 @@
   .fc-person-line-actions{justify-content:space-between}
   .fc-person-line-actions>button{flex:1}
 }
+
+/* A conferência de rateios fica secundária ao extrato das pessoas. */
+.fc-sales-toggle{display:flex;align-items:center;justify-content:space-between;gap:13px;flex-wrap:wrap}
+.fc-sales-toggle .vd-outline{min-height:41px}
+.fc-sales-toggle small{font-size:10px;color:var(--muted-dark);line-height:1.5}
