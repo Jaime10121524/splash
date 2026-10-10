@@ -19,7 +19,7 @@ const blank=()=>({
   desconto_corretor:'0,00',numero_titulo:'',
   data_negociacao:localDateISO(),data_venda:localDateISO(),data_inicio:localDateISO(),
   retorno_previsto:'',observacoes:'',historica:false,
-  corretor_pessoa_id:'',segundo_corretor_pessoa_id:'',gerente_pessoa_id:'',justificativa:'',
+  corretor_pessoa_id:'',segundo_corretor_pessoa_id:'',gerente_pessoa_id:'',atendente_pessoa_id:'',atendente_adicional_pessoa_id:'',justificativa:'',
 })
 const blankMovement=()=>({valor:'',forma_id:'',detentor:'CORRETOR',
   data_movimento:localDateISO(),observacoes:'',entrada_id:''})
@@ -77,6 +77,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       visita_id:String(visit.id),cliente_id:String(visit.cliente_id),
       corretor_pessoa_id:visit.corretor_pessoa_id?String(visit.corretor_pessoa_id):'',
       segundo_corretor_pessoa_id:visit.segundo_corretor_pessoa_id?String(visit.segundo_corretor_pessoa_id):'',
+      atendente_pessoa_id:visit.atendente_pessoa_id?String(visit.atendente_pessoa_id):'',
+      atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id?String(visit.atendente_adicional_pessoa_id):'',
     }
     setSaleForm(form)
     setUseDiscount(false)
@@ -130,6 +132,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       corretor_pessoa_id:String(op.corretor_pessoa_id),
       segundo_corretor_pessoa_id:op.segundo_corretor_pessoa_id?String(op.segundo_corretor_pessoa_id):'',
       gerente_pessoa_id:op.gerente_pessoa_id?String(op.gerente_pessoa_id):'',
+      atendente_pessoa_id:op.atendente_pessoa_id?String(op.atendente_pessoa_id):'',
+      atendente_adicional_pessoa_id:op.atendente_adicional_pessoa_id?String(op.atendente_adicional_pessoa_id):'',
       desconto_corretor:Number(op.desconto_corretor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),
       data_negociacao:op.data_negociacao||localDateISO(),
       data_venda:op.data_venda||localDateISO(),
@@ -182,6 +186,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         corretor_pessoa_id:saleForm.corretor_pessoa_id?Number(saleForm.corretor_pessoa_id):null,
         segundo_corretor_pessoa_id:saleForm.segundo_corretor_pessoa_id?Number(saleForm.segundo_corretor_pessoa_id):null,
         gerente_pessoa_id:saleForm.gerente_pessoa_id?Number(saleForm.gerente_pessoa_id):null,
+        atendente_pessoa_id:saleForm.atendente_pessoa_id?Number(saleForm.atendente_pessoa_id):null,
+        atendente_adicional_pessoa_id:saleForm.atendente_adicional_pessoa_id?Number(saleForm.atendente_adicional_pessoa_id):null,
         desconto_corretor:parsed,
         retorno_previsto:saleForm.retorno_previsto||null,
       }
@@ -371,7 +377,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           É possível corrigir os dados antes de movimentar dinheiro ou após estornar integralmente um lançamento errado. A alteração ficará na auditoria. Devolução é só para dinheiro realmente devolvido.
         </div>}
         {dialog.type==='new'&&<label>Situação inicial
-          <FormControl type="select" value={saleForm.situacao} onChange={v=>setField('situacao',v)}
+          <FormControl type="select" value={saleForm.situacao} onChange={v=>setSaleForm(f=>({...f,situacao:v,visita_id:'',atendente_pessoa_id:'',atendente_adicional_pessoa_id:''}))}
             options={[{value:'VENDA',label:'Venda fechada'},{value:'PENDENCIA',label:'Pendência de negociação'}]}/></label>}
         {dialog.type==='new'?<ClientFinder label="Cliente" value={client} onChange={selected=>{
           setClient(selected);setField('cliente_id',selected?.id||'');setField('visita_id','')
@@ -382,6 +388,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
             setSaleForm(f=>({...f,visita_id:value,
               corretor_pessoa_id:picked?.corretor_pessoa_id?String(picked.corretor_pessoa_id):f.corretor_pessoa_id,
               segundo_corretor_pessoa_id:picked?.segundo_corretor_pessoa_id?String(picked.segundo_corretor_pessoa_id):f.segundo_corretor_pessoa_id,
+              atendente_pessoa_id:picked?.atendente_pessoa_id?String(picked.atendente_pessoa_id):'',
+              atendente_adicional_pessoa_id:picked?.atendente_adicional_pessoa_id?String(picked.atendente_adicional_pessoa_id):'',
             }))
           }} options={[{value:'',label:'Sem vínculo direto'},...clientVisits.map(v=>({
             value:String(v.id),label:'#'+v.id+' · '+dateBR(v.chegada_em,true)+' · '+(v.status==='VENDA'?'Venda':'Pendência')
@@ -407,6 +415,18 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
               disabled={!!saleForm.visita_id}
               onChange={v=>setField('segundo_corretor_pessoa_id',v)}
               options={[{value:'',label:'Nenhum'},...brokerChoices.filter(x=>x.value!==saleForm.corretor_pessoa_id)]}/></label>
+        </div>
+        <div className="cm-form-grid">
+          <label>Atendente
+            <FormControl type="select" value={saleForm.atendente_pessoa_id}
+              disabled={!!saleForm.visita_id}
+              onChange={v=>setSaleForm(f=>({...f,atendente_pessoa_id:v,atendente_adicional_pessoa_id:''}))}
+              options={[{value:'',label:'Sem atendente'},...personOptions(people,['vendedor','corretor'])]}/></label>
+          <label>Segundo atendente
+            <FormControl type="select" value={saleForm.atendente_adicional_pessoa_id}
+              disabled={!!saleForm.visita_id||!saleForm.atendente_pessoa_id}
+              onChange={v=>setField('atendente_adicional_pessoa_id',v)}
+              options={[{value:'',label:'Nenhum'},...personOptions(people,['vendedor','corretor']).filter(x=>x.value!==saleForm.atendente_pessoa_id)]}/></label>
         </div>
         <label>Gerente responsável (opcional)
           <FormControl type="select" value={saleForm.gerente_pessoa_id}
