@@ -452,6 +452,12 @@ class FechamentosController extends CommercialBaseController
                 $db->transRollback();return $this->errorResponse(404,'Pagamento não encontrado.');
             }
             $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$record['operacao_id']])->getRowArray();
+            $internalForm=$db->table('venda_formas_pagamento')->select('id')
+                ->where('codigo','ABATIMENTO_EMP')->get()->getRowArray();
+            if($internalForm && (int)$record['forma_id']===(int)$internalForm['id']){
+                $db->transRollback();
+                return $this->errorResponse(409,'Abatimentos de empréstimo precisam de reversão conjunta do acerto. Não é permitido estorná-los isoladamente.');
+            }
             if($db->table('comissao_titular_movimentos')->where('referencia_pagamento_id',(int)$id)->countAllResults()>0){
                 $db->transRollback();return $this->errorResponse(409,'Pagamento já estornado.');
             }
@@ -459,7 +465,7 @@ class FechamentosController extends CommercialBaseController
                 'operacao_id'=>$record['operacao_id'],'corretor_pessoa_id'=>$record['corretor_pessoa_id'],
                 'tipo'=>'ESTORNO','referencia_pagamento_id'=>(int)$id,
                 'valor'=>$record['valor'],'data_pagamento'=>substr($this->now(),0,10),
-                'observacoes'=>$reason,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'forma_id'=>$record['forma_id'],'observacoes'=>$reason,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
                 'criado_em'=>$this->now(),
             ]);
             $this->commitOrFail($db);
@@ -1035,6 +1041,12 @@ class FechamentosController extends CommercialBaseController
             if(!$pay){
                 $db->transRollback();return $this->errorResponse(404,'Repasse não encontrado.');
             }
+            $internalForm=$db->table('venda_formas_pagamento')->select('id')
+                ->where('codigo','ABATIMENTO_EMP')->get()->getRowArray();
+            if($internalForm && (int)$pay['forma_id']===(int)$internalForm['id']){
+                $db->transRollback();
+                return $this->errorResponse(409,'Abatimentos de empréstimo precisam de reversão conjunta do acerto. Não é permitido estorná-los isoladamente.');
+            }
             if($db->table('comissao_repasses')->where('referencia_pagamento_id',(int)$id)->countAllResults()>0){
                 $db->transRollback();return $this->errorResponse(409,'Esse pagamento já foi estornado.');
             }
@@ -1042,7 +1054,7 @@ class FechamentosController extends CommercialBaseController
                 'rateio_id'=>(int)$pay['rateio_id'],'tipo'=>'ESTORNO',
                 'referencia_pagamento_id'=>(int)$id,
                 'valor'=>$pay['valor'],'data_pagamento'=>substr($this->now(),0,10),
-                'observacoes'=>$reason,
+                'forma_id'=>$pay['forma_id'],'observacoes'=>$reason,
                 'criado_por_usuario_id'=>(int)auth('session')->user()->id,
                 'criado_em'=>$this->now(),
             ]);
