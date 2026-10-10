@@ -105,6 +105,24 @@ class FechamentosPeriodos extends Migration
         $this->forge->addForeignKey('rateio_id','comissao_rateios','id','RESTRICT','RESTRICT','fk_fe_pag_rateio');
         $this->forge->addForeignKey('movimento_id','comissao_repasses','id','RESTRICT','RESTRICT','fk_fe_pag_mov');
         $this->forge->createTable('fechamento_periodo_repasses',true);
+
+        $this->forge->addField([
+            'id'=>['type'=>'INT','unsigned'=>true,'auto_increment'=>true],
+            'fechamento_id'=>['type'=>'INT','unsigned'=>true],
+            'operacao_id'=>['type'=>'INT','unsigned'=>true],
+            'movimento_id'=>['type'=>'INT','unsigned'=>true],
+            'forma_id'=>['type'=>'INT','unsigned'=>true],
+            'valor'=>['type'=>'DECIMAL','constraint'=>'15,2'],
+            'situacao'=>['type'=>'VARCHAR','constraint'=>12,'default'=>'ATIVO'],
+        ]);
+        $this->forge->addKey('id',true);
+        $this->forge->addUniqueKey('movimento_id','uq_fe_titular_mov');
+        $this->forge->addKey('fechamento_id');
+        $this->forge->addForeignKey('fechamento_id','fechamento_periodos','id','RESTRICT','RESTRICT','fk_fe_tit_periodo');
+        $this->forge->addForeignKey('operacao_id','venda_operacoes','id','RESTRICT','RESTRICT','fk_fe_tit_operacao');
+        $this->forge->addForeignKey('movimento_id','comissao_titular_movimentos','id','RESTRICT','RESTRICT','fk_fe_tit_mov');
+        $this->forge->createTable('fechamento_periodo_titulares',true);
+
         $this->createEventTable();
     }
 
@@ -126,7 +144,7 @@ class FechamentosPeriodos extends Migration
 
     public function down()
     {
-        foreach(['fechamento_periodo_eventos','fechamento_periodo_repasses','fechamento_periodo_abates',
+        foreach(['fechamento_periodo_eventos','fechamento_periodo_titulares','fechamento_periodo_repasses','fechamento_periodo_abates',
             'fechamento_periodo_entradas','fechamento_periodo_vendas',
             'fechamento_periodo_pessoas','fechamento_periodos',
             'fechamento_responsabilidades'] as $table)$this->forge->dropTable($table,true);
