@@ -240,12 +240,12 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
       {busy&&<section className="com-panel"><div className="com-empty">Carregando extrato financeiro...</div></section>}
       {!busy&&payload&&<>
         <section className="finx-highlights" aria-label="Resumo de direitos e obrigações">
-          <div className="finx-tile finx-tile-green"><span>{allSelected?'Créditos de todas as pessoas':'Ganhos e comissões'}</span><strong>{cash(totals.ganhos)}</strong><small>Direitos por titular, sem misturar a propriedade</small></div>
-          <div className="finx-tile finx-tile-green"><span>Recebido</span><strong>{cash(totals.recebido)}</strong><small>Dinheiro pago ao beneficiário</small></div>
-          <div className="finx-tile finx-tile-green"><span>A receber</span><strong>{cash(totals.aReceber)}</strong><small>Créditos ainda pendentes</small></div>
+          <div className="finx-tile finx-tile-green"><span>{allSelected?'Créditos de todas as pessoas':'Ganhos e comissões'}</span><strong>{cash(totals.ganhos)}</strong><small>Comissão que pertence a cada beneficiário</small></div>
+          <div className="finx-tile finx-tile-green"><span>Recebido por beneficiários</span><strong>{cash(totals.recebido)}</strong><small>Já quitado em pagamentos confirmados</small></div>
+          <div className="finx-tile finx-tile-green"><span>A receber de comissões</span><strong>{cash(totals.aReceber)}</strong><small>Saldo dos créditos pessoais</small></div>
           {personalAllowed&&<div className="finx-tile finx-tile-red"><span>Despesas registradas</span><strong>{cash(totals.despesas)}</strong><small>Gastos do período</small></div>}
-          {personalAllowed&&<div className="finx-tile finx-tile-red"><span>Empréstimos em aberto</span><strong>{cash(totals.emprestimosPendentes)}</strong><small>Já abatido: {cash(totals.emprestimosPagos)}</small></div>}
-          {totals.repasses>0&&<div className="finx-tile finx-tile-red"><span>Repasses a fazer</span><strong>{cash(totals.repassesPendentes)}</strong><small>Já repassado: {cash(totals.repassesPagos)}</small></div>}
+          {personalAllowed&&<div className="finx-tile finx-tile-red"><span>Dívidas em aberto</span><strong>{cash(totals.emprestimosPendentes)}</strong><small>Saldo atual · Abatido: {cash(totals.emprestimosPagos)}</small></div>}
+          {totals.repasses>0&&<div className="finx-tile finx-tile-red"><span>Pagamentos a fazer</span><strong>{cash(totals.repassesPendentes)}</strong><small>Compromissos administrados · Pago: {cash(totals.repassesPagos)}</small></div>}
         </section>
         {payload.possivel_truncamento&&<div className="com-alert">O limite de 500 vendas foi alcançado; reduza o período para evitar valores incompletos.</div>}
         {!groups.length?<section className="com-panel"><div className="com-empty">Nenhum lançamento com esses filtros.</div></section>:
@@ -267,10 +267,10 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
           </div>}
         <section className="finx-general" aria-label="Resumo geral do extrato">
           <h2>Geral do período</h2>
-          <div className="finx-general-grid">
-            <div><span>Direitos pessoais apurados</span><strong className="finx-text-green">{cash(totals.ganhos)}</strong></div>
-            <div><span>Despesas registradas</span><strong className="finx-text-red">− {cash(totals.despesas)}</strong></div>
-            <div><span>Resultado pessoal estimado</span><strong className={general>=0?'finx-text-green':'finx-text-red'}>{cash(general)}</strong></div>
+          <div className="finx-result">
+            <div><span>{allSelected?'Resultado estimado das pessoas selecionadas':'Resultado pessoal estimado'}</span>
+              <small>Ganhos próprios apurados − despesas registradas</small></div>
+            <strong className={general>=0?'finx-text-green':'finx-text-red'}>{cash(general)}</strong>
           </div>
           {allSelected&&<p>O total de créditos consolida direitos de pessoas diferentes. Não significa que todos esses valores pertençam ao administrador. Os repasses das vendas dos corretores vinculados aparecem sob quem centraliza os pagamentos.</p>}
           {personalAllowed&&<p>Repasses a terceiros ({cash(totals.repassesPendentes)} pendentes) e saldo de empréstimos ({cash(totals.emprestimosPendentes)}) são exibidos separadamente: não são descontados novamente dos direitos pessoais já líquidos. Abatimentos de dívida também não representam dinheiro recebido.</p>}
