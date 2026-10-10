@@ -26,6 +26,7 @@ export default function FinanceiroPessoal({role='admin',tab='despesas',start,end
   const [category,setCategory]=useState('')
   const [loan,setLoan]=useState({data_emprestimo:day(),valor:'',descricao:''})
   const [cancelId,setCancelId]=useState(null)
+  const [cancelLoanId,setCancelLoanId]=useState(null)
   const [cancelReason,setCancelReason]=useState('')
   const load=async()=>{
     const params=new URLSearchParams({inicio:start,fim:end})
@@ -58,7 +59,7 @@ export default function FinanceiroPessoal({role='admin',tab='despesas',start,end
     try{
       const result=await comercialPost(endpoint,payload)
       setNotice(result.message||success)
-      setForm(null);setCancelId(null);setCancelReason('')
+      setForm(null);setCancelId(null);setCancelLoanId(null);setCancelReason('')
       await load()
     }catch(e){setError(e.message)}
     finally{setSaving(false)}
@@ -95,6 +96,13 @@ export default function FinanceiroPessoal({role='admin',tab='despesas',start,end
     submit('/api/financeiro/despesas/'+cancelId+'/cancelar',{
       justificativa:cancelReason.trim(),
     },'Despesa cancelada.')
+  }
+  const cancelLoan=e=>{
+    e.preventDefault()
+    if(cancelReason.trim().length<5)return setError('Explique o cancelamento do empréstimo.')
+    submit('/api/financeiro/emprestimos/'+cancelLoanId+'/cancelar',{
+      justificativa:cancelReason.trim(),
+    },'Empréstimo cancelado.')
   }
   const expenses=data?.despesas||[],loans=data?.emprestimos||[]
   const loanBalance=Number(data?.resumo?.saldo_emprestimos||0)
@@ -202,7 +210,19 @@ export default function FinanceiroPessoal({role='admin',tab='despesas',start,end
               <small>Valor {brl(l.valor)}</small>
               <small>Abatido {brl(l.abatido)}</small>
               <strong>Falta {brl(l.saldo)}</strong>
+              {l.situacao==='CANCELADO'?<small>Cancelado: {l.justificativa_cancelamento}</small>:
+                admin && l.abatimentos.length===0?<button type="button" className="vd-outline"
+                  onClick={()=>{setCancelLoanId(l.id);setCancelReason('')}}>Cancelar empréstimo</button>:null}
             </div>
+            {cancelLoanId===l.id&&<form className="fp-cancel" onSubmit={cancelLoan}>
+              <label>Motivo do cancelamento do empréstimo
+                <textarea rows={2} maxLength={500} value={cancelReason}
+                  onChange={e=>setCancelReason(e.target.value)} required/></label>
+              <div className="fp-buttons">
+                <button type="button" className="vd-outline" onClick={()=>setCancelLoanId(null)}>Voltar</button>
+                <button type="submit" className="cm-button primary" disabled={saving}>Confirmar cancelamento</button>
+              </div>
+            </form>}
           </article>)}
         </section>
       </>}
