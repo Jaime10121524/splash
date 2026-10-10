@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, useState } from 'react'
 import './UiFields.css'
+import PhoneInput from './PhoneInput.jsx'
 
 /**
  * Componentes de formulário SPLASH.
@@ -259,6 +260,7 @@ export function FormControl({type='text',value,onChange,options=[],...rest}) {
     case 'date': return <DateInput value={value} onChange={onChange} {...rest}/>
     case 'datetime': return <DateTimeInput value={value} onChange={onChange} {...rest}/>
     case 'time': return <TimeInput value={value} onChange={onChange} {...rest}/>
+    case 'tel': return <PhoneInput className="ui-input" value={value} onChange={onChange} {...rest}/>
     default: return <input type={type} className="ui-input" value={value} onChange={e=>onChange(e.target.value)} {...rest}/>
   }
 }
