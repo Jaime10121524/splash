@@ -930,6 +930,44 @@ class FechamentosController extends CommercialBaseController
         }
     }
 
+    /**
+     * Rateios de uma venda específica, com acesso somente administrativo.
+     * Não gera pagamento e só libera edição antes de qualquer movimentação
+     * financeira da comissão.
+     */
+    public function rateiosVenda(int|string $id): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $db=db_connect();
+        $op=$db->table('venda_operacoes')->where('id',(int)$id)->get()->getRowArray();
+        if(!$op)return $this->errorResponse(404,'Venda não encontrada.');
+        $rateios=$db->table('comissao_rateios r')
+            ->select('r.*,p.nome AS beneficiario_nome')
+            ->join('pessoas p','p.id=r.beneficiario_pessoa_id')
+            ->where('r.operacao_id',(int)$id)->orderBy('r.id','ASC')->get()->getResultArray();
+        $rateioIds=array_map(static fn($x)=>(int)$x['id'],$rateios);
+        $rateioMovimentado=$rateioIds&&$db->table('comissao_repasses')
+            ->whereIn('rateio_id',$rateioIds)->countAllResults()>0;
+        $titularMovimentado=$db->table('comissao_titular_movimentos')
+            ->where('operacao_id',(int)$id)->countAllResults()>0;
+        $comissao=$this->commission($op);
+        $quitada=$this->salePaid($db,$op);
+        $editavel=$op['situacao']==='VENDA' && $comissao!==null && $quitada
+            && !$rateioMovimentado && !$titularMovimentado;
+        return $this->response->setJSON([
+            'operacao_id'=>(int)$id,
+            'corretor_pessoa_id'=>(int)$op['corretor_pessoa_id'],
+            'comissao_bruta'=>$comissao===null?null:VendaMoney::decimal($comissao),
+            'quitada'=>$quitada,
+            'editavel'=>$editavel,
+            'rateios'=>$rateios,
+            'aviso'=>!$quitada?'Ajustes disponíveis após a quitação da venda.'
+                :($rateioMovimentado||$titularMovimentado
+                    ?'Rateios bloqueados por pagamentos/estornos já registrados. O histórico não será sobrescrito.'
+                    :'Confira e salve as participações antes do fechamento semanal.'),
+        ])->setHeader('Cache-Control','no-store');
+    }
+
     public function ratear(int|string $id): ResponseInterface
     {
         if($denied=$this->authorizeAdmin())return $denied;
