@@ -112,7 +112,15 @@ class VendasController extends CommercialBaseController
             $received+=$m['tipo']==='ENTRADA'?$value:-$value;
         }
         unset($m);
+        $editavel=$op['comissao_ajustada']===null;
+        foreach($movements as $mov){
+            if($mov['tipo']==='DEVOLUCAO') $editavel=false;
+        }
+        // Só pode alterar condições com todos os lançamentos estornados
+        // (ou quando não houve entrada). Devolução real NÃO libera edição.
+        if($received!==0) $editavel=false;
         return $this->response->setJSON([
+            'editavel'=>$editavel,
             'operacao'=>$op,'movimentos'=>$movements,
             'recebido'=>VendaMoney::decimal($received),
             'saldo'=>VendaMoney::decimal(max(0,VendaMoney::cents((string)$op['valor_cobrado'])-$received)),
@@ -270,10 +278,18 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(404,'Operação não encontrada.');
             }
-            if($db->table('venda_recebimentos')->where('operacao_id',(int)$id)->countAllResults()>0
-                || $op['comissao_ajustada']!==null){
+            $movementRows=$db->table('venda_recebimentos')
+                ->select('tipo,valor')->where('operacao_id',(int)$id)->get()->getResultArray();
+            $hasRealRefund=false;
+            $net=0;
+            foreach($movementRows as $move) {
+                $cent=VendaMoney::cents((string)$move['valor'],true);
+                $net += $move['tipo']==='ENTRADA' ? $cent : -$cent;
+                if($move['tipo']==='DEVOLUCAO')$hasRealRefund=true;
+            }
+            if($net!==0 || $hasRealRefund || $op['comissao_ajustada']!==null){
                 $db->transRollback();
-                return $this->errorResponse(409,'Esta operação já possui movimentação ou comissão ajustada. Estorne os lançamentos incorretos e confira o financeiro antes de alterar o cadastro.');
+                return $this->errorResponse(409,'Cadastro protegido: existem pagamentos não estornados, devoluções reais ou comissão já ajustada. Apenas operações sem movimentação financeira válida podem ser corrigidas.');
             }
             $versionId=$this->optionalId($data['plano_versao_id']??null);
             $ruleId=$this->optionalId($data['regra_comissao_id']??null);
