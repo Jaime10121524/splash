@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ClientFields, SurfaceModal, normalizeClient } from '../components/ComercialForms.jsx'
 import { comercialGet, comercialPost, dateBR } from '../lib/comercialApi.js'
 import './ComercialPages.css'
+import { formatPhone } from '../components/PhoneInput.jsx'
 
 export default function Clientes({navigate}) {
   const [rows,setRows]=useState([])
@@ -94,7 +95,7 @@ export default function Clientes({navigate}) {
             <div className="com-avatar">{c.nome?.trim()?.charAt(0)?.toUpperCase()||'C'}</div>
             <div className="com-client-main">
               <strong>{c.nome}</strong>
-              <small>{c.telefone}{c.cpf?' · CPF '+c.cpf:''}</small>
+              <small>{formatPhone(c.telefone)}{c.cpf?' · CPF '+c.cpf:''}</small>
               <div className="com-client-detail"><span>Corrente: <b>{c.dono_corrente_nome||'Não informado'}</b></span>
                 {c.indicador_nome&&<span>Indicação: <b>{c.indicador_nome}</b></span>}
                 {c.origem_nome&&<span>Origem: {c.origem_nome}</span>}
