@@ -51,6 +51,7 @@ export default function Fechamentos({role='admin'}){
   const [batchEntries,setBatchEntries]=useState([])
   const [batchKey,setBatchKey]=useState('')
   const [planOverrides,setPlanOverrides]=useState([])
+  const [removingOverride,setRemovingOverride]=useState(null)
   const [planCatalog,setPlanCatalog]=useState([])
   const [override,setOverride]=useState({
     plano_versao_id:'',modalidade:'TODOS',tipo_dia:'OUTROS',
@@ -267,13 +268,14 @@ export default function Fechamentos({role='admin'}){
     finally{setBusy(false)}
   }
   async function removeOverride(id){
-    if(!window.confirm('Excluir esta exceção somente para novas apurações?'))return
+    if(removingOverride!==id){setRemovingOverride(id);return}
     setBusy(true);setFormError('')
     try{
       const result=await comercialPost('/api/fechamentos/excecoes/'+id+'/excluir',{})
       setNotice(result.message)
       const refreshed=await comercialGet('/api/fechamentos/politica')
       setPlanOverrides(refreshed.excecoes||[])
+      setRemovingOverride(null)
     }catch(e){setFormError(e.message)}
     finally{setBusy(false)}
   }
@@ -577,6 +579,69 @@ export default function Fechamentos({role='admin'}){
           <div className="fc-holiday-list">{holidays.slice(0,20).map(h=><div key={h.data}>
             <span>{dateBR(h.data)}</span><strong>{h.descricao}</strong></div>)}</div>
         </form>
+        <form className="cm-form fc-exceptions-form" onSubmit={saveOverride}>
+          <strong>Exceções por plano e forma de pagamento</strong>
+          <div className="com-inform">Exemplo: se 5% do plano de um ano gera R$ 58,80, mas o atendente recebe R$ 60,00, cadastre uma regra de valor fixo de R$ 60,00 para esse plano em Outros dias. Para uma comissão maior em venda 100% à vista, selecione À vista. A regra vale para novas apurações, sem mexer nas já pagas.</div>
+          <label>Versão do plano
+            <FormControl type="select" value={override.plano_versao_id}
+              onChange={v=>setOverride(x=>({...x,plano_versao_id:v}))}
+              options={planCatalog.map(p=>({value:String(p.id),label:nameOfPlan(p.id)}))}
+              placeholder="Selecione o plano"/></label>
+          <div className="cm-form-grid">
+            <label>Forma da venda
+              <FormControl type="select" value={override.modalidade}
+                onChange={v=>setOverride(x=>({...x,modalidade:v}))}
+                options={[
+                  {value:'TODOS',label:'Todas'},
+                  {value:'AVISTA',label:'100% à vista'},
+                  {value:'CARTAO',label:'Cartão'},
+                  {value:'MISTO',label:'Misto'},
+                ]}/></label>
+            <label>Tipo de dia
+              <FormControl type="select" value={override.tipo_dia}
+                onChange={v=>setOverride(x=>({...x,tipo_dia:v}))}
+                options={[
+                  {value:'TODOS',label:'Todos os dias'},
+                  {value:'UTIL',label:'Dia útil'},
+                  {value:'OUTROS',label:'Feriado ou fim de semana'},
+                ]}/></label>
+          </div>
+          <div className="cm-form-grid">
+            <label>Participante
+              <FormControl type="select" value={override.papel}
+                onChange={v=>setOverride(x=>({...x,papel:v}))}
+                options={[{value:'ATENDENTE',label:'Atendente / vendedor'},
+                  {value:'GERENTE',label:'Gerente'}]}/></label>
+            <label>Cálculo
+              <FormControl type="select" value={override.tipo_calculo}
+                onChange={v=>setOverride(x=>({...x,tipo_calculo:v}))}
+                options={[{value:'FIXO',label:'Valor fixo (R$)'},
+                  {value:'PERCENTUAL',label:'Percentual (%)'}]}/></label>
+          </div>
+          <label>{override.tipo_calculo==='FIXO'?'Valor combinado (R$)':'Percentual combinado (%)'}
+            <input type="text" inputMode="decimal" value={override.valor}
+              onChange={e=>setOverride(x=>({...x,valor:e.target.value}))}
+              placeholder={override.tipo_calculo==='FIXO'?'Ex.: 60,00':'Ex.: 6,00'}/></label>
+          <label>Observações
+            <textarea maxLength={350} rows={2} value={override.observacoes}
+              onChange={e=>setOverride(x=>({...x,observacoes:e.target.value}))}
+              placeholder="Ex.: Arredondamento do atendente no plano de um ano"/></label>
+          <div className="cm-form-actions">
+            <button type="submit" className="cm-button primary" disabled={busy||!override.plano_versao_id}>
+              Salvar exceção do plano</button>
+          </div>
+        </form>
+        <div className="fc-exceptions-list">
+          <strong>Exceções cadastradas</strong>
+          {!planOverrides.length&&<p className="fc-hint">Ainda não há exceções. Serão usados os percentuais gerais.</p>}
+          {planOverrides.map(e=><div key={e.id}>
+            <span><strong>{nameOfPlan(e.plano_versao_id)}</strong>
+              <small>{e.papel==='ATENDENTE'?'Atendente':'Gerente'} · {e.modalidade==='AVISTA'?'100% à vista':e.modalidade} · {e.tipo_dia==='UTIL'?'Dia útil':e.tipo_dia==='OUTROS'?'Feriado/fim de semana':'Todos os dias'} · {e.tipo_calculo==='FIXO'?money(e.valor):e.valor+'%'}</small></span>
+            <button className="vd-outline" type="button" disabled={busy}
+              onClick={()=>removeOverride(e.id)}>
+              {removingOverride===e.id?'Confirmar exclusão':'Excluir'}</button>
+          </div>)}
+        </div>
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
       </div>}
       {dialog.type==='rateios'&&<form className="cm-form fc-rateio-form" onSubmit={saveRateios}>
