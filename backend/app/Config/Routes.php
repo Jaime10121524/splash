@@ -45,6 +45,7 @@ $routes->group('api', static function ($routes): void {
 
     // Operações de vendas: títulos e negociações compartilham o mesmo extrato.
     $routes->get('vendas/opcoes', 'Api\VendasController::opcoes');
+    $routes->get('vendas/resumo', 'Api\VendasController::resumo');
     $routes->get('vendas', 'Api\VendasController::index');
     $routes->get('vendas/(:num)', 'Api\VendasController::detalhe/$1');
     $routes->post('vendas', 'Api\VendasController::create', ['filter'=>'csrf']);
