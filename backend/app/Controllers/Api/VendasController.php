@@ -196,7 +196,7 @@ class VendasController extends CommercialBaseController
                     return $this->errorResponse(409,'Este atendimento já possui uma negociação vinculada.');
                 }
                 if(($kind==='VENDA' && $visit['status']!=='VENDA')
-                    ||($kind==='PENDENCIA' && !in_array($visit['status'],['PENDENCIA','VENDA'],true))){
+                    ||($kind==='PENDENCIA' && $visit['status']!=='PENDENCIA')){
                     $db->transRollback();
                     return $this->errorResponse(409,'Encerre o atendimento como Venda fechada ou Pendência antes de vincular.');
                 }
