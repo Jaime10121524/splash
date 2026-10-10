@@ -80,7 +80,13 @@ class VendasController extends CommercialBaseController
                 dc.nome AS dono_corrente_nome,
                 fp.id AS fechamento_id,fp.status AS fechamento_status,
                 (SELECT COALESCE(SUM(CASE WHEN mov.tipo='ENTRADA' THEN mov.valor ELSE -mov.valor END),0)
-                 FROM venda_recebimentos mov WHERE mov.operacao_id=o.id) AS recebido",false)
+                 FROM venda_recebimentos mov WHERE mov.operacao_id=o.id) AS recebido,
+                (SELECT COALESCE(SUM(CASE WHEN own.tipo='PAGAMENTO' THEN own.valor ELSE -own.valor END),0)
+                 FROM comissao_titular_movimentos own WHERE own.operacao_id=o.id) AS comissao_propria_paga,
+                (SELECT COALESCE(SUM(CASE WHEN rep.tipo='PAGAMENTO' THEN rep.valor ELSE -rep.valor END),0)
+                 FROM comissao_repasses rep
+                 JOIN comissao_rateios rate ON rate.id=rep.rateio_id
+                 WHERE rate.operacao_id=o.id) AS participacoes_pagas",false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas cp','cp.id=o.corretor_pessoa_id','left')
             ->join('pessoas sp','sp.id=o.segundo_corretor_pessoa_id','left')
@@ -98,6 +104,12 @@ class VendasController extends CommercialBaseController
             $row['id']=(int)$row['id'];
             $row['cliente_id']=(int)$row['cliente_id'];
             $row['historica']=(bool)$row['historica'];
+            $total=$row['comissao_ajustada']??$row['comissao_prevista'];
+            $paid=VendaMoney::cents((string)$row['comissao_propria_paga'],true)
+                +VendaMoney::cents((string)$row['participacoes_pagas'],true);
+            $row['comissao_paga']=VendaMoney::decimal($paid);
+            $row['comissao_pendente']=$total===null?null:VendaMoney::decimal(
+                max(0,VendaMoney::cents((string)$total,true)-$paid));
             $row['saldo']=VendaMoney::decimal(max(0,
                 VendaMoney::cents((string)$row['valor_cobrado'],true)
                 -VendaMoney::cents((string)$row['recebido'],true)
