@@ -65,7 +65,7 @@ class FinanceiroPessoalController extends CommercialBaseController
         $categoryRows=$categories->groupEnd()->orderBy('nome','ASC')->get()->getResultArray();
 
         $expensesQuery=$db->table('financeiro_despesas d')
-            ->select('d.id,d.pessoa_id,d.categoria_id,d.data_despesa,d.valor,d.descricao,d.situacao,c.nome AS categoria_nome,p.nome AS pessoa_nome')
+            ->select('d.id,d.pessoa_id,d.categoria_id,d.data_despesa,d.valor,d.descricao,d.situacao,d.justificativa_cancelamento,c.nome AS categoria_nome,p.nome AS pessoa_nome')
             ->join('financeiro_categorias_despesa c','c.id=d.categoria_id')
             ->join('pessoas p','p.id=d.pessoa_id')
             ->where('d.data_despesa >=',$start)->where('d.data_despesa <=',$end);
@@ -73,7 +73,7 @@ class FinanceiroPessoalController extends CommercialBaseController
         $expenses=$expensesQuery->orderBy('d.id','DESC')->limit(500)->get()->getResultArray();
 
         $loansQuery=$db->table('financeiro_emprestimos e')
-            ->select('e.id,e.pessoa_id,e.data_emprestimo,e.valor,e.descricao,e.situacao,p.nome AS pessoa_nome')
+            ->select('e.id,e.pessoa_id,e.data_emprestimo,e.valor,e.descricao,e.situacao,e.justificativa_cancelamento,p.nome AS pessoa_nome')
             ->join('pessoas p','p.id=e.pessoa_id');
         if($id)$loansQuery->where('e.pessoa_id',$id);
         $loans=$loansQuery->orderBy('e.id','DESC')->limit(500)->get()->getResultArray();
@@ -94,7 +94,7 @@ class FinanceiroPessoalController extends CommercialBaseController
             $original=VendaMoney::cents((string)$loan['valor'],true);
             $abates=$paid[(int)$loan['id']]??0;
             $loan['abatido']=VendaMoney::decimal($abates);
-            $loan['saldo']=VendaMoney::decimal(max(0,$original-$abates));
+            $loan['saldo']=VendaMoney::decimal($loan['situacao']==='CANCELADO'?0:max(0,$original-$abates));
             $loan['abatimentos']=$history[(int)$loan['id']]??[];
         }
         unset($loan);
@@ -180,11 +180,44 @@ class FinanceiroPessoalController extends CommercialBaseController
             }
             $db->table('financeiro_despesas')->where('id',(int)$id)->update([
                 'situacao'=>'CANCELADA','justificativa_cancelamento'=>$reason,
+                'cancelado_por_usuario_id'=>$actor['user_id'],
+                'cancelado_em'=>date('Y-m-d H:i:s'),
             ]);
             $this->commitOrFail($db);
             return $this->responseOK('Despesa cancelada com histórico preservado.');
         }catch(Throwable $e){
             $db->transRollback();return $this->unexpected($e,'cancelar despesa');
+        }
+    }
+
+    public function cancelarEmprestimo(int|string $id): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $reason=$this->cleanText($this->jsonPayload()['justificativa']??null,500,true);
+        if($reason===false||mb_strlen((string)$reason)<5){
+            return $this->errorResponse(422,'Informe o motivo do cancelamento (mínimo cinco caracteres).');
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $loan=$db->query('SELECT * FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$loan){
+                $db->transRollback();return $this->errorResponse(404,'Empréstimo não encontrado.');
+            }
+            if($loan['situacao']!=='ATIVO'){
+                $db->transRollback();return $this->errorResponse(409,'Este empréstimo já foi cancelado.');
+            }
+            if($db->table('financeiro_emprestimo_abates')->where('emprestimo_id',(int)$id)->countAllResults()>0){
+                $db->transRollback();return $this->errorResponse(409,'Empréstimo com abatimentos não pode ser cancelado sem conciliação dos fechamentos.');
+            }
+            $db->table('financeiro_emprestimos')->where('id',(int)$id)->update([
+                'situacao'=>'CANCELADO','justificativa_cancelamento'=>$reason,
+                'cancelado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'cancelado_em'=>date('Y-m-d H:i:s'),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Empréstimo cancelado sem apagar o histórico.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'cancelar empréstimo');
         }
     }
 
