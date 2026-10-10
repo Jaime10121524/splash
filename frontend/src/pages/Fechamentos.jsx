@@ -7,6 +7,7 @@ import './ComercialPages.css'
 import './Fechamentos.css'
 
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))
+const suggestedAmount=value=>Number(value)>0?Number(value).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):''
 const numeric=v=>{
   const s=String(v??'').trim()
   const t=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s
@@ -330,7 +331,7 @@ export default function Fechamentos({role='admin'}){
       setLoanOptions((data.emprestimos||[]).filter(l=>Number(l.saldo)>0))
       setBatchAbates([])
       const initial=paymentMethods.find(f=>f.codigo==='PIX')||paymentMethods[0]
-      setBatchEntries([{forma_id:String(initial?.id||''),valor:''}])
+      setBatchEntries([{forma_id:String(initial?.id||''),valor:suggestedAmount(person.resumo.pendente)}])
       setBatchKey(newKey())
       setMethodId(String(initial?.id||''))
       setDialog({type:'batch',person})
@@ -344,7 +345,14 @@ export default function Fechamentos({role='admin'}){
   const abateSum=batchAbates.reduce((sum,item)=>sum+(Number(numeric(item.valor))||0),0)
   const batchTotal=batchSum+abateSum
   function updateAbate(index,field,value){
-    setBatchAbates(old=>old.map((item,i)=>i===index?{...item,[field]:value}:item))
+    setBatchAbates(old=>old.map((item,i)=>{
+      if(i!==index)return item
+      if(field!=='emprestimo_id')return {...item,[field]:value}
+      const loan=loanOptions.find(l=>String(l.id)===value)
+      const otherAbates=old.reduce((sum,row,j)=>sum+(j===index?0:(Number(numeric(row.valor))||0)),0)
+      const balance=Math.max(0,Number(dialog?.person?.resumo?.pendente||0)-otherAbates)
+      return {...item,emprestimo_id:value,valor:suggestedAmount(Math.min(Number(loan?.saldo||0),balance))}
+    }))
   }
   async function saveBatch(event){
     event.preventDefault()
@@ -619,7 +627,12 @@ export default function Fechamentos({role='admin'}){
               onClick={()=>setBatchEntries(entries=>entries.filter((_,j)=>j!==i))}>Retirar</button>
           </div>)}
           <button type="button" className="vd-outline" disabled={batchEntries.length>=10}
-            onClick={()=>setBatchEntries(entries=>[...entries,{forma_id:String(paymentMethods[0]?.id||''),valor:''}])}>+ Outra forma de pagamento</button>
+            onClick={()=>setBatchEntries(entries=>{
+               const used=entries.reduce((n,x)=>n+(Number(numeric(x.valor))||0),0)
+               const offsets=batchAbates.reduce((n,x)=>n+(Number(numeric(x.valor))||0),0)
+               const remaining=Math.max(0,Number(dialog.person.resumo.pendente)-used-offsets)
+               return [...entries,{forma_id:String(paymentMethods[0]?.id||''),valor:suggestedAmount(remaining)}]
+             })}>+ Outra forma de pagamento</button>
         </div>
         <div className="fc-loan-offsets">
           <div><strong>Abatimento de empréstimo (negociado)</strong>
