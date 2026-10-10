@@ -28,6 +28,8 @@ jobs:
         run: php backend/tests/financeiro_emprestimos_smoke.php
       - name: Independent broker closing isolation
         run: php backend/tests/fechamentos_escopo_smoke.php
+      - name: Financial ledger permission and role isolation
+        run: php backend/tests/extrato_permissoes_smoke.php
       - name: Central custody and reconciliation tests
         run: php backend/tests/conciliacao_custodia_smoke.php
       - name: Pix matching and reversal tests
