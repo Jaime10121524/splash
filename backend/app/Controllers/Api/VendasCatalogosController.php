@@ -53,6 +53,9 @@ class VendasCatalogosController extends CommercialBaseController
         $data=$this->jsonPayload();
         $name=$this->cleanText($data['nome']??null,80,true);
         $code=strtoupper(trim((string)($data['codigo']??'')));
+        if($code==='ABATIMENTO_EMP'){
+            return $this->errorResponse(409,'Abatimento de empréstimo é uma forma interna restrita ao fechamento financeiro.');
+        }
         if($name===false||!preg_match('/^[A-Z0-9_]{2,25}$/D',$code)
             ||!isset($data['credito'])||!is_bool($data['credito'])
             ||!isset($data['ativo'])||!is_bool($data['ativo'])){
@@ -62,6 +65,9 @@ class VendasCatalogosController extends CommercialBaseController
         try{
             $row=$id===null?null:$db->table('venda_formas_pagamento')->where('id',(int)$id)->get()->getRowArray();
             if($id!==null&&!$row){$db->transRollback();return $this->errorResponse(404,'Forma não encontrada.');}
+            if($row && $row['codigo']==='ABATIMENTO_EMP'){
+                $db->transRollback();return $this->errorResponse(409,'Forma interna protegida contra edição.');
+            }
             if($row && in_array($row['codigo'],['PIX','CREDITO'],true)
                 && ($code!==$row['codigo'] || (bool)$data['credito']!==(bool)$row['credito'])){
                 $db->transRollback();return $this->errorResponse(409,'A natureza das formas Pix e Crédito deve ser preservada.');
