@@ -285,15 +285,6 @@ export default function FechamentosPeriodos({role='admin'}){
             className={currentStage===step?'active':currentStage>step?'complete':''}
             aria-current={currentStage===step?'step':undefined}>{stepLabels[step]}</span>)}
         </div>
-        {currentStage===4&&<section className="fpw-stats">
-          <div><span>Comissões nas vendas</span><strong>{money(current.resumo.comissoes)}</strong></div>
-          <div><span>Recebido do clube por {current.responsavel_nome}</span><strong>{money(amountPaid)}</strong></div>
-          <div><span>A receber do clube (estimativa)</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
-          <div><span>Abatido em dívidas</span><strong>{money(current.resumo.abatido_dividas)}</strong></div>
-          <div><span>Pago aos participantes neste fechamento</span><strong>{money(paidOut)}</strong></div>
-          <div><span>Falta repassar aos participantes</span><strong>{money(current.resumo.rateios_pendentes)}</strong></div>
-          <div><span>Saldo físico registrado após repasses</span><strong>{money(current.resumo.saldo_caixa_registrado)}</strong></div>
-        </section>}
         {currentStage===1&&<section className="com-panel">
           <div className="com-panel-head"><div><h2>1. Vendas e comissões por corretor</h2>
             <p>Somente as vendas pertencentes a este grupo. As contas pessoais continuam separadas.</p></div></div>
