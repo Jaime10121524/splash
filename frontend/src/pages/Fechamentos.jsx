@@ -722,7 +722,7 @@ export default function Fechamentos({role='admin'}){
               onClick={()=>removeOverride(e.id)}>
               {removingOverride===e.id?'Confirmar exclusão':'Excluir'}</button>
           </div>)}
-        </div>
+        </div>}
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
       </div>}
       {dialog.type==='rateios'&&<form className="cm-form fc-rateio-form" onSubmit={saveRateios}>
