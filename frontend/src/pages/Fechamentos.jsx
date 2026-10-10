@@ -576,7 +576,7 @@ export default function Fechamentos({role='admin'}){
               <span>{line.descricao} · {line.titulo||'#'+line.operacao_id}</span>
               <strong>Falta {money(line.pendente)}</strong>
             </div>)}
-        </div>}
+        </div>
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions">
           <button type="button" className="cm-button" disabled={busy} onClick={()=>setDialog(null)}>Cancelar</button>
