@@ -39,6 +39,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [client,setClient]=useState(null)
   const [linkedVisit,setLinkedVisit]=useState(null)
   const [saleForm,setSaleForm]=useState(blank)
+  const [useDiscount,setUseDiscount]=useState(false)
   const [moveForm,setMoveForm]=useState(blankMovement)
   const [detail,setDetail]=useState(null)
   const [formError,setFormError]=useState('')
@@ -78,6 +79,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       segundo_corretor_pessoa_id:visit.segundo_corretor_pessoa_id?String(visit.segundo_corretor_pessoa_id):'',
     }
     setSaleForm(form)
+    setUseDiscount(false)
     setClient({id:visit.cliente_id,nome:visit.cliente_nome,telefone:visit.cliente_telefone})
     setFormError('');setDialog({type:'new'})
     onVisitAccepted()
@@ -134,11 +136,13 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       observacoes:op.observacoes||'',
       justificativa:'',
     })
+    setUseDiscount(Number(op.desconto_corretor)>0)
     setFormError('')
     setDialog({type:'edit',op:dialog.op})
   }
   function openNew(kind=tab==='pendencias'?'PENDENCIA':'VENDA') {
     setSaleForm({...blank(),situacao:kind})
+    setUseDiscount(false)
     setClient(null);setLinkedVisit(null);setDetail(null);setFormError('');setDialog({type:'new'})
   }
   async function openDetail(op,type='details'){
@@ -404,7 +408,15 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         <div className="cm-form-grid">
           <label>Valor de tabela
             <div className="vd-readonly">{currency(selectedPlanTotal)}</div></label>
-          <label>Desconto concedido ao cliente
+          <div className="vd-discount-area">
+            <label className="vd-discount-check">
+              <input type="checkbox" checked={useDiscount} onChange={e=>{
+                setUseDiscount(e.target.checked)
+                if(!e.target.checked)setField('desconto_corretor','0,00')
+              }}/>
+              Conceder desconto ao cliente
+            </label>
+            {useDiscount&&<label>Valor do desconto
             <div className="vd-money-control">
               <span className="vd-money-prefix" aria-hidden="true">R$</span>
               <input type="text" inputMode="decimal" aria-label="Valor do desconto concedido ao cliente"
@@ -418,7 +430,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
                 placeholder="0,00"/>
             </div>
             <small className="vd-field-help">O desconto sai integralmente da comissão do corretor, não da parte do clube.</small>
-          </label>
+          </label>}
+          </div>
         </div>
         <div className="vd-summary-line">Valor cobrado do cliente <strong>{duePreview!==null&&duePreview>=0?currency(duePreview):'Inválido'}</strong></div>
         <label>Data da negociação <FormControl type="date" value={saleForm.data_negociacao}
