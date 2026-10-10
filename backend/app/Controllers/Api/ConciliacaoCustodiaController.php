@@ -168,6 +168,12 @@ final class ConciliacaoCustodiaController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(409,'Este lançamento já foi estornado.');
             }
+            if($db->table('fechamento_custodia_pix_vinculos')
+                ->where('movimento_custodia_id',(int)$movimentoId)
+                ->where('situacao','ATIVO')->countAllResults()){
+                $db->transRollback();
+                return $this->errorResponse(409,'Este lançamento está associado a um Pix de venda. Desfaça o vínculo do Pix antes de estornar.');
+            }
             if($entry['tipo']!=='REPASSE_CLUBE'){
                 $old=$this->balanco($db,$period);
                 $disponivel=VendaMoney::cents((string)$old['saldos']['saldo_conciliado'],true);
