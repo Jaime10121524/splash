@@ -56,7 +56,7 @@ if($sale===false||$closing===false
     ||substr_count($sale,'impedeVendaFechada')<5
     ||substr_count($closing,'ProtecaoVendaFechada::bloqueada')<5
     ||!str_contains($sale,"'comissao_pendente'")
-    ||!str_contains($sale,"'comissoes'=>$comissaoStatus")){
+    ||!str_contains($sale,"'comissoes'=>\$comissaoStatus")){
     throw new RuntimeException('Proteção ou exibição de saldo da venda foi perdida em alguma API.');
 }
 if(is_file(dirname(__DIR__).'/app/Database/Migrations/2026-10-10-235959_ResetarVendasFinanceiroTestes.php')){
