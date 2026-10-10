@@ -7,6 +7,7 @@ namespace App\Controllers\Api;
 use App\Libraries\RateioRules;
 use App\Libraries\RateioAutomatico;
 use App\Libraries\VendaMoney;
+use App\Libraries\SaldoComissao;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -185,8 +186,7 @@ class FechamentosController extends CommercialBaseController
             foreach($op['rateios'] as $a){
                 if((int)$a['responsavel_pessoa_id']===$root)$rootTransfer+=VendaMoney::cents((string)$a['valor']);
             }
-            $rootTotal=$base-$rootTransfer;
-            if($rootTotal<0)continue;
+            $rootTotal=SaldoComissao::titular($base,$rootTransfer);
             $key=(int)$op['id'];
             $paidOwner=$ownerByOperation[$key]['saldo']??0;
             $sourceLabel='Corretor principal — parte própria';
@@ -245,9 +245,10 @@ class FechamentosController extends CommercialBaseController
         $result=[];
         foreach($accounts as $account){
             foreach($account['itens'] as &$line){
-                $line['total']=VendaMoney::decimal($line['total_centavos']);
-                $line['pago']=VendaMoney::decimal($line['pago_centavos']);
-                $line['pendente']=VendaMoney::decimal(max(0,$line['total_centavos']-$line['pago_centavos']));
+                $balance=SaldoComissao::resumo($line['total_centavos'],$line['pago_centavos']);
+                $line['total']=$balance['total'];
+                $line['pago']=$balance['pago'];
+                $line['pendente']=$balance['pendente'];
                 unset($line['total_centavos'],$line['pago_centavos']);
             }
             unset($line);
@@ -306,24 +307,22 @@ class FechamentosController extends CommercialBaseController
 
     private function ownerPaid($db,int $id): int
     {
-        $net=0;
-        foreach($db->table('comissao_titular_movimentos')->select('tipo,valor')->where('operacao_id',$id)->get()->getResultArray() as $m){
-            $n=VendaMoney::cents((string)$m['valor'],true);
-            $net+=$m['tipo']==='PAGAMENTO'?$n:-$n;
-        }
-        return $net;
+        $movimentos=$db->table('comissao_titular_movimentos')
+            ->select('tipo,valor')->where('operacao_id',$id)->get()->getResultArray();
+        return SaldoComissao::pago($movimentos);
     }
 
     private function ownerDue($db,array $op): int
     {
         $amount=$this->commission($op);
         if($amount===null)return 0;
+        $distributed=0;
         foreach($db->table('comissao_rateios')
             ->select('valor')->where('operacao_id',(int)$op['id'])
             ->where('responsavel_pessoa_id',(int)$op['corretor_pessoa_id'])->get()->getResultArray() as $r){
-            $amount-=VendaMoney::cents((string)$r['valor'],true);
+            $distributed+=VendaMoney::cents((string)$r['valor'],true);
         }
-        return $amount;
+        return SaldoComissao::titular($amount,$distributed);
     }
 
     public function pagarTitular(int|string $id): ResponseInterface
