@@ -131,7 +131,7 @@ class FechamentosController extends CommercialBaseController
      * O titular recebe apenas sua parcela após os rateios. Cada beneficiário
      * vê suas participações e repasses; sem acesso a nomes de clientes.
      */
-    private function contasPorPessoa($db,array $operations,bool $admin,?int $onlyPersonId=null): array
+    private function contasPorPessoa($db,array $operations,bool $admin,?int $onlyPersonId=null,bool $includeOutgoing=false): array
     {
         if(!$operations)return [];
         $ids=array_column($operations,'id');
@@ -183,7 +183,7 @@ class FechamentosController extends CommercialBaseController
                 'nome'=>$admin?($personName[$personId]??$name):$name,
                 'total_centavos'=>0,'pago_centavos'=>0,'abatido_centavos'=>0,
                 'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,
-                'itens'=>[],
+                'itens'=>[],'saidas'=>[],
             ];
             $accounts[$personId]['total_centavos']+=$line['total_centavos'];
             $accounts[$personId]['pago_centavos']+=$line['pago_centavos'];
@@ -255,10 +255,20 @@ class FechamentosController extends CommercialBaseController
                         'pessoa_id'=>$payer,
                         'nome'=>$admin?($personName[$payer]??$a['origem_nome']):'Sua conta',
                         'total_centavos'=>0,'pago_centavos'=>0,'abatido_centavos'=>0,
-                        'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,'itens'=>[],
+                        'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,'itens'=>[],'saidas'=>[],
                     ];
                     $accounts[$payer]['obrigações_centavos']+=$outstanding;
                     $accounts[$payer]['obrigações_pagas_centavos']+=$paid;
+                    if($includeOutgoing){
+                        $accounts[$payer]['saidas'][]=[
+                            'id'=>(int)$a['id'],'beneficiario_pessoa_id'=>$payee,
+                            'beneficiario_nome'=>$a['beneficiario_nome'],
+                            'papel'=>$a['papel'],'data_venda'=>$op['data_venda'],
+                            'titulo'=>$meta['titulo'],'operacao_id'=>$key,
+                            'total'=>$a['valor'],'pago'=>$a['pago'],
+                            'pendente'=>$a['pendente'],
+                        ];
+                    }
                 }
             }
         }
@@ -292,7 +302,8 @@ class FechamentosController extends CommercialBaseController
                 $account['obrigações_centavos'],$account['obrigações_pagas_centavos']);
             // Conta individual não recebe sequer no JSON os valores que deve
             // repassar a terceiros; mostra somente o líquido que lhe pertence.
-            if(!$admin){
+            if(!$includeOutgoing){
+                unset($account['saidas']);
                 unset($account['resumo']['a_repassar'],
                     $account['resumo']['repasses_ja_pagos'],
                     $account['resumo']['repasses_pendentes']);
@@ -327,8 +338,17 @@ class FechamentosController extends CommercialBaseController
                 if(!$personId)return $this->errorResponse(422,'Pessoa inválida.');
             }
         }
+        $canSeeOutgoing=$admin;
+        if(!$admin){
+            if(!$user->can('finance.own') || (! $user->inGroup('corretor') && ! $user->inGroup('vendedor') && ! $user->inGroup('gerente'))){
+                return $this->errorResponse(403,'Acesso ao financeiro não autorizado.');
+            }
+            // Delegados consultam apenas a conta pessoal: jamais recebem o extrato dos terceiros.
+            $canSeeOutgoing=$user->inGroup('corretor') && !$db->table('fechamento_responsabilidades')
+                ->where('corretor_pessoa_id',$personId)->countAllResults();
+        }
         $operations=$this->rows($db,$start,$end);
-        $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId);
+        $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId,$canSeeOutgoing);
         $lots=[];
         if($admin){
             $query=$db->table('comissao_lotes_pagamento l')
