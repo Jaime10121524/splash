@@ -24,6 +24,9 @@ class VendasCatalogosController extends CommercialBaseController
             ||!isset($data['ativo'])||!is_bool($data['ativo'])){
             return $this->errorResponse(422,'Revise nome, tipo, fração da comissão, desconto (0 a 100%) e situação.');
         }
+        if($mode==='AVISTA' && (float)$discount!==0.0) {
+            return $this->errorResponse(422,'Regras à vista não utilizam desconto de cartão. Informe zero.');
+        }
         $db=db_connect();$db->transBegin();
         try{
             $insert=[
