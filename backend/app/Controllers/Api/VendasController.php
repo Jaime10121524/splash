@@ -205,6 +205,10 @@ class VendasController extends CommercialBaseController
                     $db->transRollback();
                     return $this->errorResponse(422,'Informe número de título com quatro dígitos e datas válidas.');
                 }
+                if($saleDate<$day){
+                    $db->transRollback();
+                    return $this->errorResponse(422,'A data da venda não pode ser anterior à negociação.');
+                }
                 $expiry=$this->expiry($start,(int)$plan['duracao_meses']);
                 if($this->numberExists($db,$number,(string)$plan['codigo'])){
                     $db->transRollback();
@@ -268,6 +272,10 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Informe número com quatro dígitos, data da venda e início válidos.');
             }
+            if($date<$op['data_negociacao']){
+                $db->transRollback();
+                return $this->errorResponse(422,'A data da venda não pode ser anterior à negociação.');
+            }
             $expiry=$this->expiry($start,(int)$op['prazo_meses']);
             if($this->numberExists($db,$number,(string)$op['sigla_plano'])){
                 $db->transRollback();
@@ -314,6 +322,10 @@ class VendasController extends CommercialBaseController
                 ||($mode==='MISTO' && !(bool)$method['credito'] && $method['codigo']!=='PIX')){
                 $db->transRollback();
                 return $this->errorResponse(422,'Meio de pagamento incompatível com a regra escolhida. Use uma regra à vista, cartão ou mista adequada.');
+            }
+            if($date<$op['data_negociacao']){
+                $db->transRollback();
+                return $this->errorResponse(422,'O recebimento não pode ser anterior ao início da negociação.');
             }
             $balance=$this->balance($db,(int)$id,$op);
             if($money>$balance){
@@ -367,6 +379,10 @@ class VendasController extends CommercialBaseController
                 ->where('operacao_id',(int)$id)->where('tipo','ENTRADA')->get()->getRowArray();
             if(!$op||!$original){
                 $db->transRollback();return $this->errorResponse(404,'Recebimento original não encontrado.');
+            }
+            if($date<$original['data_movimento']){
+                $db->transRollback();
+                return $this->errorResponse(422,'A devolução não pode ser anterior ao recebimento original.');
             }
             $already=$db->table('venda_recebimentos')->selectSum('valor')
                 ->where('referencia_entrada_id',$reference)->where('tipo','DEVOLUCAO')
