@@ -361,10 +361,54 @@ export default function Fechamentos({role='admin'}){
       <p className="com-disclaimer">{report.aviso} O rateio não transfere dinheiro por si só; ao registrar um pagamento, confirme que ele realmente foi feito.</p>
     </>:null}
     {dialog&&<SurfaceModal
-      title={dialog.type==='policy'?'Regras automáticas e feriados':dialog.type==='rateios'?'Distribuir comissão':dialog.type==='pay'?'Registrar repasse':
+      title={dialog.type==='policy'?'Regras automáticas e feriados':
+        dialog.type==='ownerPayment'?'Pagamentos da comissão do corretor':
+        dialog.type==='ownerReverse'?'Estornar pagamento do corretor':
+        dialog.type==='rateios'?'Distribuir comissão':dialog.type==='pay'?'Registrar repasse':
         dialog.type==='reverse'?'Estornar repasse':'Extrato do participante'}
       subtitle={dialog.type==='rateios'?dialog.op.cliente_nome:dialog.rateio?.beneficiario_nome}
       busy={busy} onClose={()=>setDialog(null)}>
+      {dialog.type==='ownerPayment'&&<div className="cm-form">
+        <div className="com-inform">Parte própria do corretor depois das participações. Somente registre dinheiro que ele realmente recebeu ou reteve, inclusive quando a comissão ficou no Pix. Este registro não transfere dinheiro automaticamente.</div>
+        <div className="fc-stats fc-ledger-summary">
+          <div><span>Total devido</span><strong>{money(dialog.line.total)}</strong></div>
+          <div><span>Já recebeu</span><strong>{money(dialog.line.pago)}</strong></div>
+          <div><span>Falta pagar</span><strong>{money(dialog.line.pendente)}</strong></div>
+        </div>
+        <div className="fc-ledger-moves">
+          {dialog.line.movimentos.length?dialog.line.movimentos.map(m=><div key={m.id}>
+            <div><strong>{m.tipo==='PAGAMENTO'?'Pagamento registrado':'Estorno de registro'}</strong>
+              <small>{dateBR(m.data)} · {m.observacoes||'Sem observação'}</small></div>
+            <div><strong>{m.tipo==='PAGAMENTO'?'+':'−'}{money(m.valor)}</strong>
+              {m.tipo==='PAGAMENTO'&&!dialog.line.movimentos.some(a=>a.tipo==='ESTORNO'&&Number(a.referencia_pagamento_id)===Number(m.id))&&
+                <button className="vd-outline" type="button" onClick={()=>{setReason('');setFormError('');setDialog({type:'ownerReverse',line:dialog.line,move:m})}}>Estornar</button>}
+            </div>
+          </div>):<p className="fc-hint">Nenhum pagamento registrado nesta comissão.</p>}
+        </div>
+        {Number(dialog.line.pendente)>0&&<form className="cm-form" onSubmit={recordOwnPayment}>
+          <label>Valor realmente pago/recebido (R$)
+            <input type="text" inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Ex.: 150,00"/></label>
+          <label>Data de pagamento <FormControl type="date" value={date} onChange={setDate}/></label>
+          <label>Descrição obrigatória
+            <textarea rows={2} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}
+              placeholder="Ex.: Comissão paga pelo clube / comissão retida no Pix"/></label>
+          {formError&&<p className="cm-error" role="alert">{formError}</p>}
+          <div className="cm-form-actions">
+            <button type="button" className="cm-button" onClick={()=>setDialog(null)}>Cancelar</button>
+            <button type="submit" disabled={busy} className="cm-button primary">{busy?'Salvando...':'Confirmar pagamento'}</button>
+          </div>
+        </form>}
+      </div>}
+      {dialog.type==='ownerReverse'&&<form className="cm-form" onSubmit={reverseOwnPayment}>
+        <div className="com-inform">Estorno somente do registro financeiro de {money(dialog.move.valor)}. Não significa devolução física de dinheiro.</div>
+        <label>Justificativa do estorno
+          <textarea rows={3} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="cm-form-actions">
+          <button type="button" className="cm-button" onClick={()=>setDialog({type:'ownerPayment',line:dialog.line})}>Voltar</button>
+          <button type="submit" className="cm-button primary" disabled={busy}>Confirmar estorno</button>
+        </div>
+      </form>}
       {dialog.type==='policy'&&policy&&<div className="cm-form">
         <form className="cm-form" onSubmit={savePolicy}>
           <div className="com-inform">Percentuais sobre o valor de tabela do plano, exceto a divisão entre corretores, que utiliza o saldo da comissão após os participantes. Alterações não recalculam rateios já registrados.</div>
