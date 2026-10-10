@@ -305,6 +305,16 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(404,'Operação ou meio de pagamento não encontrado/ativo.');
             }
+            // Evita registrar uma forma de pagamento que geraria comissão
+            // incoerente com a regra congelada na operação.
+            $ruleSnapshot=json_decode((string)$op['regra_snapshot'],true,512,JSON_THROW_ON_ERROR);
+            $mode=(string)($ruleSnapshot['modalidade']??'');
+            if(($mode==='AVISTA' && (bool)$method['credito'])
+                ||($mode==='CARTAO' && !(bool)$method['credito'])
+                ||($mode==='MISTO' && !(bool)$method['credito'] && $method['codigo']!=='PIX')){
+                $db->transRollback();
+                return $this->errorResponse(422,'Meio de pagamento incompatível com a regra escolhida. Use uma regra à vista, cartão ou mista adequada.');
+            }
             $balance=$this->balance($db,(int)$id,$op);
             if($money>$balance){
                 $db->transRollback();
