@@ -210,11 +210,19 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
                   <span>Atendente: <b>{v.atendente_nome||'Não iniciado'}{v.adicional_nome?' + '+v.adicional_nome:''}</b></span>
                   {v.retorno_previsto&&<span>Volta prevista: <b>{dateBR(v.retorno_previsto)}</b></span>}
                   {v.motivo_nome&&<span>Motivo: <b>{v.motivo_nome}</b></span>}
+                  {v.operacao_id&&<span className="com-sale-link">
+                    <b>{v.operacao_situacao==='VENDA'?'Venda vinculada':'Pendência vinculada'}</b>
+                    {v.numero_titulo?' · Título '+v.numero_titulo+' '+v.titulo_sigla:' · Negociação #'+v.operacao_id}
+                  </span>}
                 </div>
               </div>
               <div className="com-actions">
                 <button type="button" onClick={()=>openBrokers(v)}>Corretores</button>
-                {admin&&['VENDA','PENDENCIA'].includes(v.status)&&<button type="button"
+                {admin&&v.operacao_id&&<button type="button" className="primary"
+                  onClick={()=>navigate(v.operacao_situacao==='VENDA'?'vendas':'pendencias',v)}>
+                  {v.operacao_situacao==='VENDA'?'Ver título':'Ver pendência'}
+                </button>}
+                {admin&&!v.operacao_id&&['VENDA','PENDENCIA'].includes(v.status)&&<button type="button"
                   className="primary" onClick={()=>navigate(v.status==='VENDA'?'vendas':'pendencias',v)}>
                   {v.status==='VENDA'?'Registrar título':'Abrir pendência financeira'}
                 </button>}
