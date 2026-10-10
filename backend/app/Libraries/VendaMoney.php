@@ -67,11 +67,17 @@ final class VendaMoney
             ];
             $remaining=$base-$cashPix;
             $after=self::roundDiv($remaining*(100000-$basis),100000);
+            if($discount>$cashPix+$after) {
+                return ['valor'=>null,'aviso'=>'O desconto excede a comissão líquida; revise o acordo.'];
+            }
             return ['valor'=>self::decimal($cashPix+$after-$discount),'aviso'=>'Estimativa mista; conferir repasses no fechamento.'];
         }
         $commission=$mode==='CARTAO'
             ?self::roundDiv($base*(100000-$basis),100000)
             :$base;
+        if($discount>$commission) {
+            return ['valor'=>null,'aviso'=>'O desconto excede a comissão líquida; revise o acordo.'];
+        }
         return ['valor'=>self::decimal($commission-$discount),'aviso'=>null];
     }
 }
