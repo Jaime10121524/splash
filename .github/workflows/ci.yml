@@ -20,6 +20,8 @@ jobs:
         run: php backend/tests/rateio_rules_smoke.php
       - name: Automatic commission split tests
         run: php backend/tests/rateio_automatico_smoke.php
+      - name: Individual financial ledger tests
+        run: php backend/tests/financeiro_saldos_smoke.php
 
   frontend:
     name: React/Vite build
