@@ -213,6 +213,9 @@ export default function FechamentosPeriodos({role='admin'}){
   const paidOut=current?.resumo?.pagamentos_periodo||'0.00'
   const currentStage=!current?0:current.status==='CONCLUIDO'?4:current.status==='REPASSES'?3:salesReviewed?2:1
   const stepLabels=['','1. Vendas do grupo','2. Receber do clube','3. Pagar participantes','4. Relatório concluído']
+  const peopleReport=summaryByPerson(current)
+  const paymentsByPerson=groupedPayments(current)
+  const groupResult=peopleReport.reduce((total,p)=>total+cents(p.resultado_estimado),0)/100
   return <div className="com-page fpw-page">
     <header className="com-heading fpw-heading">
       <div><span className="com-eyebrow">SPLASH / FECHAMENTOS</span>
