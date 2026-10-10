@@ -263,7 +263,7 @@ export default function PessoasUsuarios({tab='pessoas'}) {
     } busy={busy} onClose={close}>
       {modal.kind==='person'&&<form className="pu-form" onSubmit={submitPerson}>
         <p className="pu-intro">Uma mesma pessoa pode atuar como corretor, vendedor e gerente.</p>
-        <label>Nome completo <em>*</em><input autoFocus required maxLength={160} value={personForm.nome}
+        <label><span className="field-caption">Nome completo <em>*</em></span><input autoFocus required maxLength={160} value={personForm.nome}
           onChange={e=>setPersonForm(f=>({...f,nome:e.target.value}))} placeholder="Nome do participante"/></label>
         <div className="pu-form-grid">
           <label>Telefone<PhoneInput value={personForm.telefone}
@@ -286,9 +286,9 @@ export default function PessoasUsuarios({tab='pessoas'}) {
         <p className="pu-intro">{modal.kind==='newLogin'
           ? 'Crie um acesso individual para '+modal.person.nome+'. A senha deve ser informada com segurança diretamente ao usuário.'
           : 'Atualize o login sem modificar registros e comissões da pessoa vinculada.'}</p>
-        <label>Nome de usuário <em>*</em><input autoFocus required minLength={3} maxLength={30} value={loginForm.username}
+        <label><span className="field-caption">Nome de usuário <em>*</em></span><input autoFocus required minLength={3} maxLength={30} value={loginForm.username}
           onChange={e=>setLoginForm(f=>({...f,username:e.target.value}))} placeholder="Ex.: vendedor01"/></label>
-        <label>E-mail de recuperação <em>*</em><input type="email" required maxLength={254} value={loginForm.email}
+        <label><span className="field-caption">E-mail de recuperação <em>*</em></span><input type="email" required maxLength={254} value={loginForm.email}
           onChange={e=>setLoginForm(f=>({...f,email:e.target.value}))} placeholder="nome@exemplo.com"/></label>
         <label>{modal.kind==='newLogin'?'Senha inicial':'Nova senha (opcional)'} {modal.kind==='newLogin'&&<em>*</em>}
           <input type="password" autoComplete="new-password" minLength={modal.kind==='newLogin'?8:undefined}
@@ -296,7 +296,7 @@ export default function PessoasUsuarios({tab='pessoas'}) {
             onChange={e=>setLoginForm(f=>({...f,password:e.target.value}))}
             placeholder={modal.kind==='newLogin'?'Crie uma senha forte':'Deixe vazio para manter a senha atual'}/>
           <small>Mínimo 8 caracteres, uma letra maiúscula e um número.</small></label>
-        <label>Grupo de acesso <em>*</em><FormControl type="select" value={loginForm.group}
+        <label><span className="field-caption">Grupo de acesso <em>*</em></span><FormControl type="select" value={loginForm.group}
           onChange={next=>setLoginForm(f=>({...f,group:next}))} ariaLabel="Grupo de acesso"
           options={modal.kind==='newLogin'?papelOptions.filter(r=>modal.person.papeis.includes(r.value))
             :userRoles.filter(r=>byPerson.get(modal.user.pessoa_id)?.papeis?.includes(r.value))}/></label>
@@ -307,10 +307,10 @@ export default function PessoasUsuarios({tab='pessoas'}) {
       {modal.kind==='link'&&<div className="pu-form">
         <p className="pu-intro">Vincule uma conta do Shield a uma pessoa cadastrada sem login. Esse vínculo é único.</p>
         {modal.person?<label>Pessoa<strong>{modal.person.nome}</strong></label>
-          :<label>Pessoa <em>*</em><FormControl type="select" value={selectedPerson} onChange={setSelectedPerson}
+          :<label><span className="field-caption">Pessoa <em>*</em></span><FormControl type="select" value={selectedPerson} onChange={setSelectedPerson}
             placeholder="Selecione a pessoa" options={availablePersons.map(p=>({value:String(p.id),label:p.nome}))}/></label>}
         {modal.user?<label>Usuário<strong>@{modal.user.username}</strong></label>
-          :<label>Conta existente <em>*</em><FormControl type="select" value={selectedAccount} onChange={setSelectedAccount}
+          :<label><span className="field-caption">Conta existente <em>*</em></span><FormControl type="select" value={selectedAccount} onChange={setSelectedAccount}
             placeholder="Selecione o usuário" options={unlinkedAccounts.map(u=>({value:String(u.id),label:'@'+u.username+' · '+roleLabel(u.groups?.[0]||'restrito')}))}/></label>}
         {formError&&<p className="pu-validation" role="alert">{formError}</p>}
         <div className="pu-dialog-actions"><button className="pu-secondary" type="button" onClick={close}>Cancelar</button><button className="pu-primary" disabled={busy} onClick={submitLink}>{busy?'Vinculando...':'Vincular conta'}</button></div>
