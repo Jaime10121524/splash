@@ -295,7 +295,7 @@ export default function FechamentosPeriodos({role='admin'}){
               <div className="fpw-person-summary">
                 <span>Parte própria recebida anteriormente: <b>{money(p.titular_ja_recebido)}</b></span>
                 <span>Entrada do clube referente a esta comissão (caixa de {current.responsavel_nome}): <b>{money(p.recebido_clube)}</b></span>
-                <span>Comissão ainda a receber (estimativa): <b>{money(p.a_receber_estimado)}</b></span>
+                <span>Diferença bruta sem entrada do clube registrada: <b>{money(p.a_receber_estimado)}</b></span>
                 <span>Comissão própria pendente: <b>{money(p.titular_pendente)}</b></span>
                 <span>Rateios devidos: <b>{money(p.repasse_total)}</b></span>
                 <span>Rateios já pagos: <b>{money(p.repasse_ja_pago)}</b></span>
@@ -413,7 +413,7 @@ export default function FechamentosPeriodos({role='admin'}){
               Imprimir / salvar em PDF</button></div>
           <div className="fpw-report-sums">
             <div><span>Entradas do clube no caixa de {current.responsavel_nome}</span><strong>{money(current.resumo.recebido_clube)}</strong></div>
-            <div><span>Valor ainda a receber do clube (estimativa)</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
+            <div><span>Comissão bruta sem entrada do clube registrada*</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
             <div><span>Pagamentos realizados no fechamento</span><strong>{money(current.resumo.pagamentos_periodo)}</strong></div>
             <div><span>Dívidas compensadas (sem dinheiro)</span><strong>{money(current.resumo.abatido_dividas)}</strong></div>
             <div><span>Saldo das entradas após pagamentos</span><strong>{money(current.resumo.saldo_caixa_registrado)}</strong></div>
@@ -440,7 +440,7 @@ export default function FechamentosPeriodos({role='admin'}){
               </p>)}
             </div>)}
           </div>}
-          <p className="fpw-help">{current.observacao} Valores pagos a um titular só devem ser baixados depois da transferência efetiva; o recebimento pelo responsável do grupo não equivale a esse pagamento.</p>
+          <p className="fpw-help">* Diferença entre comissão bruta e entradas do clube registradas. Não é cobrança automática: Pix anteriores e valores retidos podem exigir conferência. Pagamentos ao titular e abatimentos de empréstimos não são recebimentos do clube. Valores pagos a um titular só devem ser baixados depois da transferência efetiva.</p>
         </section>}
         {currentStage===4&&<section className="fpw-optional-custody">
           <div><strong>Controle opcional: dinheiro sob sua guarda</strong>
