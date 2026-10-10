@@ -388,7 +388,7 @@ export default function Fechamentos({role='admin'}){
     </section>:admin&&report?<>
       <section className="fc-stats">
         <div><span>Total a pagar às pessoas</span><strong>{money(totals.due)}</strong></div>
-        <div><span>Já pago (registrado)</span><strong>{money(totals.paid)}</strong></div>
+        <div><span>Liquidado (pagamentos + abatimentos)</span><strong>{money(totals.paid)}</strong></div>
         <div><span>Ainda falta pagar</span><strong>{money(totals.pending)}</strong></div>
       </section>
       <section className="com-panel fc-breakdown">
@@ -413,7 +413,8 @@ export default function Fechamentos({role='admin'}){
             </div>
             <div className="fc-person-stats">
               <div><span>Total devido</span><strong>{money(person.resumo.total)}</strong></div>
-              <div><span>Já pago</span><strong>{money(person.resumo.pago)}</strong></div>
+              <div><span>Recebido</span><strong>{money(person.resumo.recebido||0)}</strong></div>
+              <div><span>Abatido da dívida</span><strong>{money(person.resumo.abatido||0)}</strong></div>
               <div><span>Falta pagar</span><strong className="fc-outstanding">{money(person.resumo.pendente)}</strong></div>
             </div>
             {open&&<div className="fc-person-lines">
@@ -424,7 +425,7 @@ export default function Fechamentos({role='admin'}){
                   <small>Venda {line.titulo||'#'+line.operacao_id} · {dateBR(line.data_venda)}
                     {line.visita_id?' · Atendimento #'+line.visita_id:''}</small>
                   {line.cliente_nome&&<small>Cliente: {line.cliente_nome}</small>}
-                  <small>Total: {money(line.total)} · Já pago: {money(line.pago)}</small>
+                  <small>Total: {money(line.total)} · Recebido: {money(line.recebido||0)} · Abatido: {money(line.abatido||0)}</small>
                   {!!line.movimentos.length&&<small>{line.movimentos.length} movimentação(ões) no histórico</small>}
                 </div>
                 <div className="fc-person-line-actions">
@@ -457,7 +458,8 @@ export default function Fechamentos({role='admin'}){
             {item.observacoes&&<small>{item.observacoes}</small>}
             <div className="fc-settlement-methods">{item.formas.map((f,i)=><span key={i}>{f.forma}: {money(f.valor)}</span>)}</div>
           </div>
-          <strong>{money(item.valor_total)}</strong>
+          <div className="fc-settlement-amount"><strong>{money(item.valor_total)}</strong>
+            <small>Pago {money(item.valor_transferido??item.valor_total)} · Abatido {money(item.valor_abate||0)}</small></div>
         </article>)}</div>}
       </section>
       <div className="fc-sales-toggle">
@@ -509,7 +511,8 @@ export default function Fechamentos({role='admin'}){
         <div className="com-inform">Você paga uma única vez por pessoa. O SPLASH distribui os valores pelas vendas mais antigas com saldo pendente, preservando em cada venda quanto foi Pix, dinheiro ou outro meio. Nada é marcado pago antes de confirmar.</div>
         <div className="fc-stats fc-ledger-summary">
           <div><span>Comissões</span><strong>{money(dialog.person.resumo.total)}</strong></div>
-          <div><span>Já recebeu</span><strong>{money(dialog.person.resumo.pago)}</strong></div>
+          <div><span>Recebido</span><strong>{money(dialog.person.resumo.recebido||0)}</strong></div>
+          <div><span>Abatido da dívida</span><strong>{money(dialog.person.resumo.abatido||0)}</strong></div>
           <div><span>Falta receber</span><strong>{money(dialog.person.resumo.pendente)}</strong></div>
         </div>
         <label>Data do acerto <FormControl type="date" value={date} onChange={setDate}/></label>
@@ -586,7 +589,7 @@ export default function Fechamentos({role='admin'}){
         <div className="com-inform">Parte própria do corretor depois das participações. Somente registre dinheiro que ele realmente recebeu ou reteve, inclusive quando a comissão ficou no Pix. Este registro não transfere dinheiro automaticamente.</div>
         <div className="fc-stats fc-ledger-summary">
           <div><span>Total devido</span><strong>{money(dialog.line.total)}</strong></div>
-          <div><span>Já recebeu</span><strong>{money(dialog.line.pago)}</strong></div>
+          <div><span>Liquidado</span><strong>{money(dialog.line.pago)}</strong></div>
           <div><span>Falta pagar</span><strong>{money(dialog.line.pendente)}</strong></div>
         </div>
         <div className="fc-ledger-moves">
