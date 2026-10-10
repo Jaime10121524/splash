@@ -150,6 +150,15 @@ export default function FechamentosPeriodos({role='admin'}){
       data_pagamento:record.data,formas:forms,chave_requisicao:nonce,
     })
   }
+  function saveReversal(e){
+    e.preventDefault()
+    if(!record.justificativa||record.justificativa.trim().length<5){
+      return setError('Informe o motivo do estorno em pelo menos cinco caracteres.')
+    }
+    action('/api/fechamentos-periodos/'+current.id+'/repasses/'+record.id+'/estornar',{
+      justificativa:record.justificativa.trim(),
+    })
+  }
   function saveLink(e){
     e.preventDefault()
     if(!link.child)return setError('Selecione o corretor.')
@@ -311,6 +320,19 @@ export default function FechamentosPeriodos({role='admin'}){
             <button type="button" className="cm-button primary" disabled={busy}
               onClick={()=>{setModal('confirmar')}}>Concluir fechamento e guardar relatório →</button></div>
         </>}
+        {(current.historico_repasses||[]).length>0&&<section className="com-panel fpw-stage fpw-payment-history">
+          <div className="com-panel-head"><div><h2>Pagamentos registrados neste fechamento</h2>
+            <p>Histórico por pessoa e forma de pagamento. Correções exigem estorno justificado antes da conclusão.</p></div></div>
+          <div className="fpw-lines">{current.historico_repasses.map(m=><div key={m.id}>
+            <div><strong>{m.beneficiario_nome} · {m.forma_nome}</strong>
+              <small>{m.situacao==='ATIVO'?'Pagamento confirmado':'Estornado'} · Rateio # {m.rateio_id}</small></div>
+            <strong>{money(m.valor)}</strong>
+            {current.status==='REPASSES'&&m.situacao==='ATIVO'&&
+              <button type="button" className="vd-outline" onClick={()=>{
+                setRecord({id:m.id,justificativa:''});setModal('estorno')
+              }}>Estornar</button>}
+          </div>)}</div>
+        </section>}
         <section className="com-panel fpw-report" id="splash-fechamento-relatorio">
           <div className="com-panel-head"><div><h2>4. Resultado do período</h2>
             <p>Valores recebidos e pagos realmente registrados; resultado gerencial por corretor, sem somar lucros de pessoas distintas.</p></div>
@@ -336,7 +358,8 @@ export default function FechamentosPeriodos({role='admin'}){
     </>}
     {modal&&<SurfaceModal eyebrow="SPLASH / FECHAMENTOS"
       title={modal==='entrada'?'Recebimento do clube':modal==='abate'?'Abater empréstimo':
-        modal==='pagamento'?'Pagamento ao participante':modal==='vinculos'?'Responsabilidade dos corretores':'Concluir fechamento'}
+        modal==='pagamento'?'Pagamento ao participante':modal==='estorno'?'Estornar pagamento':
+        modal==='vinculos'?'Responsabilidade dos corretores':'Concluir fechamento'}
       onClose={closeModal} busy={busy}>
       {modal==='entrada'&&<form className="fpw-modal-form" onSubmit={saveEntry}>
         <label>De qual corretor é esta comissão? *
@@ -392,6 +415,15 @@ export default function FechamentosPeriodos({role='admin'}){
         <p className="fpw-help">Total informado: {money(payMethods.reduce((n,x)=>n+(Number(cleanMoney(x.valor))||0),0))}.</p>
         <div className="fpw-actions"><button type="button" className="vd-outline" onClick={closeModal}>Cancelar</button>
           <button type="submit" className="cm-button primary" disabled={busy}>Confirmar pagamento realizado</button></div>
+      </form>}
+      {modal==='estorno'&&<form className="fpw-modal-form" onSubmit={saveReversal}>
+        <p className="fpw-help">O pagamento não será apagado. Um lançamento de estorno ficará no histórico e a participação voltará a ter saldo pendente.</p>
+        <label>Justificativa *
+          <textarea value={record.justificativa||''} rows={3} maxLength={500} required
+            onChange={e=>setRecord(x=>({...x,justificativa:e.target.value}))}
+            placeholder="Explique a correção"/></label>
+        <div className="fpw-actions"><button type="button" className="vd-outline" onClick={closeModal}>Cancelar</button>
+          <button type="submit" className="cm-button primary" disabled={busy}>Confirmar estorno</button></div>
       </form>}
       {modal==='vinculos'&&admin&&<form className="fpw-modal-form" onSubmit={saveLink}>
         <p className="fpw-help">Vincule somente corretores que você realmente administra. Os demais continuarão independentes e farão o próprio fechamento. Isso é diferente do dono da corrente do cliente.</p>
