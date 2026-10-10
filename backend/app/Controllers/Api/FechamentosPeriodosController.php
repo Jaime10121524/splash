@@ -405,7 +405,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             $person['repasse_pendente']=VendaMoney::decimal(max(0,$person['repasse_cent']-$person['repasse_pago_cent']));
             $person['abatido']=VendaMoney::decimal($person['abatido_cent']);
             $person['despesas']=VendaMoney::decimal($person['despesas_cent']);
-            $person['resultado_estimado']=VendaMoney::decimal($person['comissao_cent']-$person['repasse_cent']-$person['despesas_cent']);
+            $person['resultado_estimado']=VendaMoney::decimal($person['comissao_cent']-$person['repasse_cent']-$person['despesas_cent']+VendaMoney::cents((string)$person['participacoes_total'],true));
             // Entradas deste fechamento e movimentações históricas de comissão são fontes
             // diferentes: não presumir que uma já foi lançada como a outra.
             $person['comissao_sem_conciliacao']=VendaMoney::decimal(max(0,$person['comissao_cent']-$person['titular_pago_cent']));
