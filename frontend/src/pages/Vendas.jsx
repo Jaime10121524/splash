@@ -342,7 +342,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         </div>
         <div className="vd-values"><span>Plano {currency(op.valor_cobrado)}</span>
           <strong>Recebido {currency(op.recebido)}</strong><small>Saldo {currency(op.saldo)}</small>
-          <small>{op.comissao_ajustada!==null?'Comissão ajustada: '+currency(op.comissao_ajustada):'Comissão estimada: '+(op.comissao_prevista===null?'A conferir':currency(op.comissao_prevista))}</small></div>
+          <small>{op.comissao_ajustada!==null?'Comissão ajustada: '+currency(op.comissao_ajustada):'Comissão estimada: '+(op.comissao_prevista===null?'Após quitação':currency(op.comissao_prevista))}</small></div>
         <div className="com-actions"><button type="button" onClick={()=>openDetail(op)}>Extrato</button>
           {op.situacao==='PENDENCIA'&&<button type="button" className="primary" onClick={()=>openConvert(op)}>Fechar venda</button>}
         </div>
@@ -476,7 +476,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <strong className={m.tipo==='ENTRADA'?'vd-positive':'vd-negative'}>{m.tipo==='ENTRADA'?'+':'-'}{currency(m.valor)}</strong>
         </div>)}</div>:<div className="com-empty vd-empty">Nenhum recebimento lançado.</div>}
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
-        <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada (a apurar)':'Comissão prevista (não paga)'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'A conferir':currency(detail.operacao.comissao_prevista)}</strong></span></div>
+        <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada (a apurar)':'Comissão prevista (não paga)'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'Após quitação':currency(detail.operacao.comissao_prevista)}</strong></span></div>
         {detail.operacao.ajuste_motivo&&<div className="com-inform">Justificativa do ajuste: {detail.operacao.ajuste_motivo}</div>}
         {!!detail.historico_correcoes?.length&&<div className="vd-corrections">
           <strong>Histórico de correções</strong>
@@ -521,7 +521,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <FormControl type="select" value={moveForm.entrada_id}
             onChange={v=>setMoveForm(f=>({...f,entrada_id:v}))}
             options={entryRecords.map(r=>({value:String(r.id),
-              label:'#'+r.id+' · '+r.forma_nome+' · '+currency(r.valor)}))}
+              label:'#'+r.id+' · '+r.forma_nome+' · disponível '+currency(r.saldo_estornavel)}))}
             placeholder="Escolha o recebimento original"/></label>:
           <label><span className="field-caption">Forma de pagamento <em>*</em></span>
             <FormControl type="select" value={moveForm.forma_id}
