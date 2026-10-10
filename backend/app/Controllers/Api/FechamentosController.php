@@ -49,7 +49,7 @@ class FechamentosController extends CommercialBaseController
     private function rows($db,string $start,string $end): array
     {
         $operations=$db->table('venda_operacoes o')
-            ->select('o.id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
+            ->select('o.id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_tabela,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas p','p.id=o.corretor_pessoa_id','left')
             ->where('o.situacao','VENDA')
