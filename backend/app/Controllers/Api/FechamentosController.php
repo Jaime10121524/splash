@@ -155,10 +155,20 @@ class FechamentosController extends CommercialBaseController
                 $history[(int)$m['rateio_id']][]=$m;
             }
         }
-        $paymentMethods=[];
-        foreach($db->table('venda_formas_pagamento')->select('id,nome')->get()->getResultArray() as $method){
+        $paymentMethods=[];$abatMethod=0;
+        foreach($db->table('venda_formas_pagamento')->select('id,nome,codigo')->get()->getResultArray() as $method){
             $paymentMethods[(int)$method['id']]=$method['nome'];
+            if($method['codigo']==='ABATIMENTO_EMP')$abatMethod=(int)$method['id'];
         }
+        $abated=static function(array $moves) use($abatMethod): int {
+            $total=0;
+            foreach($moves as $m){
+                if($abatMethod>0 && (int)($m['forma_id']??0)===$abatMethod){
+                    $total+=($m['tipo']==='PAGAMENTO'?1:-1)*VendaMoney::cents((string)$m['valor'],true);
+                }
+            }
+            return $total;
+        };
         $accounts=[];
         $personName=[];
         if($admin){
@@ -171,12 +181,13 @@ class FechamentosController extends CommercialBaseController
             $accounts[$personId]??=[
                 'pessoa_id'=>$personId,
                 'nome'=>$admin?($personName[$personId]??$name):$name,
-                'total_centavos'=>0,'pago_centavos'=>0,
+                'total_centavos'=>0,'pago_centavos'=>0,'abatido_centavos'=>0,
                 'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,
                 'itens'=>[],
             ];
             $accounts[$personId]['total_centavos']+=$line['total_centavos'];
             $accounts[$personId]['pago_centavos']+=$line['pago_centavos'];
+            $accounts[$personId]['abatido_centavos']+=$line['abatido_centavos'];
             $accounts[$personId]['itens'][]=$line;
         };
         foreach($operations as $op){
@@ -207,6 +218,7 @@ class FechamentosController extends CommercialBaseController
                 ...$meta,'tipo'=>'TITULAR','rateio_id'=>null,
                 'descricao'=>$sourceLabel,'pagador'=>'Clube / acerto do responsável',
                 'total_centavos'=>$rootTotal,'pago_centavos'=>$paidOwner,
+                'abatido_centavos'=>$abated($ownerByOperation[$key]['movimentos']??[]),
                 'movimentos'=>array_map(static function($m) use($admin,$paymentMethods){ return [
                     'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                     'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
@@ -228,7 +240,8 @@ class FechamentosController extends CommercialBaseController
                     },
                     'pagador'=>$admin?$a['origem_nome']:'Corretor responsável',
                     'total_centavos'=>$outstanding,'pago_centavos'=>$paid,
-                    'movimentos'=>array_map(static function($m) use($admin){ return [
+                    'abatido_centavos'=>$abated($history[(int)$a['id']]??[]),
+                    'movimentos'=>array_map(static function($m) use($admin,$paymentMethods){ return [
                         'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                         'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
                         'observacoes'=>$admin?$m['observacoes']:null,
@@ -241,7 +254,7 @@ class FechamentosController extends CommercialBaseController
                     $accounts[$payer]??=[
                         'pessoa_id'=>$payer,
                         'nome'=>$admin?($personName[$payer]??$a['origem_nome']):'Sua conta',
-                        'total_centavos'=>0,'pago_centavos'=>0,
+                        'total_centavos'=>0,'pago_centavos'=>0,'abatido_centavos'=>0,
                         'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,'itens'=>[],
                     ];
                     $accounts[$payer]['obrigações_centavos']+=$outstanding;
@@ -256,21 +269,26 @@ class FechamentosController extends CommercialBaseController
                 $line['total']=$balance['total'];
                 $line['pago']=$balance['pago'];
                 $line['pendente']=$balance['pendente'];
-                unset($line['total_centavos'],$line['pago_centavos']);
+                $line['abatido']=VendaMoney::decimal($line['abatido_centavos']);
+                $line['recebido']=VendaMoney::decimal($line['pago_centavos']-$line['abatido_centavos']);
+                unset($line['total_centavos'],$line['pago_centavos'],$line['abatido_centavos']);
             }
             unset($line);
             $due=$account['total_centavos'];
             $paid=$account['pago_centavos'];
+            $offset=$account['abatido_centavos'];
             $account['resumo']=[
                 'total'=>VendaMoney::decimal($due),
                 'pago'=>VendaMoney::decimal($paid),
+                'recebido'=>VendaMoney::decimal($paid-$offset),
+                'abatido'=>VendaMoney::decimal($offset),
                 'pendente'=>VendaMoney::decimal(max(0,$due-$paid)),
                 'a_repassar'=>VendaMoney::decimal($account['obrigações_centavos']),
                 'repasses_ja_pagos'=>VendaMoney::decimal($account['obrigações_pagas_centavos']),
                 'repasses_pendentes'=>VendaMoney::decimal(max(0,
                     $account['obrigações_centavos']-$account['obrigações_pagas_centavos'])),
             ];
-            unset($account['total_centavos'],$account['pago_centavos'],
+            unset($account['total_centavos'],$account['pago_centavos'],$account['abatido_centavos'],
                 $account['obrigações_centavos'],$account['obrigações_pagas_centavos']);
             // Conta individual não recebe sequer no JSON os valores que deve
             // repassar a terceiros; mostra somente o líquido que lhe pertence.
