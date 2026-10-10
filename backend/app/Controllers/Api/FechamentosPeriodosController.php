@@ -202,7 +202,7 @@ class FechamentosPeriodosController extends CommercialBaseController
                 $db->transRollback();return $this->errorResponse(409,'Mais de 500 vendas. Reduza o período.');
             }
             foreach($sales as $sale){
-                $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$sale['id']])->get()->getRowArray();
+                $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$sale['id']])->getRowArray();
                 if($db->table('fechamento_periodo_vendas')->where('operacao_id',(int)$sale['id'])->countAllResults()){
                     $db->transRollback();return $this->errorResponse(409,'Uma venda do período já pertence a outro fechamento. Consulte o histórico.');
                 }
@@ -480,7 +480,7 @@ class FechamentosPeriodosController extends CommercialBaseController
         $ids=array_map(static fn($x)=>(int)$x['id'],$rows);
         if($lock){
             $locked=$ids;sort($locked,SORT_NUMERIC);
-            foreach($locked as $id)$db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[$id])->get()->getRowArray();
+            foreach($locked as $id)$db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[$id])->getRowArray();
         }
         $byRateio=[];
         foreach($db->table('comissao_rateios')->select('operacao_id,responsavel_pessoa_id,valor')
@@ -675,7 +675,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             $entry=$db->table('fechamento_periodo_abates')->where('id',(int)$abatimentoId)
                 ->where('fechamento_id',(int)$id)->get()->getRowArray();
             if(!$entry){$db->transRollback();return $this->errorResponse(404,'Abatimento não encontrado.');}
-            $db->query('SELECT id FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[(int)$entry['emprestimo_id']])->get()->getRowArray();
+            $db->query('SELECT id FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[(int)$entry['emprestimo_id']])->getRowArray();
             $related=$db->table('comissao_titular_movimentos')->select('id')
                 ->where('lote_id',(int)$entry['lote_id'])->get()->getResultArray();
             foreach($related as $m){
@@ -755,7 +755,7 @@ class FechamentosPeriodosController extends CommercialBaseController
                 $db->transRollback();return $this->errorResponse(409,'Não existem vendas neste fechamento.');
             }
             sort($saleIds,SORT_NUMERIC);
-            foreach($saleIds as $sid)$db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[$sid])->get()->getRowArray();
+            foreach($saleIds as $sid)$db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[$sid])->getRowArray();
             $group=array_map(static fn($r)=>(int)$r['pessoa_id'],
                 $db->table('fechamento_periodo_pessoas')->select('pessoa_id')
                     ->where('fechamento_id',(int)$id)->get()->getResultArray());
@@ -877,7 +877,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             $entry=$db->table('fechamento_periodo_titulares')
                 ->where('id',(int)$entryId)->where('fechamento_id',(int)$id)->get()->getRowArray();
             if(!$entry){$db->transRollback();return $this->errorResponse(404,'Pagamento não encontrado.');}
-            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$entry['operacao_id']])->get()->getRowArray();
+            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$entry['operacao_id']])->getRowArray();
             $entry=$db->table('fechamento_periodo_titulares')->where('id',(int)$entryId)->get()->getRowArray();
             if($entry['situacao']!=='ATIVO'){
                 $db->transRollback();return $this->errorResponse(409,'Pagamento já estornado.');
@@ -923,7 +923,7 @@ class FechamentosPeriodosController extends CommercialBaseController
                 ->where('f.fechamento_id',(int)$id)->where('f.id',(int)$entryId)
                 ->get()->getRowArray();
             if(!$entry){$db->transRollback();return $this->errorResponse(404,'Repasse não encontrado.');}
-            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$entry['operacao_id']])->get()->getRowArray();
+            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$entry['operacao_id']])->getRowArray();
             $entry=$db->table('fechamento_periodo_repasses')->where('id',(int)$entryId)->get()->getRowArray();
             if($entry['situacao']!=='ATIVO'){
                 $db->transRollback();return $this->errorResponse(409,'Repasse já estornado.');
