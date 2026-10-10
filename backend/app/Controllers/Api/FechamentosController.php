@@ -202,6 +202,7 @@ class FechamentosController extends CommercialBaseController
                     'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                     'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
                     'observacoes'=>$m['observacoes'],
+                    'referencia_pagamento_id'=>$m['referencia_pagamento_id']===null?null:(int)$m['referencia_pagamento_id'],
                 ],$ownerByOperation[$key]['movimentos']??[]),
             ]);
             foreach($op['rateios'] as $a){
@@ -221,6 +222,7 @@ class FechamentosController extends CommercialBaseController
                         'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                         'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
                         'observacoes'=>$m['observacoes'],
+                        'referencia_pagamento_id'=>$m['referencia_pagamento_id']===null?null:(int)$m['referencia_pagamento_id'],
                     ],$history[(int)$a['id']]??[]),
                 ]);
                 if($onlyPersonId===null || (int)$a['responsavel_pessoa_id']===$onlyPersonId){
