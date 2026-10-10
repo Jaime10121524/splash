@@ -218,7 +218,7 @@ class FechamentosController extends CommercialBaseController
                 $oldIds=array_column($old,'id');
                 if($db->table('comissao_repasses')->whereIn('rateio_id',$oldIds)->countAllResults()){
                     $db->transRollback();
-                    return $this->errorResponse(409,'Existem pagamentos registrados. Estorne os repasses antes de editar; rateios com histórico financeiro exigem apuração complementar.');
+                    return $this->errorResponse(409,'Rateios com histórico de pagamentos ou estornos não podem ser substituídos. Faça um ajuste complementar no futuro fechamento.');
                 }
             }
             $clean=[];$ids=[];
@@ -244,6 +244,25 @@ class FechamentosController extends CommercialBaseController
             if(count($people)!==count($ids)){
                 $db->transRollback();
                 return $this->errorResponse(422,'Uma das pessoas não está cadastrada.');
+            }
+            $roles=[];
+            if($ids){
+                foreach($db->table('pessoa_papeis')->select('pessoa_id,papel')
+                    ->whereIn('pessoa_id',array_keys($ids))->get()->getResultArray() as $r){
+                    $roles[(int)$r['pessoa_id']][]=$r['papel'];
+                }
+            }
+            foreach($clean as $item){
+                $allowed=match($item['papel']){
+                    'CORRETOR'=>['corretor'],
+                    'ATENDENTE'=>['corretor','vendedor'],
+                    'GERENTE'=>['gerente'],
+                    default=>[],
+                };
+                if(!array_intersect($allowed,$roles[$item['beneficiario_pessoa_id']]??[])){
+                    $db->transRollback();
+                    return $this->errorResponse(422,'O beneficiário precisa ter a função correspondente cadastrada em Pessoas.');
+                }
             }
             $graph=array_map(static fn($a)=>[
                 'origem'=>$a['responsavel_pessoa_id'],'destino'=>$a['beneficiario_pessoa_id'],
