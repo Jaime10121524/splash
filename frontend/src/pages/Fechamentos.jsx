@@ -51,6 +51,8 @@ export default function Fechamentos({role='admin'}){
   const [paymentMethods,setPaymentMethods]=useState([])
   const [methodId,setMethodId]=useState('')
   const [batchEntries,setBatchEntries]=useState([])
+  const [loanOptions,setLoanOptions]=useState([])
+  const [batchAbates,setBatchAbates]=useState([])
   const [batchKey,setBatchKey]=useState('')
   const [planOverrides,setPlanOverrides]=useState([])
   const [removingOverride,setRemovingOverride]=useState(null)
@@ -285,34 +287,61 @@ export default function Fechamentos({role='admin'}){
   }
   const newKey=()=> (typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():
     String(Date.now())+'_'+Math.random().toString(36).slice(2,12))
-  function openBatch(person){
-    setFormError('');setDate(localDateISO());setReason('')
-    const initial=paymentMethods.find(f=>f.codigo==='PIX')||paymentMethods[0]
-    setBatchEntries([{forma_id:String(initial?.id||''),valor:''}])
-    setBatchKey(newKey())
-    setMethodId(String(initial?.id||''))
-    setDialog({type:'batch',person})
+  async function openBatch(person){
+    setBusy(true);setFormError('');setDate(localDateISO());setReason('')
+    try{
+      const data=await comercialGet('/api/financeiro/pessoal?'+new URLSearchParams({
+        pessoa_id:String(person.pessoa_id),inicio:start,fim:end,
+      }))
+      setLoanOptions((data.emprestimos||[]).filter(l=>Number(l.saldo)>0))
+      setBatchAbates([])
+      const initial=paymentMethods.find(f=>f.codigo==='PIX')||paymentMethods[0]
+      setBatchEntries([{forma_id:String(initial?.id||''),valor:''}])
+      setBatchKey(newKey())
+      setMethodId(String(initial?.id||''))
+      setDialog({type:'batch',person})
+    }catch(e){setError(e.message)}
+    finally{setBusy(false)}
   }
   function updateBatch(index,field,value){
     setBatchEntries(old=>old.map((item,i)=>i===index?{...item,[field]:value}:item))
   }
   const batchSum=batchEntries.reduce((sum,item)=>sum+(Number(numeric(item.valor))||0),0)
+  const abateSum=batchAbates.reduce((sum,item)=>sum+(Number(numeric(item.valor))||0),0)
+  const batchTotal=batchSum+abateSum
+  function updateAbate(index,field,value){
+    setBatchAbates(old=>old.map((item,i)=>i===index?{...item,[field]:value}:item))
+  }
   async function saveBatch(event){
     event.preventDefault()
     const person=dialog.person
-    if(!batchEntries.length||batchEntries.some(x=>!x.forma_id||!numeric(x.valor)||Number(numeric(x.valor))<=0)){
-      return setFormError('Informe a forma e o valor de cada parte do pagamento.')
+    const cashEntries=batchEntries.filter(x=>String(x.valor).trim()!=='')
+    if(cashEntries.some(x=>!x.forma_id||!numeric(x.valor)||Number(numeric(x.valor))<=0)){
+      return setFormError('Informe a forma e o valor de cada pagamento real.')
     }
-    if(batchSum>Number(person.resumo.pendente)+0.00001)return setFormError('O acerto supera o saldo pendente da pessoa.')
+    if(batchAbates.some(x=>!x.emprestimo_id||!numeric(x.valor)||Number(numeric(x.valor))<=0)){
+      return setFormError('Informe um empréstimo e valor de abatimento válido.')
+    }
+    for(const x of batchAbates){
+      const loan=loanOptions.find(l=>String(l.id)===String(x.emprestimo_id))
+      if(!loan||Number(numeric(x.valor))>Number(loan.saldo)+0.00001){
+        return setFormError('O abatimento ultrapassa o saldo do empréstimo.')
+      }
+    }
+    if(batchTotal<=0||batchTotal>Number(person.resumo.pendente)+0.00001){
+      return setFormError('O valor pago mais o abatimento deve ser positivo e não ultrapassar a comissão pendente.')
+    }
     setBusy(true);setFormError('')
     try{
       const payload={
         chave_requisicao:batchKey,pessoa_id:Number(person.pessoa_id),inicio:start,fim:end,
         data_pagamento:date,observacoes:reason,
-        formas:batchEntries.map(x=>({forma_id:Number(x.forma_id),valor:numeric(x.valor)})),
+        formas:cashEntries.map(x=>({forma_id:Number(x.forma_id),valor:numeric(x.valor)})),
+        abatimentos:batchAbates.map(x=>({emprestimo_id:Number(x.emprestimo_id),valor:numeric(x.valor)})),
       }
       const result=await comercialPost('/api/fechamentos/pagamentos-lote',payload)
-      setNotice(result.message+' '+money(result.valor_total||batchSum)+' distribuídos nas vendas desta pessoa.')
+      setNotice(result.message+' Pago: '+money(result.valor_transferido||batchSum)
+        +' · Abatimento da dívida: '+money(result.valor_abate||abateSum)+'.')
       setDialog(null);await reload()
     }catch(e){setFormError(e.message)}
     finally{setBusy(false)}
@@ -503,9 +532,35 @@ export default function Fechamentos({role='admin'}){
           <button type="button" className="vd-outline" disabled={batchEntries.length>=10}
             onClick={()=>setBatchEntries(entries=>[...entries,{forma_id:String(paymentMethods[0]?.id||''),valor:''}])}>+ Outra forma de pagamento</button>
         </div>
+        <div className="fc-loan-offsets">
+          <div><strong>Abatimento de empréstimo (negociado)</strong>
+            <small>Não é dinheiro transferido. Deduz a dívida desta pessoa e liquida a mesma parcela da comissão.</small></div>
+          {batchAbates.map((row,i)=><div className="fc-batch-row" key={i}>
+            <label>Empréstimo
+              <FormControl type="select" value={row.emprestimo_id}
+                onChange={v=>updateAbate(i,'emprestimo_id',v)}
+                options={loanOptions.filter(l=>String(l.id)===String(row.emprestimo_id)
+                  ||!batchAbates.some(b=>String(b.emprestimo_id)===String(l.id)))
+                  .map(l=>({value:String(l.id),label:'#'+l.id+' · Falta '+money(l.saldo)}))}
+                placeholder="Selecione o empréstimo"/></label>
+            <label>Abater (R$)
+              <input inputMode="decimal" value={row.valor}
+                onChange={e=>updateAbate(i,'valor',e.target.value)} placeholder="Ex.: 50,00"/></label>
+            <button type="button" className="vd-outline"
+              onClick={()=>setBatchAbates(old=>old.filter((_,j)=>j!==i))}>Retirar</button>
+          </div>)}
+          {loanOptions.length>batchAbates.length&&
+            <button type="button" className="vd-outline"
+              onClick={()=>setBatchAbates(old=>[...old,{emprestimo_id:'',valor:''}])}>
+              + Abater de um empréstimo
+            </button>}
+          {!loanOptions.length&&<small>Nenhum empréstimo com saldo nesta pessoa. Cadastre em Financeiro → Empréstimos.</small>}
+        </div>
         <div className="fc-batch-total">
-          <span>Total deste pagamento</span><strong>{money(batchSum)}</strong>
-          <small>Saldo disponível {money(dialog.person.resumo.pendente)}. Você pode pagar só uma parte agora.</small>
+          <span>Pago por Pix/dinheiro/outros</span><strong>{money(batchSum)}</strong>
+          <span>Abatido da dívida</span><strong>{money(abateSum)}</strong>
+          <span>Total liquidado neste acerto</span><strong>{money(batchTotal)}</strong>
+          <small>Saldo disponível {money(dialog.person.resumo.pendente)}. Você pode liquidar somente uma parte agora.</small>
         </div>
         <label>Observações (opcional)
           <textarea maxLength={500} rows={2} value={reason}
@@ -523,7 +578,7 @@ export default function Fechamentos({role='admin'}){
         <div className="cm-form-actions">
           <button type="button" className="cm-button" disabled={busy} onClick={()=>setDialog(null)}>Cancelar</button>
           <button type="submit" className="cm-button primary"
-            disabled={busy || batchSum<=0 || batchSum>Number(dialog.person.resumo.pendente)+0.00001}>
+            disabled={busy || batchTotal<=0 || batchTotal>Number(dialog.person.resumo.pendente)+0.00001}>
             {busy?'Registrando...':'Confirmar pagamento à pessoa'}</button>
         </div>
       </form>}
