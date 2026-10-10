@@ -50,7 +50,8 @@ if(count($rows)!==1 || $rows[0]['papel']!=='GERENTE' || $rows[0]['valor']!==6000
     throw new RuntimeException('Gerente no fim de semana: esperado 5% = 60.');
 }
 $op['data_venda']='2026-10-09';
-if(RateioAutomatico::propose($op,$policy)['rateios']!==[]){
-    throw new RuntimeException('Gerente não recebe em dia útil.');
+$rows=RateioAutomatico::propose($op,$policy)['rateios'];
+if(count($rows)!==1||$rows[0]['papel']!=='GERENTE'||$rows[0]['valor']!==6000){
+    throw new RuntimeException('Gerente cadastrado recebe percentual também em dia útil.');
 }
 echo "RateioAutomatico: 6 cenários OK\n";
