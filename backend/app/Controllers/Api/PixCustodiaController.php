@@ -184,7 +184,14 @@ final class PixCustodiaController extends CommercialBaseController
             if($already){
                 $db->transRollback();return $this->responseOK('Vínculo já registrado, sem duplicar.',200,['duplicado'=>true]);
             }
-            // Bloqueia a própria entrada para que dois fechamentos não vinculem o mesmo Pix.
+            // Mesma ordem de lock usada nos estornos das vendas: primeiro operação,
+            // depois recebimento. Evita uma devolução concorrente mudar o saldo.
+            $meta=$db->table('venda_recebimentos')->select('operacao_id')
+                ->where('id',$rid)->get()->getRowArray();
+            if(!$meta){
+                $db->transRollback();return $this->errorResponse(404,'Pix original não encontrado.');
+            }
+            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$meta['operacao_id']])->getRowArray();
             $db->query('SELECT id FROM venda_recebimentos WHERE id=? FOR UPDATE',[$rid])->getRowArray();
             $origin=$this->origem($db,$rid,$period);
             $valor=$origin?VendaMoney::cents((string)$origin['valor_disponivel'],true):0;
