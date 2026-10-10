@@ -62,6 +62,13 @@ $routes->group('api', static function ($routes): void {
     $routes->post('vendas/aplicacoes/(:segment)', 'Api\VendasCatalogosController::aplicacao/$1', ['filter'=>'csrf']);
 
     // Apuração individual: rateios, pagamentos manuais e extrato próprio.
+    // Contas pessoais. A API resolve a pessoa do usuário, nunca aceita trocar o dono por parâmetro.
+    $routes->get('financeiro/pessoal', 'Api\\FinanceiroPessoalController::index');
+    $routes->post('financeiro/categorias', 'Api\\FinanceiroPessoalController::cadastrarCategoria', ['filter'=>'csrf']);
+    $routes->post('financeiro/despesas', 'Api\\FinanceiroPessoalController::cadastrarDespesa', ['filter'=>'csrf']);
+    $routes->post('financeiro/despesas/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarDespesa/$1', ['filter'=>'csrf']);
+    $routes->post('financeiro/emprestimos', 'Api\\FinanceiroPessoalController::cadastrarEmprestimo', ['filter'=>'csrf']);
+
     $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
     $routes->get('fechamentos/meu', 'Api\FechamentosController::meu');
     $routes->get('fechamentos/contas', 'Api\FechamentosController::contas');
