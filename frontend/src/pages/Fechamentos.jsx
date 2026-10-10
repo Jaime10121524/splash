@@ -32,6 +32,8 @@ export default function Fechamentos({role='admin'}){
   const [settlements,setSettlements]=useState([])
   const [showSales,setShowSales]=useState(false)
   const [openPersons,setOpenPersons]=useState({})
+  const [focusPerson,setFocusPerson]=useState('')
+  const [personFinance,setPersonFinance]=useState(null)
   const [busy,setBusy]=useState(false)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
@@ -103,6 +105,38 @@ export default function Fechamentos({role='admin'}){
     paid:r.paid+Number(a.resumo.pago),
     pending:r.pending+Number(a.resumo.pendente),
   }),{due:0,paid:0,pending:0})
+  const selectedAccount=accounts.find(a=>String(a.pessoa_id)===focusPerson)||accounts[0]||null
+  const focusedId=Number(selectedAccount?.pessoa_id||0)
+  const owned=(report?.operacoes||[]).filter(o=>Number(o.corretor_pessoa_id)===focusedId)
+  const gross=owned.reduce((sum,op)=>sum+Number(op.comissao_base||0),0)
+  const obligations=(report?.operacoes||[]).flatMap(op=>(op.rateios||[])
+    .filter(rate=>Number(rate.responsavel_pessoa_id)===focusedId)
+    .map(rate=>({...rate,op_id:op.id,titulo:op.numero_titulo?op.numero_titulo+' '+(op.sigla_plano||''):'#'+op.id})))
+  const outgoing=obligations.reduce((n,r)=>n+Number(r.valor||0),0)
+  const outgoingPaid=obligations.reduce((n,r)=>n+Number(r.pago||0),0)
+  const payable=obligations.reduce((n,r)=>n+Number(r.pendente||0),0)
+  const ownEntries=(selectedAccount?.itens||[]).filter(i=>i.tipo==='TITULAR')
+  const ownReceived=ownEntries.reduce((n,i)=>n+Number(i.recebido||0),0)
+  const ownRemaining=ownEntries.reduce((n,i)=>n+Number(i.pendente||0),0)
+  const otherRights=(selectedAccount?.itens||[]).filter(i=>i.tipo==='PARTICIPACAO')
+    .reduce((n,i)=>n+Number(i.total||0),0)
+  const expense=Number(personFinance?.resumo?.despesas_periodo||0)
+  const netAfterExpenses=Number(selectedAccount?.resumo?.total||0)-expense
+  const recipients=Object.values(obligations.reduce((map,item)=>{
+    const id=String(item.beneficiario_pessoa_id)
+    const r=map[id]||{id,name:item.beneficiario_nome,total:0,paid:0,pending:0,count:0}
+    r.total+=Number(item.valor);r.paid+=Number(item.pago);r.pending+=Number(item.pendente)
+    r.count+=1;map[id]=r;return map
+  },{})).sort((a,b)=>b.pending-a.pending)
+  useEffect(()=>{
+    if(!admin||!selectedAccount)return undefined
+    let active=true;setPersonFinance(null)
+    comercialGet('/api/financeiro/pessoal?'+new URLSearchParams({
+      inicio:start,fim:end,pessoa_id:String(selectedAccount.pessoa_id),
+    })).then(result=>{if(active)setPersonFinance(result)})
+      .catch(()=>{if(active)setPersonFinance(null)})
+    return ()=>{active=false}
+  },[admin,start,end,selectedAccount?.pessoa_id])
   const openOwnPayment=line=>{
     setMethodId(String(paymentMethods.find(m=>m.codigo==='PIX')?.id||paymentMethods[0]?.id||''))
     setAmount(Number(line.pendente).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}))
@@ -390,6 +424,58 @@ export default function Fechamentos({role='admin'}){
         <div><span>Total a pagar às pessoas</span><strong>{money(totals.due)}</strong></div>
         <div><span>Liquidado (pagamentos + abatimentos)</span><strong>{money(totals.paid)}</strong></div>
         <div><span>Ainda falta pagar</span><strong>{money(totals.pending)}</strong></div>
+      </section>
+      <section className="com-panel fc-checkout">
+        <div className="com-panel-head"><div><h2>Fechamento semanal — conferência de caixa</h2>
+          <p>Escolha um corretor. Confira comissões, o que já recebeu, a parte ainda sem baixa e as obrigações com os participantes. Depois registre os acertos.</p></div></div>
+        <div className="fc-checkout-body">
+          <div className="fc-checkout-toolbar">
+            <label>Fechamento de quem?
+              <FormControl type="select" value={selectedAccount?String(selectedAccount.pessoa_id):''}
+                onChange={setFocusPerson}
+                options={accounts.map(a=>({value:String(a.pessoa_id),label:a.nome}))}
+                placeholder="Selecione o corretor"/></label>
+            <span>{dateBR(start)} a {dateBR(end)}</span>
+          </div>
+          {selectedAccount?<>
+            <div className="fc-checkout-steps">
+              <span>1. Conferir vendas</span><span>2. Conferir repasses</span>
+              <span>3. Pagar / abater empréstimo</span><span>4. Confirmar e conferir extrato</span>
+            </div>
+            <div className="fc-checkout-kpis">
+              <div><span>Comissão bruta das vendas próprias</span><strong>{money(gross)}</strong></div>
+              <div><span>Participações a pagar</span><strong>{money(outgoing)}</strong></div>
+              <div><span>Já recebido da parte própria</span><strong>{money(ownReceived)}</strong></div>
+              <div><span>Parte própria ainda sem baixa</span><strong>{money(ownRemaining)}</strong></div>
+              <div><span>Direitos por atendimento/gerência</span><strong>{money(otherRights)}</strong></div>
+              <div><span>Despesas pessoais no período</span><strong>{personFinance?money(expense):'—'}</strong></div>
+              <div><span>Comissão líquida prevista após rateios</span><strong>{money(selectedAccount.resumo.total)}</strong></div>
+              <div><span>Líquido estimado após despesas</span><strong>{personFinance?money(netAfterExpenses):'—'}</strong></div>
+            </div>
+            <p className="fc-help">Comissão bruta não representa dinheiro em mãos. “Já recebido” mostra pagamentos lançados na parte própria; Pix retido e valores guardados para o clube precisam ser registrados e conciliados. O líquido estimado não é saldo bancário nem inclui empréstimos ainda não abatidos.</p>
+            <div className="fc-checkout-balance">
+              <div><span>Participantes já pagos</span><strong>{money(outgoingPaid)}</strong></div>
+              <div><span>Participantes que falta pagar</span><strong>{money(payable)}</strong></div>
+              <div><span>Saldo dos empréstimos da pessoa</span><strong>{personFinance?money(personFinance.resumo?.saldo_emprestimos):'—'}</strong></div>
+            </div>
+            <div className="fc-checkout-recipients">
+              <h3>Quem este corretor ainda precisa pagar</h3>
+              {recipients.length?recipients.map(r=><div key={r.id}>
+                <div><strong>{r.name}</strong><small>{r.count} participações · Total {money(r.total)} · Pago {money(r.paid)}</small></div>
+                <strong>{money(r.pending)} pendente</strong>
+                <button type="button" className="vd-outline" disabled={busy||r.pending<=0}
+                  onClick={()=>{const target=accounts.find(a=>Number(a.pessoa_id)===Number(r.id));if(target)openBatch(target)}}>
+                  Registrar acerto</button>
+              </div>):<p className="fc-hint">Não há participantes para pagar neste período.</p>}
+            </div>
+            <div className="fc-checkout-actions">
+              <button type="button" className="vd-outline" onClick={()=>setShowSales(true)}>Conferir vendas e rateios</button>
+              <button type="button" className="cm-button primary" disabled={busy||Number(selectedAccount.resumo.pendente)<=0}
+                onClick={()=>openBatch(selectedAccount)}>Acertar comissão de {selectedAccount.nome}</button>
+            </div>
+            <p className="fc-help">No acerto você informa Pix, dinheiro ou outra forma e, separadamente, o valor negociado a abater de um empréstimo. O sistema baixa as vendas da pessoa por ordem cronológica.</p>
+          </>:<div className="com-empty">Nenhuma comissão apurada para o período escolhido.</div>}
+        </div>
       </section>
       <section className="com-panel fc-breakdown">
         <div className="com-panel-head"><div><h2>Quanto pagar a cada pessoa</h2>
