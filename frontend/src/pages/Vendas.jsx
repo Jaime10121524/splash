@@ -348,9 +348,21 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         <div className="cm-form-grid">
           <label>Valor de tabela
             <div className="vd-readonly">{currency(selectedPlanTotal)}</div></label>
-          <label>Desconto da sua comissão
-            <input type="text" inputMode="decimal" value={saleForm.desconto_corretor}
-              onChange={e=>setField('desconto_corretor',e.target.value)} placeholder="0,00"/></label>
+          <label>Desconto concedido ao cliente
+            <div className="vd-money-control">
+              <span className="vd-money-prefix" aria-hidden="true">R$</span>
+              <input type="text" inputMode="decimal" aria-label="Valor do desconto concedido ao cliente"
+                value={saleForm.desconto_corretor}
+                onFocus={e=>e.target.select()}
+                onChange={e=>setField('desconto_corretor',e.target.value.replace(/[^0-9,.]/g,''))}
+                onBlur={()=>{
+                  const parsed=moneyInput(saleForm.desconto_corretor)
+                  if(parsed!==null)setField('desconto_corretor',Number(parsed).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}))
+                }}
+                placeholder="0,00"/>
+            </div>
+            <small className="vd-field-help">O desconto sai integralmente da comissão do corretor, não da parte do clube.</small>
+          </label>
         </div>
         <div className="vd-summary-line">Valor cobrado do cliente <strong>{duePreview!==null&&duePreview>=0?currency(duePreview):'Inválido'}</strong></div>
         <label>Data da negociação <FormControl type="date" value={saleForm.data_negociacao}
