@@ -8,6 +8,7 @@ use App\Libraries\RateioRules;
 use App\Libraries\RateioAutomatico;
 use App\Libraries\VendaMoney;
 use App\Libraries\SaldoComissao;
+use App\Libraries\ExtratoPermissoes;
 use App\Libraries\DistribuicaoPagamento;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
@@ -344,8 +345,9 @@ class FechamentosController extends CommercialBaseController
                 return $this->errorResponse(403,'Acesso ao financeiro não autorizado.');
             }
             // Delegados consultam apenas a conta pessoal: jamais recebem o extrato dos terceiros.
-            $canSeeOutgoing=$user->inGroup('corretor') && !$db->table('fechamento_responsabilidades')
-                ->where('corretor_pessoa_id',$personId)->countAllResults();
+            $delegado=$db->table('fechamento_responsabilidades')
+                ->where('corretor_pessoa_id',$personId)->countAllResults()>0;
+            $canSeeOutgoing=ExtratoPermissoes::repasses(false,$user->inGroup('corretor'),$delegado);
         }
         $operations=$this->rows($db,$start,$end);
         $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId,$canSeeOutgoing);
