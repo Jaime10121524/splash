@@ -337,7 +337,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         dialog.type==='receipt'?'Registrar recebimento':dialog.type==='refund'?'Devolver dinheiro':
         dialog.type==='reversal'?'Estornar lançamento':dialog.type==='edit'?'Corrigir cadastro':
         dialog.type==='details'?'Extrato da operação':dialog.type==='adjust'?'Ajustar comissão':dialog.type==='setting'?'Cadastro financeiro':'Configurações de vendas'}
-      subtitle={dialog.type==='details'||dialog.type==='receipt'||dialog.type==='refund'?dialog.op?.cliente_nome:''}
+      subtitle={['details','receipt','refund','reversal','edit'].includes(dialog.type)?dialog.op?.cliente_nome:''}
       busy={busy} onClose={()=>setDialog(null)}>
 
       {['new','edit'].includes(dialog.type)&&<form className="cm-form vd-form" onSubmit={saveSale}>
@@ -447,23 +447,28 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       </form>}
 
       {dialog.type==='details'&&detail&&<div className="cm-form">
-        <div className="vd-overview"><div><span>Valor cobrado</span><strong>{currency(detail.operacao.valor_cobrado)}</strong></div>
-          <div><span>Recebido líquido</span><strong>{currency(detail.recebido)}</strong></div>
-          <div><span>Saldo a receber</span><strong>{currency(detail.saldo)}</strong></div></div>
-        <div className="vd-detail-title"><strong>Movimentos registrados</strong><small>Não editáveis; correções são devoluções vinculadas</small></div>
+        <div className="vd-overview"><div><span>Preço cobrado pelo título</span><strong>{currency(detail.operacao.valor_cobrado)}</strong></div>
+          <div><span>Cliente já pagou</span><strong>{currency(detail.recebido)}</strong></div>
+          <div><span>Falta o cliente pagar</span><strong>{currency(detail.saldo)}</strong></div></div>
+        <div className="com-inform">Esses três valores mostram pagamentos do CLIENTE pelo título, não o que o clube deve de comissão ao corretor.</div>
+        <div className="vd-detail-title"><strong>Movimentos registrados</strong><small>Estorno corrige erro; devolução registra dinheiro realmente devolvido</small></div>
         {(detail.movimentos||[]).length ? <div className="vd-ledger">{detail.movimentos.map(m=><div key={m.id} className="vd-ledger-entry">
-          <div><strong>{m.tipo==='DEVOLUCAO'?'Devolução':'Recebimento'} · {m.forma_nome}</strong>
+          <div><strong>{m.tipo==='ESTORNO'?'Estorno (correção)':m.tipo==='DEVOLUCAO'?'Devolução real':'Recebimento'} · {m.forma_nome}</strong>
             <small>{dateBR(m.data_movimento)} · {m.detentor==='CORRETOR'?'Com você':'Com a empresa'} · Lançamento #{m.id}</small>
             {m.observacoes&&<small>{m.observacoes}</small>}</div>
-          <strong className={m.tipo==='DEVOLUCAO'?'vd-negative':'vd-positive'}>{m.tipo==='DEVOLUCAO'?'-':'+'}{currency(m.valor)}</strong>
+          <strong className={m.tipo==='ENTRADA'?'vd-positive':'vd-negative'}>{m.tipo==='ENTRADA'?'+':'-'}{currency(m.valor)}</strong>
         </div>)}</div>:<div className="com-empty vd-empty">Nenhum recebimento lançado.</div>}
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
-        <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada':'Comissão estimada'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'A conferir':currency(detail.operacao.comissao_prevista)}</strong></span></div>
+        <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada (a apurar)':'Comissão prevista (não paga)'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'A conferir':currency(detail.operacao.comissao_prevista)}</strong></span></div>
         {detail.operacao.ajuste_motivo&&<div className="com-inform">Justificativa do ajuste: {detail.operacao.ajuste_motivo}</div>}
+        <div className="com-inform">Pagamento de comissão, valores a repassar ao clube e despesas serão controlados separadamente no fechamento. O lançamento de Pix acima não significa que a comissão já foi paga.</div>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions vd-wrap">
           <button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
+          <button type="button" className="cm-button" disabled={!!detail.movimentos.length || detail.operacao.comissao_ajustada!==null} onClick={openEdit}>Editar cadastro</button>
           <button type="button" className="cm-button" onClick={openAdjustment}>Ajustar comissão</button>
-          <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver</button>
+          <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
+          <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
           <button type="button" className="cm-button primary" disabled={Number(detail.saldo)<=0} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
         </div>
       </div>}
@@ -482,16 +487,18 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <button type="submit" className="cm-button primary" disabled={busy}>{busy?'Salvando...':'Salvar ajuste'}</button></div>
       </form>}
 
-      {(dialog.type==='receipt'||dialog.type==='refund')&&<form className="cm-form" onSubmit={saveMovement}>
-        <div className="com-inform">{dialog.type==='refund'
-          ? 'A devolução ficará vinculada ao recebimento original e será atribuída ao mesmo responsável pelo dinheiro.'
-          : 'Informe o valor efetivamente recebido. Pix fica com você; cartão de crédito fica com a empresa, até registrar uma exceção/transferência em etapa posterior.'}</div>
-        {dialog.type==='refund'?<label>Recebimento original
+      {['receipt','refund','reversal'].includes(dialog.type)&&<form className="cm-form" onSubmit={saveMovement}>
+        <div className="com-inform">{dialog.type==='reversal'
+          ? 'ESTORNO é apenas uma correção de lançamento incorreto. Nenhum dinheiro é devolvido ao cliente. O sistema anula o saldo registrado dessa entrada e preserva o histórico. Depois, registre o recebimento certo.'
+          : dialog.type==='refund'
+          ? 'DEVOLUÇÃO significa dinheiro de fato devolvido ao cliente e mantém o responsável por esse dinheiro. Não utilize para corrigir erro de digitação.'
+          : 'Informe quanto o CLIENTE realmente pagou pelo título. Isso não significa comissão recebida. Pix fica com o corretor responsável pela arrecadação; crédito fica com a empresa.'}</div>
+        {['refund','reversal'].includes(dialog.type)?<label>Recebimento original
           <FormControl type="select" value={moveForm.entrada_id}
             onChange={v=>setMoveForm(f=>({...f,entrada_id:v}))}
             options={entryRecords.map(r=>({value:String(r.id),
               label:'#'+r.id+' · '+r.forma_nome+' · '+currency(r.valor)}))}
-            placeholder="Escolha a entrada para devolver"/></label>:
+            placeholder="Escolha o recebimento original"/></label>:
           <label><span className="field-caption">Forma de pagamento <em>*</em></span>
             <FormControl type="select" value={moveForm.forma_id}
               onChange={v=>setMoveForm(f=>({...f,forma_id:v}))}
@@ -504,19 +511,19 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
                 onChange={v=>setMoveForm(f=>({...f,detentor:v}))}
                 options={[{value:'CORRETOR',label:'Com você'},{value:'EMPRESA',label:'Com a empresa'}]}/>}
         </label>}
-        <div className="cm-form-grid"><label><span className="field-caption">Valor (R$) <em>*</em></span>
+        {dialog.type!=='reversal'&&<div className="cm-form-grid"><label><span className="field-caption">Valor (R$) <em>*</em></span>
           <input type="text" inputMode="decimal" value={moveForm.valor}
             onChange={e=>setMoveForm(f=>({...f,valor:e.target.value}))} placeholder="Ex.: 200,00"/></label>
           <label>Data do movimento <FormControl type="date" value={moveForm.data_movimento}
-            onChange={v=>setMoveForm(f=>({...f,data_movimento:v}))}/></label></div>
-        <label>{dialog.type==='refund'?'Motivo obrigatório':'Observações'}
+            onChange={v=>setMoveForm(f=>({...f,data_movimento:v}))}/></label></div>}
+        <label>{dialog.type==='refund'?'Motivo da devolução':dialog.type==='reversal'?'Motivo do erro no lançamento':'Observações'}
           <textarea rows={2} maxLength={500} value={moveForm.observacoes}
             onChange={e=>setMoveForm(f=>({...f,observacoes:e.target.value}))}/></label>
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions"><button type="button" className="cm-button" disabled={busy}
           onClick={()=>setDialog({type:'details',op:dialog.op})}>Voltar</button>
           <button type="submit" className="cm-button primary" disabled={busy}>
-            {busy?'Gravando...':dialog.type==='refund'?'Confirmar devolução':'Registrar recebimento'}</button></div>
+            {busy?'Gravando...':dialog.type==='refund'?'Confirmar devolução':dialog.type==='reversal'?'Confirmar estorno':'Registrar recebimento'}</button></div>
       </form>}
 
       {dialog.type==='settings'&&<div className="cm-form">
