@@ -214,9 +214,8 @@ class PlanosController extends BaseController
     {
         // Validação preventiva para a implementação futura de vendas.
         // As FKs de vendas/títulos também deverão ser RESTRICT na exclusão.
-        return $db->tableExists('vendas')
-            && $db->fieldExists('plano_versao_id', 'vendas')
-            && $db->table('vendas')->where('plano_versao_id',$versionId)->countAllResults() > 0;
+        return $db->tableExists('venda_operacoes')
+            && $db->table('venda_operacoes')->where('plano_versao_id',$versionId)->countAllResults() > 0;
     }
 
     private function validateVersion(array $data): array
