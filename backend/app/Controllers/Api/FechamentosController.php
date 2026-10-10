@@ -694,6 +694,17 @@ class FechamentosController extends CommercialBaseController
                 $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$row['id']])->getRowArray();
             }
             $operations=$this->rows($db,$start,$end);
+            foreach($operations as $op){
+                $incoming=false;$outgoing=false;
+                foreach($op['rateios'] as $rateio){
+                    if((int)$rateio['beneficiario_pessoa_id']===(int)$personId)$incoming=true;
+                    if((int)$rateio['responsavel_pessoa_id']===(int)$personId)$outgoing=true;
+                }
+                if($incoming && $outgoing){
+                    $db->transRollback();
+                    return $this->errorResponse(409,'Esta pessoa também redistribui comissão recebida nesta venda. É necessário conferir o rateio antes do acerto automático para não pagar duas vezes.');
+                }
+            }
             $accounts=$this->contasPorPessoa($db,$operations,true,(int)$personId);
             if(!$accounts){
                 $db->transRollback();return $this->errorResponse(409,'Nenhum valor disponível para esta pessoa no período.');
