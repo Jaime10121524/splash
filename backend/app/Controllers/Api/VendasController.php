@@ -135,6 +135,7 @@ class VendasController extends CommercialBaseController
         $history=$db->table('venda_operacoes_auditoria')->select('id,acao,justificativa,criado_em,usuario_id')
             ->where('operacao_id',(int)$id)->orderBy('id','DESC')->get()->getResultArray();
         $editavel=$op['comissao_ajustada']===null;
+        if($this->temRateio($db,(int)$id))$editavel=false;
         foreach($movements as $mov){
             if($mov['tipo']==='DEVOLUCAO') $editavel=false;
         }
@@ -304,7 +305,7 @@ class VendasController extends CommercialBaseController
                 $net += $move['tipo']==='ENTRADA' ? $cent : -$cent;
                 if($move['tipo']==='DEVOLUCAO')$hasRealRefund=true;
             }
-            if($net!==0 || $hasRealRefund || $op['comissao_ajustada']!==null){
+            if($net!==0 || $hasRealRefund || $op['comissao_ajustada']!==null || $this->temRateio($db,(int)$id)){
                 $db->transRollback();
                 return $this->errorResponse(409,'Cadastro protegido: existem pagamentos não estornados, devoluções reais ou comissão já ajustada. Apenas operações sem movimentação financeira válida podem ser corrigidas.');
             }
@@ -481,6 +482,10 @@ class VendasController extends CommercialBaseController
         $db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($op && $this->temRateio($db,(int)$id)){
+                $db->transRollback();
+                return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
+            }
             $method=$db->table('venda_formas_pagamento')->where('id',$methodId)->get()->getRowArray();
             if(!$op||!$method ||!(bool)$method['ativo']){
                 $db->transRollback();
@@ -538,6 +543,10 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($op && $this->temRateio($db,(int)$id)){
+                $db->transRollback();
+                return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
+            }
             $original=$db->table('venda_recebimentos')->where('id',$reference)
                 ->where('operacao_id',(int)$id)->where('tipo','ENTRADA')->get()->getRowArray();
             if(!$op||!$original){
@@ -589,6 +598,10 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($op && $this->temRateio($db,(int)$id)){
+                $db->transRollback();
+                return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
+            }
             $original=$db->table('venda_recebimentos')
                 ->where('id',$reference)->where('operacao_id',(int)$id)->where('tipo','ENTRADA')
                 ->get()->getRowArray();
@@ -637,6 +650,10 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($op && $this->temRateio($db,(int)$id)){
+                $db->transRollback();
+                return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
+            }
             if(!$op){
                 $db->transRollback();
                 return $this->errorResponse(404,'Venda ou pendência não encontrada.');
@@ -731,6 +748,11 @@ class VendasController extends CommercialBaseController
             $new['regra_snapshot']=json_encode($estimate['rule'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
         }
         $db->table('venda_operacoes')->where('id',$id)->update($new);
+    }
+
+    private function temRateio($db,int $id): bool
+    {
+        return $db->table('comissao_rateios')->where('operacao_id',$id)->countAllResults()>0;
     }
 
     private function number(mixed $raw): ?string
