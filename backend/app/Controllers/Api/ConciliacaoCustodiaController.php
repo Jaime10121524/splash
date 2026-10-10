@@ -111,6 +111,17 @@ final class ConciliacaoCustodiaController extends CommercialBaseController
                 return $this->responseOK('Movimento já registrado. Nenhum valor foi duplicado.',200,['duplicado'=>true]);
             }
             $old=$this->balanco($db,$period);
+            if($tipo==='PIX_RETIDO'){
+                $repetido=$db->table('fechamento_custodia_movimentos c')
+                    ->join('fechamento_periodos f','f.id=c.fechamento_id')
+                    ->where('f.responsavel_pessoa_id',(int)$period['responsavel_pessoa_id'])
+                    ->where('c.tipo','PIX_RETIDO')->where('c.situacao','ATIVO')
+                    ->where('c.referencia',$referencia)->countAllResults();
+                if($repetido){
+                    $db->transRollback();
+                    return $this->errorResponse(409,'Referência de Pix já utilizada neste grupo. Confira o movimento anterior.');
+                }
+            }
             if($tipo==='SALDO_ANTERIOR'){
                 foreach($old['movimentos'] as $movement){
                     if($movement['tipo']==='SALDO_ANTERIOR' && $movement['situacao']==='ATIVO'){
