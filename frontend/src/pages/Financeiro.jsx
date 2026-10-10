@@ -48,8 +48,10 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
   const totals=filtered.reduce((r,a)=>({
     total:r.total+Number(a.resumo.total),
     paid:r.paid+Number(a.resumo.pago),
+    received:r.received+Number(a.resumo.recebido||0),
+    offsets:r.offsets+Number(a.resumo.abatido||0),
     pending:r.pending+Number(a.resumo.pendente),
-  }),{total:0,paid:0,pending:0})
+  }),{total:0,paid:0,received:0,offsets:0,pending:0})
   const setOpen=id=>setExpanded(p=>({...p,[id]:!p[id]}))
   return <div className="com-page fin-page">
     <header className="com-heading"><div><span className="com-eyebrow">SPLASH / FINANCEIRO</span>
@@ -80,7 +82,8 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
     {!busy&&payload&&<>
       <section className="fin-kpis">
         <div><span>Total de comissões a receber</span><strong>{money(totals.total)}</strong></div>
-        <div><span>Já recebido e confirmado</span><strong>{money(totals.paid)}</strong></div>
+        <div><span>Recebido em pagamentos</span><strong>{money(totals.received)}</strong></div>
+        <div><span>Abatido em empréstimos</span><strong>{money(totals.offsets)}</strong></div>
         <div><span>Ainda falta receber</span><strong>{money(totals.pending)}</strong></div>
       </section>
       {payload.possivel_truncamento&&<p className="com-alert">O período retornou o limite de 500 vendas. Reduza as datas para ver todos os lançamentos.</p>}
@@ -93,7 +96,8 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
           </div>
           <div className="fin-account-stats">
             <div><span>Comissões</span><strong>{money(a.resumo.total)}</strong></div>
-            <div><span>Recebido</span><strong>{money(a.resumo.pago)}</strong></div>
+            <div><span>Recebido</span><strong>{money(a.resumo.recebido||0)}</strong></div>
+            <div><span>Abatido</span><strong>{money(a.resumo.abatido||0)}</strong></div>
             <div><span>Pendente</span><strong>{money(a.resumo.pendente)}</strong></div>
           </div>
           {admin&&Number(a.resumo.a_repassar)>0&&
@@ -120,7 +124,8 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
                 </div>
                 <div className="fin-line-numbers">
                   <span>Total <b>{money(item.total)}</b></span>
-                  <span>Recebido <b>{money(item.pago)}</b></span>
+                  <span>Recebido <b>{money(item.recebido||0)}</b></span>
+                  <span>Abatido <b>{money(item.abatido||0)}</b></span>
                   <span>Falta <b>{money(item.pendente)}</b></span>
                 </div>
                 {open&&<div className="fin-line-history">
@@ -137,7 +142,7 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
           </div>
         </article>)}
       </section>}
-      <p className="com-disclaimer">{payload.aviso} Os valores “recebidos” são pagamentos efetivamente registrados pelo administrador, não transferências realizadas por esta tela.</p>
+      <p className="com-disclaimer">{payload.aviso} "Recebido" corresponde a pagamentos registrados; abatimentos de empréstimo reduzem a dívida, mas não são dinheiro recebido. Nenhuma transferência é feita por esta tela.</p>
     </>}
     </>}
     {tab!=='comissoes'&&<FinanceiroPessoal role={role} tab={tab}
