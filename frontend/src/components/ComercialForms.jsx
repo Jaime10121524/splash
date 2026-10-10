@@ -97,7 +97,9 @@ export function ClientFields({ fields, onChange, catalogs, compact=false, origin
   const owners=personOptions(catalogs.pessoas||[],['corretor','vendedor'])
   const options=(catalogs.origens||[]).filter(o=>o.ativo || String(o.id)===String(fields.origem_id))
     .map(o=>({value:String(o.id),label:o.nome}))
-  const inherited=!!referrer
+  const selectedOrigin=(catalogs.origens||[]).find(o=>String(o.id)===String(fields.origem_id))
+  const canRefer=!!selectedOrigin?.permite_indicador
+  const inherited=canRefer && !!referrer
   const ownerName=(catalogs.pessoas||[]).find(p=>String(p.id)===String(fields.dono_corrente_pessoa_id))?.nome
   return <div className="cm-form-fields">
     <label><span className="field-caption">Nome <em>*</em></span><input autoFocus required maxLength={160} value={fields.nome}
@@ -124,15 +126,21 @@ export function ClientFields({ fields, onChange, catalogs, compact=false, origin
     </>}
 
     <label>Origem do lead <FormControl type="select" value={fields.origem_id}
-      onChange={value=>set('origem_id',value)} placeholder="Selecione a origem"
+      onChange={value=>{
+        const next=(catalogs.origens||[]).find(o=>String(o.id)===String(value))
+        if(!next?.permite_indicador) {
+          setReferrer(null)
+          onChange({...fields,origem_id:value,indicador_cliente_id:null})
+        } else onChange({...fields,origem_id:value})
+      }} placeholder="Selecione a origem"
       ariaLabel="Origem do lead" options={options}/></label>
-    <ClientFinder label="Quem indicou? (opcional)" value={referrer}
+    {canRefer&&<ClientFinder label="Quem indicou? (opcional)" value={referrer}
       omitId={original?.id} onChange={selected=>{
         setReferrer(selected)
         onChange({...fields,indicador_cliente_id:selected?.id||null,
           dono_corrente_pessoa_id:selected?.dono_corrente_pessoa_id
             ? String(selected.dono_corrente_pessoa_id) : fields.dono_corrente_pessoa_id})
-      }}/>
+      }}/>} 
     {inherited ? <div className="cm-inheritance">
       <strong>Corrente herdada da indicação</strong>
       <p>O responsável será determinado pelo cadastro do cliente indicador. Isso não transfere a corrente para o atendente.</p>
