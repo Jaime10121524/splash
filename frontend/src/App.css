@@ -293,3 +293,21 @@ a { text-decoration: none; }
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important; }
 }
+
+
+/* Campo obrigatório: legenda + asterisco formam um único item de layout.
+   Não permita que o asterisco vire uma linha isolada nos modais. */
+.field-caption,.cm-field-heading,.planos-field-title{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:flex-start;
+  flex-wrap:nowrap;
+  gap:4px;
+  min-width:0;
+  width:max-content;
+  max-width:100%;
+  font-weight:800;
+  line-height:1.4;
+  white-space:normal;
+}
+.field-caption em,.cm-field-heading em{color:#d45568!important;font-style:normal;flex-shrink:0;}
