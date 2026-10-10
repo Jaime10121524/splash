@@ -97,6 +97,8 @@ class FechamentosPeriodosController extends CommercialBaseController
             ];
         }
         return $this->response->setJSON(['responsaveis'=>$options,
+            'formas'=>$db->table('venda_formas_pagamento')->select('id,nome,codigo')
+                ->where('ativo',1)->where('codigo !=','ABATIMENTO_EMP')->orderBy('nome')->get()->getResultArray(),
             'vinculos'=>$actor['admin']?$assignment:[],
             'pessoa_logada'=>$actor['pessoa_id'],
             'administrador'=>$actor['admin'],
@@ -308,6 +310,24 @@ class FechamentosPeriodosController extends CommercialBaseController
             $c=VendaMoney::cents((string)$a['valor'],true);
             $offsets+=$c;$byPerson[(int)$a['pessoa_id']]['abatido_cent']+=$c;
         }
+        $loans=$db->table('financeiro_emprestimos l')
+            ->select('l.id,l.pessoa_id,l.valor,l.descricao,l.data_emprestimo,p.nome AS pessoa_nome')
+            ->join('pessoas p','p.id=l.pessoa_id')
+            ->whereIn('l.pessoa_id',$ids)->where('l.situacao','ATIVO')
+            ->orderBy('l.data_emprestimo')->get()->getResultArray();
+        if($loans){
+            $loanIds=array_map(static fn($x)=>(int)$x['id'],$loans);
+            $amounts=[];
+            foreach($db->table('financeiro_emprestimo_abates')->select('emprestimo_id,valor')
+                ->whereIn('emprestimo_id',$loanIds)->get()->getResultArray() as $r){
+                $k=(int)$r['emprestimo_id'];
+                $amounts[$k]=($amounts[$k]??0)+VendaMoney::cents((string)$r['valor'],true);
+            }
+            foreach($loans as &$loan){
+                $loan['saldo']=VendaMoney::decimal(max(0,
+                    VendaMoney::cents((string)$loan['valor'],true)-($amounts[(int)$loan['id']]??0)));
+            }unset($loan);
+        }
         $costRows=$db->table('financeiro_despesas')
             ->select('pessoa_id,valor')->whereIn('pessoa_id',$ids)
             ->where('data_despesa >=',$period['inicio'])->where('data_despesa <=',$period['fim'])
@@ -347,7 +367,8 @@ class FechamentosPeriodosController extends CommercialBaseController
             'inicio'=>$period['inicio'],'fim'=>$period['fim'],
             'status'=>$period['status'],'concluido_em'=>$period['concluido_em'],
             'corretores'=>array_values($byPerson),'participantes'=>array_values($participant),
-            'entradas'=>$entries,'abatimentos'=>$offsetRows,'quantidade_vendas'=>count($sales),
+            'entradas'=>$entries,'abatimentos'=>$offsetRows,'emprestimos'=>$loans,
+            'quantidade_vendas'=>count($sales),
             'resumo'=>[
                 'comissoes'=>VendaMoney::decimal($gross),
                 'recebido_clube'=>VendaMoney::decimal($cash),
