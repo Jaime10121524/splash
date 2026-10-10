@@ -80,3 +80,14 @@
   .fin-filters .fc-selection>label{max-width:none}
   .fin-kpis>div{min-width:0;min-height:86px}
 }
+
+.fin-tabs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0}
+.fin-tabs>button{border:1px solid var(--border);background:var(--surface);color:var(--muted-dark);border-radius:11px;min-height:42px;padding:9px 18px;font-size:12px;font-weight:800;cursor:pointer}
+.fin-tabs>button.active{border-color:var(--brand);background:var(--brand-light);color:var(--brand)}
+.fin-tabs>button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.fin-account-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:760px){
+  .fin-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  .fin-tabs>button{min-width:0;padding:10px 5px;font-size:11px}
+  .fin-account-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
