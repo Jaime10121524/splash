@@ -30,6 +30,8 @@ jobs:
         run: php backend/tests/fechamentos_escopo_smoke.php
       - name: Central custody and reconciliation tests
         run: php backend/tests/conciliacao_custodia_smoke.php
+      - name: Pix matching and reversal tests
+        run: php backend/tests/pix_conciliacao_smoke.php
 
   frontend:
     name: React/Vite build
