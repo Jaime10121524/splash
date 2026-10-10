@@ -89,8 +89,23 @@ final class RateioAutomatico
         $managerOverride=self::exception($op,'GERENTE',$payment,$day);
         $available=$base;
         if($receivers){
-            $total=self::customAmount($serviceOverride,$table,self::fraction($table,$serviceRate));
+            $total=self::fraction($table,$serviceRate);
+            // A regra de 12 meses se aplica a qualquer versão do plano anual.
+            // Uma exceção específica do plano tem precedência sobre este padrão.
+            if((int)($op['duracao_meses']??0)===12 && !$serviceOverride){
+                $fixed=VendaMoney::cents((string)($policy['atendente_um_ano_valor']??'60.00'),true);
+                if($fixed===null)throw new \InvalidArgumentException('Valor do atendimento anual inválido.');
+                $total=$fixed;
+                $notes[]='Atendimento do plano de 12 meses: valor padrão de '.VendaMoney::decimal($total).'.';
+            }
+            $total=self::customAmount($serviceOverride,$table,$total);
             if($serviceOverride)$notes[]='Atendimento: exceção configurada para esta versão do plano e forma de pagamento.';
+            if($payment==='AVISTA'){
+                $bonus=VendaMoney::cents((string)($policy['adicional_atendente_avista']??'0.00'),true);
+                if($bonus===null)throw new \InvalidArgumentException('Adicional à vista inválido.');
+                $total+=$bonus;
+                if($bonus>0)$notes[]='Adicional à vista para atendimento: '.VendaMoney::decimal($bonus).'.';
+            }
             if($total>$available)return ['rateios'=>[],'avisos'=>['Comissão insuficiente para pagar atendimento: revisar manualmente.']];
             foreach($receivers as $index=>$to){
                 $value=$index===count($receivers)-1
@@ -150,6 +165,9 @@ final class RateioAutomatico
         $holiday=$db->table('comissao_feriados')->where('data',$op['data_venda'])->countAllResults()>0;
         $op['_regras_especiais']=$db->table('comissao_excecoes_plano')
             ->where('plano_versao_id',(int)$op['plano_versao_id'])->get()->getResultArray();
+        $planVersion=$db->table('plano_versoes')
+            ->select('duracao_meses')->where('id',(int)$op['plano_versao_id'])->get()->getRowArray();
+        $op['duracao_meses']=(int)($planVersion['duracao_meses']??0);
         $renewalOther=false;
         if($op['segundo_corretor_pessoa_id']){
             $cliente=$db->table('clientes c')->select('o.nome AS origem_nome')
