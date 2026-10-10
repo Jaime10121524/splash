@@ -8,14 +8,15 @@ import { formatPhone } from '../components/PhoneInput.jsx'
 const statusLabels={
   AGUARDANDO:'Aguardando', ATENDENDO:'Em atendimento',
   RETORNO:'Retorno agendado', SEM_VENDA:'Não fechou',
-  PENDENCIA:'Pendência de negociação',
+  PENDENCIA:'Pendência de negociação', VENDA:'Venda fechada',
 }
 const stateOptions=[
   {value:'RETORNO',label:'Retorno agendado'},
   {value:'SEM_VENDA',label:'Não fechou'},
   {value:'PENDENCIA',label:'Pendência de negociação (sem financeiro)'},
+  {value:'VENDA',label:'Venda fechada (aguarda lançamento)'},
 ]
-const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
+const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,venda:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
 
 export default function Atendimentos() {
   const [catalogs,setCatalogs]=useState({origens:[],motivos:[],pessoas:[]})
@@ -33,6 +34,8 @@ export default function Atendimentos() {
   const [selectedClient,setSelectedClient]=useState(null)
   const [newClient,setNewClient]=useState(emptyClient())
   const [attendant,setAttendant]=useState('')
+  const [broker,setBroker]=useState('')
+  const [secondBroker,setSecondBroker]=useState('')
   const [additional,setAdditional]=useState('')
   const [outcome,setOutcome]=useState('RETORNO')
   const [returnDate,setReturnDate]=useState('')
@@ -69,9 +72,16 @@ export default function Atendimentos() {
     const body=await comercialGet('/api/atendimentos?'+params.toString())
     setVisits(body.visitas||[]);setStats(body.indicadores||initialStats)
   }
-  function openArrival(client=null){
+  function openArrival(client=null,visit=null){
     setMode('existing');setSelectedClient(client)
+    setBroker(visit?.corretor_pessoa_id?String(visit.corretor_pessoa_id):'')
+    setSecondBroker(visit?.segundo_corretor_pessoa_id?String(visit.segundo_corretor_pessoa_id):'')
     setNewClient(emptyClient());setFormError('');setModal({type:'arrival'})
+  }
+  function openBrokers(visit,type='brokers'){
+    setBroker(visit?.corretor_pessoa_id?String(visit.corretor_pessoa_id):'')
+    setSecondBroker(visit?.segundo_corretor_pessoa_id?String(visit.segundo_corretor_pessoa_id):'')
+    setFormError('');setModal({type,visit})
   }
   function openStart(visit){
     setAttendant(visit.atendente_pessoa_id?String(visit.atendente_pessoa_id):'')
@@ -86,15 +96,25 @@ export default function Atendimentos() {
     setSaving(true);setFormError('')
     try{
       let result
+      if(['arrival','brokers','resume'].includes(modal.type)){
+        if(!broker)throw new Error('Selecione o corretor responsável.')
+        if(secondBroker && secondBroker===broker)throw new Error('O segundo corretor deve ser diferente.')
+      }
+      const brokerPayload={corretor_pessoa_id:broker?Number(broker):null,
+        segundo_corretor_pessoa_id:secondBroker?Number(secondBroker):null}
       if(modal.type==='arrival'){
         if(mode==='existing'){
           if(!selectedClient)throw new Error('Escolha um cliente existente.')
-          result=await comercialPost('/api/atendimentos/chegada',{cliente_id:selectedClient.id})
+          result=await comercialPost('/api/atendimentos/chegada',{cliente_id:selectedClient.id,...brokerPayload})
         }else{
           result=await comercialPost('/api/atendimentos/chegada',{
-            novo_cliente:{...newClient,ativo:true},
+            novo_cliente:{...newClient,ativo:true},...brokerPayload,
           })
         }
+      }else if(modal.type==='brokers'){
+        result=await comercialPost('/api/atendimentos/'+modal.visit.id+'/corretores',brokerPayload)
+      }else if(modal.type==='resume'){
+        result=await comercialPost('/api/atendimentos/'+modal.visit.id+'/retomar',brokerPayload)
       }else if(modal.type==='start'){
         if(!attendant)throw new Error('Escolha o atendente responsável.')
         result=await comercialPost('/api/atendimentos/'+modal.visit.id+'/iniciar',{
@@ -122,7 +142,7 @@ export default function Atendimentos() {
     ['Visitas',stats.total,'Registros do período'],
     ['Aguardando',stats.aguardando,'Ainda não iniciados'],
     ['Em atendimento',stats.atendendo,'Atendimento em andamento'],
-    ['Finalizados',stats.retorno+stats.sem_venda+stats.pendencia,'Resultado registrado'],
+    ['Finalizados',stats.retorno+stats.sem_venda+stats.pendencia+(stats.venda||0),'Resultado registrado'],
   ]
 
   return <div className="com-page">
@@ -163,8 +183,9 @@ export default function Atendimentos() {
           <p>Registre a chegada para iniciar o histórico de atendimentos.</p></div>:
         <div className="com-visit-list">
           {visits.map(v=>{
-            const elapsed=v.inicio_em && v.fim_em
-              ? Math.max(0,(new Date(v.fim_em.replace(' ','T'))-new Date(v.inicio_em.replace(' ','T')))/1000) : null
+            const elapsed=v.inicio_em && v.fim_em ? Number(v.duracao_segundos) : null
+            const canResume=['SEM_VENDA','RETORNO','PENDENCIA'].includes(v.status)
+              && v.chegada_em?.slice(0,10)===localDateISO()
             return <article className="com-visit" key={v.id}>
               <div className="com-visit-main">
                 <div className="com-visit-name"><strong>{v.cliente_nome}</strong>
@@ -178,16 +199,20 @@ export default function Atendimentos() {
                   <span>Duração: <b>{timeSpan(elapsed)}</b></span>
                 </div>
                 <div className="com-visit-meta">
+                  <span>Corretor: <b>{v.corretor_nome||'Não informado'}{v.segundo_corretor_nome?' + '+v.segundo_corretor_nome:''}</b></span>
                   <span>Atendente: <b>{v.atendente_nome||'Não iniciado'}{v.adicional_nome?' + '+v.adicional_nome:''}</b></span>
                   {v.retorno_previsto&&<span>Volta prevista: <b>{dateBR(v.retorno_previsto)}</b></span>}
                   {v.motivo_nome&&<span>Motivo: <b>{v.motivo_nome}</b></span>}
                 </div>
               </div>
               <div className="com-actions">
+                <button type="button" onClick={()=>openBrokers(v)}>Corretores</button>
                 {v.status==='AGUARDANDO'&&<button type="button" className="primary" onClick={()=>openStart(v)}>Iniciar atendimento</button>}
                 {v.status==='ATENDENDO'&&<button type="button" className="primary" onClick={()=>openFinish(v)}>Encerrar atendimento</button>}
-                {!['AGUARDANDO','ATENDENDO'].includes(v.status)&&<button type="button" onClick={()=>
-                  openArrival({id:v.cliente_id,nome:v.cliente_nome,telefone:v.cliente_telefone})}>Nova visita</button>}
+                {canResume&&<button type="button" className="primary"
+                  onClick={()=>openBrokers(v,'resume')}>Retomar hoje</button>}
+                {!['AGUARDANDO','ATENDENDO'].includes(v.status)&&!canResume&&<button type="button" onClick={()=>
+                  openArrival({id:v.cliente_id,nome:v.cliente_nome,telefone:v.cliente_telefone},v)}>Nova visita</button>}
               </div>
             </article>
           })}
@@ -196,7 +221,7 @@ export default function Atendimentos() {
     <p className="com-disclaimer">Pendências nesta tela são apenas resultados de atendimento. Recebimentos, comissões e vendas serão vinculados no módulo financeiro/comercial posterior.</p>
 
     {modal&&<SurfaceModal
-      title={modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar atendimento':'Encerrar atendimento'}
+      title={modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar atendimento':modal.type==='finish'?'Encerrar atendimento':modal.type==='resume'?'Retomar atendimento':'Corretores do atendimento'}
       subtitle={modal.type==='arrival'?'Registre o cliente assim que chegar ao clube.':modal.visit?.cliente_nome}
       onClose={()=>setModal(null)} busy={saving}>
       <div className="cm-form">
@@ -206,6 +231,17 @@ export default function Atendimentos() {
           {mode==='existing'?<ClientFinder label="Cliente" value={selectedClient} onChange={setSelectedClient}/>:
             <ClientFields compact fields={newClient} onChange={setNewClient} catalogs={catalogs}/>}
           <div className="com-inform">A chegada será registrada com a hora do servidor. O cronômetro começa ao clicar em Iniciar atendimento.</div>
+        </>}
+        {['arrival','brokers','resume'].includes(modal.type)&&<>
+          <label><span className="field-caption">Corretor responsável <em>*</em></span>
+            <FormControl type="select" value={broker} onChange={setBroker}
+              options={personOptions(catalogs.pessoas,['corretor'])}
+              placeholder="Selecione o corretor" ariaLabel="Corretor responsável"/></label>
+          <label>Segundo corretor (opcional)
+            <FormControl type="select" value={secondBroker} onChange={setSecondBroker}
+              options={[{value:'',label:'Nenhum'},...personOptions(catalogs.pessoas,['corretor']).filter(p=>p.value!==broker)]}
+              placeholder="Nenhum" ariaLabel="Segundo corretor"/></label>
+          <div className="com-inform">O corretor não precisa ser o dono da corrente nem o usuário que cadastrou a visita.</div>
         </>}
         {modal.type==='start'&&<>
           <label><span className="field-caption">Atendente principal <em>*</em></span>
@@ -230,6 +266,9 @@ export default function Atendimentos() {
               options={availableReasons} placeholder="Escolha o motivo"/></label>}
           <label>Observações<textarea rows={3} maxLength={3000} value={notes}
             onChange={e=>setNotes(e.target.value)} placeholder="Resultado do atendimento"/></label>
+          {outcome==='VENDA'&&<div className="com-inform">
+            O resultado comercial será registrado. O título e os valores serão informados posteriormente em Vendas, sem criar comissão automática agora.
+          </div>}
           {outcome==='PENDENCIA'&&<div className="com-inform">
             A pendência comercial será registrada sem movimentar dinheiro. Entradas e comissões serão lançadas na etapa financeira.
           </div>}
@@ -237,7 +276,7 @@ export default function Atendimentos() {
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions"><button className="cm-button" disabled={saving}
           onClick={()=>setModal(null)}>Cancelar</button><button className="cm-button primary" disabled={saving}
-          onClick={submit}>{saving?'Processando...':modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar':'Encerrar'}</button></div>
+          onClick={submit}>{saving?'Processando...':modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar':modal.type==='resume'?'Retomar':modal.type==='brokers'?'Salvar corretores':'Encerrar'}</button></div>
       </div>
     </SurfaceModal>}
   </div>
