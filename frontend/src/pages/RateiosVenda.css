@@ -1,0 +1,17 @@
+.rv-box{display:grid;gap:14px;padding:14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:12px;min-width:0}
+.rv-box>header h3{font-size:14px;margin:0 0 6px;color:var(--text)}
+.rv-box>header p,.rv-note{font-size:11px;line-height:1.5;margin:0;color:var(--muted-dark)}
+.rv-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rv-summary>span{display:grid;gap:6px;border-radius:10px;border:1px solid var(--border);padding:10px;background:var(--surface);font-size:10px;color:var(--muted-dark)}
+.rv-summary strong{color:var(--text);font-size:15px;font-variant-numeric:tabular-nums}
+.rv-form{display:grid;gap:12px}
+.rv-row{display:grid;gap:12px;border-radius:10px;padding:12px;background:var(--surface);border:1px solid var(--border)}
+.rv-row-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.rv-row-top strong{font-size:12px;color:var(--text)}
+.rv-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rv-form label{font-size:11px;display:grid;gap:6px;color:var(--text);font-weight:700;min-width:0}
+.rv-form input,.rv-form textarea{width:100%;box-sizing:border-box;min-height:38px;padding:9px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text)}
+.rv-form textarea{resize:vertical}
+.rv-add{justify-self:start}
+.rv-actions{display:flex;justify-content:flex-end}
+@media(max-width:680px){.rv-fields{grid-template-columns:1fr}.rv-summary{grid-template-columns:1fr}.rv-box{padding:10px}.rv-actions button{width:100%}}
