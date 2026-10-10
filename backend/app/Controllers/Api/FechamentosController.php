@@ -84,6 +84,11 @@ class FechamentosController extends CommercialBaseController
                     * VendaMoney::cents((string)$movement['valor'],true);
             }
         }
+        $autoMap=[];
+        foreach($db->table('comissao_auto_apuracoes')->select('operacao_id,status,observacoes')
+            ->whereIn('operacao_id',$ids)->get()->getResultArray() as $record){
+            $autoMap[(int)$record['operacao_id']]=$record;
+        }
         $byOperation=[];
         foreach($allocations as $a){
             $id=(int)$a['id'];
@@ -101,6 +106,7 @@ class FechamentosController extends CommercialBaseController
                 $operation[$key]=$operation[$key]===null?null:(int)$operation[$key];
             }
             $operation['rateios']=$byOperation[$operation['id']]??[];
+            $operation['apuracao_automatica']=$autoMap[$operation['id']]??null;
             $fullyPaid=($received[$operation['id']]??0)===VendaMoney::cents((string)$operation['valor_cobrado']);
             $commission=$fullyPaid?$this->commission($operation):null;
             $operation['comissao_base']=$commission===null?null:VendaMoney::decimal($commission);
