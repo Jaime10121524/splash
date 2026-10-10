@@ -6,6 +6,7 @@ namespace App\Controllers\Api;
 
 use App\Libraries\VendaMoney;
 use App\Libraries\ComissaoAutomatica;
+use App\Libraries\RateioAutomatico;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -200,6 +201,12 @@ class VendasController extends CommercialBaseController
                     return $this->errorResponse(409,'Encerre o atendimento como Venda fechada ou Pendência antes de vincular.');
                 }
             }
+            $managerId=$this->optionalId($data['gerente_pessoa_id']??null);
+            if($managerId===false || ($managerId!==null &&
+                !$db->table('pessoa_papeis')->where('pessoa_id',$managerId)->where('papel','gerente')->countAllResults())){
+                $db->transRollback();
+                return $this->errorResponse(422,'Gerente inválido ou sem função de gerente no cadastro Pessoas.');
+            }
             $brokers=$this->participants($db,$data,$visit);
             if(isset($brokers['error'])){
                 $db->transRollback();
@@ -258,6 +265,7 @@ class VendasController extends CommercialBaseController
                 'observacao_comissao'=>$estimate['aviso'],
                 ...$brokers,
                 'dono_corrente_pessoa_id'=>(int)$client['dono_corrente_pessoa_id'],
+                'gerente_pessoa_id'=>$managerId,
                 'atendente_pessoa_id'=>$visit['atendente_pessoa_id']??null,
                 'atendente_adicional_pessoa_id'=>$visit['atendente_adicional_pessoa_id']??null,
                 'data_negociacao'=>$day,'data_venda'=>$saleDate,'data_inicio'=>$start,
@@ -373,7 +381,14 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,$brokers['error']);
             }
+            $managerId=$this->optionalId($data['gerente_pessoa_id']??null);
+            if($managerId===false || ($managerId!==null &&
+                !$db->table('pessoa_papeis')->where('pessoa_id',$managerId)->where('papel','gerente')->countAllResults())){
+                $db->transRollback();
+                return $this->errorResponse(422,'Gerente inválido ou sem função gerente.');
+            }
             $new=[
+                'gerente_pessoa_id'=>$managerId,
                 'plano_versao_id'=>$versionId,'sigla_plano'=>$plan['codigo'],
                 'prazo_meses'=>(int)$plan['duracao_meses'],
                 'valor_tabela'=>VendaMoney::decimal($table),
@@ -460,6 +475,7 @@ class VendasController extends CommercialBaseController
                     ]);
                 }
             }
+            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
             $this->commitOrFail($db);
             return $this->responseOK('Pendência convertida em venda; todos os pagamentos foram preservados.');
         }catch(Throwable $e){
@@ -520,6 +536,7 @@ class VendasController extends CommercialBaseController
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->updateEstimate($db,(int)$id,$op);
+            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
             $this->commitOrFail($db);
             return $this->responseOK('Recebimento registrado. O extrato financeiro foi preservado.');
         }catch(Throwable $e){
@@ -673,6 +690,7 @@ class VendasController extends CommercialBaseController
                 'justificativa'=>$reason,'usuario_id'=>(int)auth('session')->user()->id,
                 'criado_em'=>$this->nowLocal(),
             ]);
+            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
             $this->commitOrFail($db);
             return $this->responseOK('Comissão ajustada e registrada no histórico. Nenhum repasse foi realizado.');
         }catch(Throwable $e){
