@@ -351,6 +351,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <div className="vd-op-line">
             <strong>{op.cliente_nome}</strong>
             <span className={'com-pill '+(op.situacao==='VENDA'?'good':'muted')}>{states[op.situacao]}</span>
+            {op.fechamento_id&&<span className="com-pill good">Fechamento #{op.fechamento_id} · {op.fechamento_status==='CONCLUIDO'?'Concluído':'Em andamento'}</span>}
           </div>
           <small>{formatPhone(op.cliente_telefone)} · {op.numero_titulo?op.numero_titulo+' ':''}{op.sigla_plano}
             {' · '}Corretor: {op.corretor_nome}{op.segundo_corretor_nome?' + '+op.segundo_corretor_nome:''}</small>
@@ -359,7 +360,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         </div>
         <div className="vd-values"><span>Plano {currency(op.valor_cobrado)}</span>
           <strong>Recebido {currency(op.recebido)}</strong><small>Saldo {currency(op.saldo)}</small>
-          <small>{op.comissao_ajustada!==null?'Comissão ajustada: '+currency(op.comissao_ajustada):'Comissão estimada: '+(op.comissao_prevista===null?'Após quitação':currency(op.comissao_prevista))}</small></div>
+          <small>{op.comissao_ajustada!==null?'Comissão bruta ajustada: '+currency(op.comissao_ajustada):'Comissão bruta apurada: '+(op.comissao_prevista===null?'Após quitação':currency(op.comissao_prevista))}</small></div>
         <div className="com-actions"><button type="button" onClick={()=>openDetail(op)}>Extrato</button>
           {op.situacao==='PENDENCIA'&&<button type="button" className="primary" onClick={()=>openConvert(op)}>Fechar venda</button>}
         </div>
@@ -512,6 +513,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <div><span>Cliente já pagou</span><strong>{currency(detail.recebido)}</strong></div>
           <div><span>Falta o cliente pagar</span><strong>{currency(detail.saldo)}</strong></div></div>
         <div className="com-inform">Esses três valores mostram pagamentos do CLIENTE pelo título, não o que o clube deve de comissão ao corretor.</div>
+        {detail.fechamento&&<div className="com-alert success" role="status">
+          <strong>Venda protegida · Fechamento #{detail.fechamento.id} ({detail.fechamento.status==='CONCLUIDO'?'Concluído':'Em andamento'})</strong>
+          <p>Cadastro, recebimentos do cliente e distribuição de comissões bloqueados. Consulte os lançamentos do fechamento correspondente.</p>
+        </div>}
         <div className="vd-detail-title"><strong>Movimentos registrados</strong><small>Estorno corrige erro; devolução registra dinheiro realmente devolvido</small></div>
         {(detail.movimentos||[]).length ? <div className="vd-ledger">{detail.movimentos.map(m=><div key={m.id} className="vd-ledger-entry">
           <div><strong>{m.tipo==='ESTORNO'?'Estorno (correção)':m.tipo==='DEVOLUCAO'?'Devolução real':'Recebimento'} · {m.forma_nome}</strong>
@@ -520,7 +525,25 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <strong className={m.tipo==='ENTRADA'?'vd-positive':'vd-negative'}>{m.tipo==='ENTRADA'?'+':'-'}{currency(m.valor)}</strong>
         </div>)}</div>:<div className="com-empty vd-empty">Nenhum recebimento lançado.</div>}
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
-        <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada (a apurar)':'Comissão prevista (não paga)'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'Após quitação':currency(detail.operacao.comissao_prevista)}</strong></span></div>
+        <div className="vd-detail-title"><span>Comissão bruta desta venda: <strong>{detail.comissoes.bruta===null?'Ainda não apurada':currency(detail.comissoes.bruta)}</strong></span></div>
+        <div className="vd-commission-summary" aria-label="Pagamentos das comissões">
+          <div><span>Comissões efetivamente pagas aos beneficiários</span><strong>{currency(detail.comissoes.direitos_pagos)}</strong></div>
+          <div><span>Comissões ainda a pagar</span><strong>{detail.comissoes.direitos_pendentes===null?'A apurar':currency(detail.comissoes.direitos_pendentes)}</strong></div>
+          <div><span>Situação das comissões</span><strong>{({QUITADA:'Quitadas',PARCIAL:'Parcialmente pagas',A_RECEBER:'Ainda não pagas',AGUARDANDO_APURACAO:'Aguardando apuração'})[detail.comissoes.status]||detail.comissoes.status}</strong></div>
+        </div>
+        {!!detail.comissoes.participantes?.length&&<div className="vd-commission-people">
+          {detail.comissoes.participantes.map((item,i)=><div key={item.pessoa_id+'-'+item.papel+'-'+i}>
+            <div><strong>{item.nome}</strong><small>{item.papel==='TITULAR'?'Comissão própria':item.papel==='ATENDENTE'?'Atendimento':item.papel==='GERENTE'?'Gerência':'Corretor'}</small></div>
+            <span>Ganhou {currency(item.devido)}</span><span>Recebeu {currency(item.pago)}</span>
+            <b>A receber {currency(item.pendente)}</b>
+          </div>)}
+        </div>}
+        {detail.fechamento&&<div className="com-inform">
+          {Number(detail.entrada_clube_para_titular_no_periodo)>0
+            ? 'O clube depositou '+currency(detail.entrada_clube_para_titular_no_periodo)+' referente ao titular desta venda no fechamento #'+detail.fechamento.id+'. Este valor corresponde ao conjunto de vendas do titular no período, NÃO é um pagamento individual desta venda nem comprova que as pessoas receberam.'
+            : 'Não há entrada do clube registrada para o titular desta venda neste fechamento.'}
+          {' '}Somente pagamentos lançados ao beneficiário reduzem o valor «a receber» de sua comissão.
+        </div>}
         {detail.operacao.ajuste_motivo&&<div className="com-inform">Justificativa do ajuste: {detail.operacao.ajuste_motivo}</div>}
         <div className="vd-rateios-toggle">
           <button type="button" className="vd-outline" onClick={()=>setShowRateios(x=>!x)}
@@ -541,10 +564,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         <div className="cm-form-actions vd-wrap">
           <button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
           <button type="button" className="cm-button" disabled={!detail.editavel} onClick={openEdit}>Editar cadastro</button>
-          <button type="button" className="cm-button" onClick={openAdjustment}>Ajustar comissão</button>
-          <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
-          <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
-          <button type="button" className="cm-button primary" disabled={Number(detail.saldo)<=0} onClick={()=>{setMoveForm({...blankMovement(),valor:suggestedAmount(detail.saldo)});setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
+          <button type="button" className="cm-button" disabled={!!detail.fechamento} onClick={openAdjustment}>Ajustar comissão</button>
+          <button type="button" className="cm-button" disabled={!!detail.fechamento||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
+          <button type="button" className="cm-button" disabled={!!detail.fechamento||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
+          <button type="button" className="cm-button primary" disabled={!!detail.fechamento||Number(detail.saldo)<=0} onClick={()=>{setMoveForm({...blankMovement(),valor:suggestedAmount(detail.saldo)});setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
         </div>
       </div>}
 
