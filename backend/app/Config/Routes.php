@@ -50,8 +50,10 @@ $routes->group('api', static function ($routes): void {
     $routes->get('vendas/(:num)', 'Api\VendasController::detalhe/$1');
     $routes->post('vendas', 'Api\VendasController::create', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/converter', 'Api\VendasController::converter/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/(:num)/editar', 'Api\VendasController::editar/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/receber', 'Api\VendasController::receber/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/devolver', 'Api\VendasController::devolver/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/(:num)/estornar', 'Api\VendasController::estornar/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/ajustar-comissao', 'Api\VendasController::ajustarComissao/$1', ['filter'=>'csrf']);
     $routes->post('vendas/regras', 'Api\VendasCatalogosController::regra', ['filter'=>'csrf']);
     $routes->post('vendas/regras/(:num)/editar', 'Api\VendasCatalogosController::regra/$1', ['filter'=>'csrf']);
