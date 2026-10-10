@@ -527,19 +527,48 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <strong className={m.tipo==='ENTRADA'?'vd-positive':'vd-negative'}>{m.tipo==='ENTRADA'?'+':'-'}{currency(m.valor)}</strong>
         </div>)}</div>:<div className="com-empty vd-empty">Nenhum recebimento lançado.</div>}
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
-        <div className="vd-detail-title"><span>Comissão bruta desta venda: <strong>{detail.comissoes.bruta===null?'Ainda não apurada':currency(detail.comissoes.bruta)}</strong></span></div>
-        <div className="vd-commission-summary" aria-label="Pagamentos das comissões">
-          <div><span>Comissões liquidadas (pagamento ou abatimento)</span><strong>{currency(detail.comissoes.direitos_pagos)}</strong></div>
-          <div><span>Comissões ainda a pagar</span><strong>{detail.comissoes.direitos_pendentes===null?'A apurar':currency(detail.comissoes.direitos_pendentes)}</strong></div>
-          <div><span>Situação das comissões</span><strong>{({QUITADA:'Quitadas',PARCIAL:'Parcialmente pagas',A_RECEBER:'Ainda não pagas',AGUARDANDO_APURACAO:'Aguardando apuração'})[detail.comissoes.status]||detail.comissoes.status}</strong></div>
-        </div>
-        {!!detail.comissoes.participantes?.length&&<div className="vd-commission-people">
-          {detail.comissoes.participantes.map((item,i)=><div key={item.pessoa_id+'-'+item.papel+'-'+i}>
-            <div><strong>{item.nome}</strong><small>{item.papel==='TITULAR'?'Comissão própria':item.papel==='ATENDENTE'?'Atendimento':item.papel==='GERENTE'?'Gerência':'Corretor'}</small></div>
-            <span>Ganhou {currency(item.devido)}</span><span>Liquidado {currency(item.pago)}</span>
-            <b>A receber {currency(item.pendente)}</b>
-          </div>)}
-        </div>}
+        <section className="vd-commission-panel" aria-label="Resumo das comissões da venda">
+          <div className="vd-commission-heading">
+            <div>
+              <h3>Comissões da venda</h3>
+              <p>Valores separados por beneficiário, atualizados conforme os pagamentos registrados.</p>
+            </div>
+            <span className={'vd-commission-state '+(detail.comissoes.status==='QUITADA'?'is-paid':detail.comissoes.status==='PARCIAL'?'is-partial':'is-due')}>
+              {({QUITADA:'Quitadas',PARCIAL:'Pagamento parcial',A_RECEBER:'A receber',AGUARDANDO_APURACAO:'A apurar'})[detail.comissoes.status]||detail.comissoes.status}
+            </span>
+          </div>
+          <div className="vd-commission-metrics">
+            <div className="vd-commission-metric">
+              <span>Comissão bruta</span>
+              <strong>{detail.comissoes.bruta===null?'A apurar':currency(detail.comissoes.bruta)}</strong>
+            </div>
+            <div className="vd-commission-metric">
+              <span>Liquidado</span>
+              <strong>{currency(detail.comissoes.direitos_pagos)}</strong>
+              <small>Pagamentos e abatimentos</small>
+            </div>
+            <div className="vd-commission-metric vd-commission-due">
+              <span>A receber</span>
+              <strong>{detail.comissoes.direitos_pendentes===null?'A apurar':currency(detail.comissoes.direitos_pendentes)}</strong>
+            </div>
+          </div>
+          {!!detail.comissoes.participantes?.length&&<div className="vd-commission-beneficiaries">
+            <div className="vd-commission-subhead"><h4>Participantes</h4><small>Detalhamento por pessoa</small></div>
+            <div className="vd-commission-people">
+              {detail.comissoes.participantes.map((item,i)=><div key={item.pessoa_id+'-'+item.papel+'-'+i} className="vd-commission-person">
+                <div className="vd-commission-person-head">
+                  <strong>{item.nome}</strong>
+                  <small>{item.papel==='TITULAR'?'Comissão própria':item.papel==='ATENDENTE'?'Atendimento':item.papel==='GERENTE'?'Gerência':'Corretor'}</small>
+                </div>
+                <div className="vd-commission-person-values">
+                  <div><span>Ganhou</span><strong>{currency(item.devido)}</strong></div>
+                  <div><span>Liquidado</span><strong>{currency(item.pago)}</strong></div>
+                  <div><span>A receber</span><strong className="vd-commission-person-pending">{currency(item.pendente)}</strong></div>
+                </div>
+              </div>)}
+            </div>
+          </div>}
+        </section>
         {detail.fechamento&&<div className="com-inform">
           {Number(detail.entrada_clube_para_titular_no_periodo)>0
             ? 'O clube depositou '+currency(detail.entrada_clube_para_titular_no_periodo)+' referente ao titular desta venda no fechamento #'+detail.fechamento.id+'. Este valor corresponde ao conjunto de vendas do titular no período, NÃO é um pagamento individual desta venda nem comprova que as pessoas receberam.'
