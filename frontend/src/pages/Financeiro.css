@@ -60,3 +60,23 @@
   .fin-line-numbers span{display:grid;gap:3px}
   .fin-line-numbers b{margin:0}
 }
+
+
+/* Filtros em uma linha no desktop; sem quebra arbitrária do seletor Conta de. */
+.fin-filters{display:flex;flex-direction:row;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.fin-filters .fc-period{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;flex:0 1 auto}
+.fin-filters .fc-period>label{width:205px;min-width:160px;flex:0 0 205px}
+.fin-filters .fc-selection{display:flex;align-items:flex-end;flex:0 1 260px;min-width:195px}
+.fin-filters .fc-selection>label{width:100%;min-width:0;max-width:260px;flex:1}
+.fin-filters>small{flex-basis:100%;line-height:1.6;margin:0}
+.fin-kpis>div{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:9px;min-height:83px;text-align:left}
+.fin-kpis>div span{display:block;max-width:100%;line-height:1.4;white-space:normal}
+.fin-kpis>div strong{display:block;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.18}
+@media(max-width:760px){
+  .fin-filters{display:grid;grid-template-columns:1fr;align-items:stretch}
+  .fin-filters .fc-period{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .fin-filters .fc-period>label{width:100%;min-width:0;flex:auto}
+  .fin-filters .fc-selection{min-width:0;max-width:none}
+  .fin-filters .fc-selection>label{max-width:none}
+  .fin-kpis>div{min-width:0;min-height:86px}
+}
