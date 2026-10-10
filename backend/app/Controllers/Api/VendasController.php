@@ -212,6 +212,11 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,$brokers['error']);
             }
+            $attendants=$this->attendants($db,$data,$visit);
+            if(isset($attendants['error'])){
+                $db->transRollback();
+                return $this->errorResponse(422,$attendants['error']);
+            }
             $table=VendaMoney::cents((string)$plan['valor']);
             $discount=VendaMoney::cents($data['desconto_corretor']??'0',true);
             if($discount===null || $discount>=$table){
@@ -266,8 +271,7 @@ class VendasController extends CommercialBaseController
                 ...$brokers,
                 'dono_corrente_pessoa_id'=>(int)$client['dono_corrente_pessoa_id'],
                 'gerente_pessoa_id'=>$managerId,
-                'atendente_pessoa_id'=>$visit['atendente_pessoa_id']??null,
-                'atendente_adicional_pessoa_id'=>$visit['atendente_adicional_pessoa_id']??null,
+                ...$attendants,
                 'data_negociacao'=>$day,'data_venda'=>$saleDate,'data_inicio'=>$start,
                 'data_vencimento'=>$expiry,'retorno_previsto'=>$kind==='PENDENCIA'?$returnDay:null,
                 'observacoes'=>$notes,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
@@ -381,6 +385,11 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,$brokers['error']);
             }
+            $attendants=$this->attendants($db,$data,$visit);
+            if(isset($attendants['error'])){
+                $db->transRollback();
+                return $this->errorResponse(422,$attendants['error']);
+            }
             $managerId=$this->optionalId($data['gerente_pessoa_id']??null);
             if($managerId===false || ($managerId!==null &&
                 !$db->table('pessoa_papeis')->where('pessoa_id',$managerId)->where('papel','gerente')->countAllResults())){
@@ -399,7 +408,7 @@ class VendasController extends CommercialBaseController
                 'regras_automaticas_snapshot'=>json_encode($automatic,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'comissao_prevista'=>$estimate['valor'],
                 'observacao_comissao'=>$estimate['aviso'],
-                ...$brokers,
+                ...$brokers,...$attendants,
                 'numero_titulo'=>$number,'data_negociacao'=>$day,'data_venda'=>$saleDate,
                 'data_inicio'=>$start,'data_vencimento'=>$expiry,
                 'retorno_previsto'=>$returnDay,'observacoes'=>$notes,
@@ -717,6 +726,25 @@ class VendasController extends CommercialBaseController
             if(!$role)return ['error'=>'O corretor informado não possui função Corretor cadastrada.'];
         }
         return ['corretor_pessoa_id'=>$first,'segundo_corretor_pessoa_id'=>$second];
+    }
+
+    private function attendants($db,array $data,?array $visit): array
+    {
+        $first=$this->optionalId($visit['atendente_pessoa_id']??$data['atendente_pessoa_id']??null);
+        $second=$this->optionalId($visit['atendente_adicional_pessoa_id']??$data['atendente_adicional_pessoa_id']??null);
+        if($first===false || $second===false || ($first!==null && $first===$second)){
+            return ['error'=>'Atendentes devem ser pessoas distintas e válidas.'];
+        }
+        if($first===null && $second!==null){
+            return ['error'=>'Selecione o primeiro atendente antes do segundo.'];
+        }
+        foreach(array_filter([$first,$second]) as $person){
+            if(!$db->table('pessoa_papeis')->where('pessoa_id',$person)
+                ->whereIn('papel',['vendedor','corretor'])->countAllResults()){
+                return ['error'=>'Atendente informado precisa ter função Vendedor ou Corretor no cadastro Pessoas.'];
+            }
+        }
+        return ['atendente_pessoa_id'=>$first,'atendente_adicional_pessoa_id'=>$second];
     }
 
     private function balance($db,int $id,array $op): int
