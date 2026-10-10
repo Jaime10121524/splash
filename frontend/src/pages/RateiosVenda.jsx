@@ -46,7 +46,10 @@ export default function RateiosVenda({operacaoId,pessoas,onSaved}){
     return ()=>{active=false}
   },[operacaoId])
   const update=(index,key,value)=>setItems(old=>old.map((row,i)=>i===index?{...row,[key]:value}:row))
-  const total=items.reduce((sum,r)=>sum+Math.round(Number(parseMoney(r.valor)||0)*100),0)/100
+  // Uma pessoa pode dividir a participação recebida com outro participante.
+  // Só os repasses DIRETOS do titular reduzem sua comissão própria.
+  const total=items.filter(r=>String(r.responsavel_pessoa_id)===String(data?.corretor_pessoa_id))
+    .reduce((sum,r)=>sum+Math.round(Number(parseMoney(r.valor)||0)*100),0)/100
   const own=Number(data?.comissao_bruta||0)-total
   const roleOptions=role=>personOptions(pessoas||[],role==='ATENDENTE'?['vendedor','corretor']:role==='GERENTE'?['gerente']:['corretor'])
   async function save(e){
@@ -83,7 +86,7 @@ export default function RateiosVenda({operacaoId,pessoas,onSaved}){
     {data&&!loading&&<>
       <div className="rv-summary">
         <span>Comissão bruta <strong>{cash(data.comissao_bruta)}</strong></span>
-        <span>Outras participações <strong>{cash(total)}</strong></span>
+        <span>Repasses diretos do corretor <strong>{cash(total)}</strong></span>
         <span>Parte própria do corretor <strong>{cash(own)}</strong></span>
       </div>
       {data.aviso&&<p className="rv-note">{data.aviso}</p>}
