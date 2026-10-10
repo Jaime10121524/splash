@@ -269,21 +269,68 @@ export default function Fechamentos({role='admin'}){
       <p className="com-disclaimer">{report.aviso}</p>
     </section>:admin&&report?<>
       <section className="fc-stats">
-        <div><span>Comissões apuradas no período</span><strong>{money(totalSales)}</strong></div>
-        <div><span>Vendas com comissão indefinida</span><strong>{pendingSales}</strong></div>
-        <div><span>Participações registradas</span><strong>{report.operacoes.reduce((a,o)=>a+o.rateios.length,0)}</strong></div>
+        <div><span>Total a pagar às pessoas</span><strong>{money(totals.due)}</strong></div>
+        <div><span>Já pago (registrado)</span><strong>{money(totals.paid)}</strong></div>
+        <div><span>Ainda falta pagar</span><strong>{money(totals.pending)}</strong></div>
       </section>
-      <section className="com-panel">
-        <div className="com-panel-head"><div><h2>Contas individuais</h2><p>Uma conta por pessoa, mesmo quando o administrador efetua o pagamento.</p></div></div>
-        {report.saldos.length===0?<div className="com-empty">Nenhuma comissão apurada neste período.</div>:
-        <div className="fc-owner-list">{report.saldos.map(person=><article key={person.id}>
-          <div><strong>{person.nome}</strong><small>Comissões das vendas: {money(person.comissoes)} · Rateios a pagar: {money(person.saidas)}</small></div>
-          <div><span>Participação líquida estimada</span><strong>{money(person.saldo_proprio)}</strong>
-            <small>A receber em rateios: {money(person.repasses_pendentes)}</small></div>
-        </article>)}</div>}
+      <section className="com-panel fc-breakdown">
+        <div className="com-panel-head"><div><h2>Quanto pagar a cada pessoa</h2>
+          <p>Abra uma pessoa para conferir cada venda ou atendimento e marcar somente o pagamento que realmente aconteceu.</p></div>
+          <span className="com-count">{accounts.length} contas</span></div>
+        {!accounts.length?<div className="com-empty">Nenhuma comissão já apurada no período. Vendas incompletas ainda não entram nos valores.</div>:
+        <div className="fc-person-strip">{accounts.map(person=>{
+          const open=!!openPersons[person.pessoa_id]
+          return <article className="fc-person-card" key={person.pessoa_id}>
+            <div className="fc-person-top">
+              <div><strong>{person.nome}</strong><small>{person.itens.length} participações de vendas</small></div>
+              <button type="button" className="vd-outline" aria-expanded={open}
+                onClick={()=>setOpenPersons(p=>({...p,[person.pessoa_id]:!p[person.pessoa_id]}))}>
+                {open?'Ocultar vendas':'Ver vendas'}
+              </button>
+            </div>
+            <div className="fc-person-stats">
+              <div><span>Total devido</span><strong>{money(person.resumo.total)}</strong></div>
+              <div><span>Já pago</span><strong>{money(person.resumo.pago)}</strong></div>
+              <div><span>Falta pagar</span><strong className="fc-outstanding">{money(person.resumo.pendente)}</strong></div>
+            </div>
+            {open&&<div className="fc-person-lines">
+              {person.itens.map((line,i)=><div className="fc-person-line"
+                key={line.tipo+'-'+line.operacao_id+'-'+(line.rateio_id||0)+'-'+i}>
+                <div className="fc-person-line-info">
+                  <strong>{line.descricao}</strong>
+                  <small>Venda {line.titulo||'#'+line.operacao_id} · {dateBR(line.data_venda)}
+                    {line.visita_id?' · Atendimento #'+line.visita_id:''}</small>
+                  {line.cliente_nome&&<small>Cliente: {line.cliente_nome}</small>}
+                  <small>Total: {money(line.total)} · Já pago: {money(line.pago)}</small>
+                  {!!line.movimentos.length&&<small>{line.movimentos.length} movimentação(ões) no histórico</small>}
+                </div>
+                <div className="fc-person-line-actions">
+                  <span>Falta {money(line.pendente)}</span>
+                  {line.tipo==='TITULAR'
+                    ?<button type="button" className="vd-outline" onClick={()=>openOwnPayment(line)}>
+                      {Number(line.pendente)>0?'Registrar pagamento':'Ver pagamentos'}
+                    </button>
+                    :<button type="button" className="vd-outline"
+                      onClick={()=>openLedger({
+                        id:line.rateio_id,
+                        beneficiario_nome:person.nome,
+                        pendente:line.pendente,
+                      })}>Extrato / pagar</button>}
+                </div>
+              </div>)}
+              {Number(person.resumo.a_repassar)>0&&
+                <div className="fc-person-line"><small>A repassar a terceiros: {money(person.resumo.a_repassar)} · Já repassou: {money(person.resumo.repasses_ja_pagos)}</small></div>}
+            </div>}
+          </article>
+        })}</div>}
       </section>
-      <section className="com-panel">
-        <div className="com-panel-head"><div><h2>Vendas e participações</h2><p>Valores podem ser distribuídos por corretor, atendente ou gerente.</p></div><span className="com-count">{report.operacoes.length} vendas</span></div>
+      <div className="fc-sales-toggle">
+        <button type="button" className="vd-outline" onClick={()=>setShowSales(v=>!v)}
+          aria-expanded={showSales}>{showSales?'Ocultar conferência por venda':'Conferir / corrigir rateios por venda'}</button>
+        <small>{pendingSales>0?pendingSales+' vendas aguardando apuração. ':''}Rateios e exceções podem ser ajustados antes de registrar o pagamento.</small>
+      </div>
+      {showSales&&<section className="com-panel">
+        <div className="com-panel-head"><div><h2>Conferir participação por venda</h2><p>Use somente quando precisar mudar as divisões automáticas.</p></div><span className="com-count">{report.operacoes.length} vendas</span></div>
         {report.operacoes.length===0?<div className="com-empty">Nenhuma venda registrada para as datas.</div>:
         <div className="fc-sales">{report.operacoes.map(op=><article key={op.id}>
           <div className="fc-sale-top">
@@ -310,7 +357,7 @@ export default function Fechamentos({role='admin'}){
               onClick={()=>openRateios(op)}>Definir participações</button></div>
           </>}
         </article>)}</div>}
-      </section>
+      </section>}
       <p className="com-disclaimer">{report.aviso} O rateio não transfere dinheiro por si só; ao registrar um pagamento, confirme que ele realmente foi feito.</p>
     </>:null}
     {dialog&&<SurfaceModal
