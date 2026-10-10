@@ -32,7 +32,7 @@ class VendasController extends CommercialBaseController
         $rules=$db->table('venda_regras_comissao')->orderBy('id','ASC')->get()->getResultArray();
         foreach($rules as &$r)$r['ativo']=(bool)$r['ativo'];
         unset($r);
-        $methods=$db->table('venda_formas_pagamento')->orderBy('id','ASC')->get()->getResultArray();
+        $methods=$db->table('venda_formas_pagamento')->where('codigo !=','ABATIMENTO_EMP')->orderBy('id','ASC')->get()->getResultArray();
         foreach($methods as &$m){$m['ativo']=(bool)$m['ativo'];$m['credito']=(bool)$m['credito'];}
         unset($m);
         $application=$db->table('venda_regras_aplicacao')->get()->getResultArray();
@@ -512,7 +512,7 @@ class VendasController extends CommercialBaseController
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
             }
             $method=$db->table('venda_formas_pagamento')->where('id',$methodId)->get()->getRowArray();
-            if(!$op||!$method ||!(bool)$method['ativo']){
+            if(!$op||!$method ||!(bool)$method['ativo'] || $method['codigo']==='ABATIMENTO_EMP'){
                 $db->transRollback();
                 return $this->errorResponse(404,'Operação ou meio de pagamento não encontrado/ativo.');
             }
