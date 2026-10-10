@@ -357,7 +357,16 @@ class FechamentosPeriodosController extends CommercialBaseController
             $p['pendente']=VendaMoney::decimal(max(0,$p['total_cent']-$p['pago_cent']));
             unset($p['total_cent'],$p['pago_cent']);
         }unset($p);
+        $estAReceber=0;
         foreach($byPerson as &$person){
+            // Estimativa: valores da comissão que ainda não constam como
+            // pagos ao titular, recebidos do clube ou abatidos neste período.
+            // Dinheiro retido anteriormente exige conciliação manual.
+            $falta=$person['comissao_cent']-$person['titular_pago_cent']
+                -$person['recebido_clube_cent']-$person['abatido_cent'];
+            $person['a_receber_estimado']=VendaMoney::decimal(max(0,$falta));
+            $person['excesso_a_conciliar']=VendaMoney::decimal(max(0,-$falta));
+            $estAReceber+=max(0,$falta);
             $person['comissao']=VendaMoney::decimal($person['comissao_cent']);
             $person['recebido_clube']=VendaMoney::decimal($person['recebido_clube_cent']);
             $person['titular_ja_recebido']=VendaMoney::decimal($person['titular_pago_cent']);
@@ -383,6 +392,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             'quantidade_vendas'=>count($sales),
             'resumo'=>[
                 'comissoes'=>VendaMoney::decimal($gross),
+                'a_receber_estimado'=>VendaMoney::decimal($estAReceber),
                 'recebido_clube'=>VendaMoney::decimal($cash),
                 'abatido_dividas'=>VendaMoney::decimal($offsets),
                 'pagamentos_periodo'=>VendaMoney::decimal($paidInClosing),
