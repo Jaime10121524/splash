@@ -382,6 +382,10 @@ class FechamentosPeriodosController extends CommercialBaseController
             if(isset($byPerson[$benef]))$participacoesInternas[$benef]=$recebedor;
         }
         foreach($byPerson as &$person){
+            $participacao=$participacoesInternas[(int)$person['pessoa_id']]??null;
+            $person['participacoes_total']=$participacao['total']??'0.00';
+            $person['participacoes_recebidas']=$participacao['pago']??'0.00';
+            $person['participacoes_pendentes']=$participacao['pendente']??'0.00';
             // Estimativa: valores da comissão que ainda não constam como
             // pagos ao titular, recebidos do clube ou abatidos neste período.
             // Dinheiro retido anteriormente exige conciliação manual.
