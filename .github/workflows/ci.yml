@@ -14,6 +14,8 @@ jobs:
       - name: PHP syntax
         run: |
           find backend/app -name '*.php' -type f -print0 | xargs -0 -n1 php -l
+      - name: CSRF regeneration after logout
+        run: php backend/tests/session_csrf_smoke.php
       - name: Financial calculation smoke test
         run: php backend/tests/venda_money_smoke.php
       - name: Commission distribution smoke test
