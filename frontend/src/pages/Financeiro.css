@@ -140,6 +140,15 @@
 .finx-history b{color:var(--text);white-space:nowrap}
 .finx-general{padding:18px;border:1px solid var(--border);border-radius:13px;background:var(--surface);display:grid;gap:15px}
 .finx-general h2{color:var(--text);font-size:17px;margin:0}
+.finx-result{display:flex;justify-content:space-between;align-items:center;gap:16px;
+  padding:16px;background:var(--surface-alt);border:1px solid var(--border);border-radius:11px}
+.finx-result>div{display:grid;gap:6px}
+.finx-result span{font-size:12px;font-weight:800;color:var(--text)}
+.finx-result small{font-size:10px;line-height:1.5;color:var(--muted-dark)}
+.finx-result>strong{font-size:22px;font-variant-numeric:tabular-nums}
+.finx-group-count{font-size:11px;color:var(--muted-dark)}
+@media(max-width:650px){.finx-result{flex-direction:column;align-items:flex-start}.finx-result>strong{font-size:19px}}
+
 .finx-general-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .finx-general-grid>div{display:grid;gap:9px;padding:14px;background:var(--surface-alt);border-radius:10px;border:1px solid var(--border)}
 .finx-general-grid span{font-size:11px;color:var(--muted-dark);line-height:1.4}
