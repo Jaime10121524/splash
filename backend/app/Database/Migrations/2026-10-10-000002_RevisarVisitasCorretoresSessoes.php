@@ -18,6 +18,9 @@ class RevisarVisitasCorretoresSessoes extends Migration
             'corretor_pessoa_id' => ['type'=>'INT', 'unsigned'=>true, 'null'=>true, 'after'=>'cliente_id'],
             'segundo_corretor_pessoa_id' => ['type'=>'INT', 'unsigned'=>true, 'null'=>true, 'after'=>'corretor_pessoa_id'],
         ]);
+        $this->db->query('ALTER TABLE visitas ADD CONSTRAINT fk_visita_corretor FOREIGN KEY (corretor_pessoa_id) REFERENCES pessoas(id) ON DELETE RESTRICT ON UPDATE RESTRICT');
+        $this->db->query('ALTER TABLE visitas ADD CONSTRAINT fk_visita_corretor2 FOREIGN KEY (segundo_corretor_pessoa_id) REFERENCES pessoas(id) ON DELETE RESTRICT ON UPDATE RESTRICT');
+
         $this->forge->addField([
             'id'=>['type'=>'INT','unsigned'=>true,'auto_increment'=>true],
             'visita_id'=>['type'=>'INT','unsigned'=>true],
@@ -45,6 +48,21 @@ class RevisarVisitasCorretoresSessoes extends Migration
         $this->forge->addForeignKey('visita_id','visitas','id','RESTRICT','RESTRICT','fk_resultado_visita');
         $this->forge->createTable('visita_resultados_historico',true);
 
+        $this->forge->addField([
+            'id'=>['type'=>'INT','unsigned'=>true,'auto_increment'=>true],
+            'visita_id'=>['type'=>'INT','unsigned'=>true],
+            'anterior_corretor_id'=>['type'=>'INT','unsigned'=>true,'null'=>true],
+            'novo_corretor_id'=>['type'=>'INT','unsigned'=>true,'null'=>true],
+            'anterior_segundo_id'=>['type'=>'INT','unsigned'=>true,'null'=>true],
+            'novo_segundo_id'=>['type'=>'INT','unsigned'=>true,'null'=>true],
+            'usuario_id'=>['type'=>'INT','unsigned'=>true],
+            'criado_em'=>['type'=>'DATETIME'],
+        ]);
+        $this->forge->addKey('id',true);
+        $this->forge->addKey('visita_id');
+        $this->forge->addForeignKey('visita_id','visitas','id','RESTRICT','RESTRICT','fk_visita_corretor_hist');
+        $this->forge->createTable('visita_corretor_historico',true);
+
         // Os dados anteriores ficam intactos; reconstruímos a primeira sessão
         // e o resultado já registrado para manter tempos e justificativas.
         $db=$this->db;
@@ -59,8 +77,11 @@ class RevisarVisitasCorretoresSessoes extends Migration
 
     public function down()
     {
+        $this->forge->dropTable('visita_corretor_historico',true);
         $this->forge->dropTable('visita_resultados_historico',true);
         $this->forge->dropTable('visita_sessoes',true);
+        $this->db->query('ALTER TABLE visitas DROP FOREIGN KEY fk_visita_corretor2');
+        $this->db->query('ALTER TABLE visitas DROP FOREIGN KEY fk_visita_corretor');
         $this->forge->dropColumn('visitas',['segundo_corretor_pessoa_id','corretor_pessoa_id']);
     }
 }
