@@ -42,8 +42,22 @@ class SelecaoAutomaticaComissao extends Migration
             'MISTO'=>['MISTO',1,3],
         ] as $code=>[$mode,$num,$den]){
             $ruleId=$match($mode,$num,$den);
-            if($ruleId===null) {
-                throw new \RuntimeException('Configure primeiro a regra automática de '.$code.'. Não foi encontrado o modelo inicial esperado.');
+            if($ruleId===null){
+                // O administrador pode ter personalizado modelos antigos.
+                // Não alteramos regras existentes nem deixamos migration parcial.
+                $defaults=[
+                    'AVISTA_ATUAL'=>['À vista atual · 40%','0.000'],
+                    'AVISTA_HISTORICA'=>['À vista antigo · 1/3','0.000'],
+                    'CARTAO'=>['Cartão · 1/3 menos 8%','8.000'],
+                    'MISTO'=>['Misto · 1/3 com 8% do saldo da comissão','8.000'],
+                ];
+                $dbRule=$defaults[$code];
+                $this->db->table('venda_regras_comissao')->insert([
+                    'nome'=>$dbRule[0], 'modalidade'=>$mode,
+                    'numerador'=>$num,'denominador'=>$den,
+                    'desconto_cartao'=>$dbRule[1], 'ativo'=>1,
+                ]);
+                $ruleId=(int)$this->db->insertID();
             }
             $this->db->table('venda_regras_aplicacao')->insert([
                 'codigo'=>$code,'regra_comissao_id'=>$ruleId,
