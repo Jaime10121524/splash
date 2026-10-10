@@ -18,7 +18,7 @@ const stateOptions=[
 ]
 const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,venda:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
 
-export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}}) {
+export default function Atendimentos({initialClient=null,onClientAccepted=()=>{},navigate=()=>{},admin=false}) {
   const [catalogs,setCatalogs]=useState({origens:[],motivos:[],pessoas:[]})
   const [visits,setVisits]=useState([])
   const [stats,setStats]=useState(initialStats)
@@ -214,6 +214,10 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
               </div>
               <div className="com-actions">
                 <button type="button" onClick={()=>openBrokers(v)}>Corretores</button>
+                {admin&&['VENDA','PENDENCIA'].includes(v.status)&&<button type="button"
+                  className="primary" onClick={()=>navigate(v.status==='VENDA'?'vendas':'pendencias',v)}>
+                  {v.status==='VENDA'?'Registrar título':'Abrir pendência financeira'}
+                </button>}
                 {v.status==='AGUARDANDO'&&<button type="button" className="primary" onClick={()=>openStart(v)}>Iniciar atendimento</button>}
                 {v.status==='ATENDENDO'&&<button type="button" className="primary" onClick={()=>openFinish(v)}>Encerrar atendimento</button>}
                 {canResume&&<button type="button" className="primary"
@@ -225,7 +229,7 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
           })}
         </div>}
     </section>
-    <p className="com-disclaimer">Pendências nesta tela são apenas resultados de atendimento. Recebimentos, comissões e vendas serão vinculados no módulo financeiro/comercial posterior.</p>
+    <p className="com-disclaimer">Ao registrar Venda fechada ou Pendência, o administrador poderá vincular o título, pagamentos e devoluções à visita. As comissões distribuídas serão apuradas nos fechamentos.</p>
 
     {modal&&<SurfaceModal
       title={modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar atendimento':modal.type==='finish'?'Encerrar atendimento':modal.type==='resume'?'Retomar atendimento':'Corretores do atendimento'}
