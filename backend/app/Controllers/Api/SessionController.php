@@ -15,6 +15,9 @@ class SessionController extends BaseController
         // Se o administrador bloqueou a conta, derruba também a sessão antiga.
         if ($user !== null && $user->isBanned()) {
             auth('session')->logout();
+            // Shield limpa a sessão inteira, inclusive o token CSRF.
+            // A resposta de /api/session precisa devolver um token persistido.
+            service('security')->generateHash();
             $user = null;
         }
 
@@ -84,6 +87,10 @@ class SessionController extends BaseController
     public function logout()
     {
         auth('session')->logout();
+        // logout() do Shield apaga a chave CSRF da sessão e troca o ID.
+        // Sem gerar novo hash, csrf_hash() devolveria um token antigo
+        // que não corresponde ao armazenado na próxima requisição.
+        service('security')->generateHash();
 
         return $this->response->setJSON([
             'authenticated' => false,
