@@ -181,12 +181,22 @@ function DataCard({ label, icon, tone, detail, value = '—' }) {
 function Dashboard({ user, navigate }) {
   const admin = user.role === 'admin'
   const [visitSummary, setVisitSummary] = useState(null)
+  const [salesSummary, setSalesSummary] = useState(null)
   useEffect(() => {
     if (!admin) return undefined
     let active = true
     fetch('/api/atendimentos', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .then(response => response.ok ? response.json() : null)
       .then(data => { if (active && data?.indicadores) setVisitSummary(data.indicadores) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [admin])
+  useEffect(() => {
+    if (!admin) return undefined
+    let active = true
+    fetch('/api/vendas/resumo', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (active && data) setSalesSummary(data) })
       .catch(() => {})
     return () => { active = false }
   }, [admin])
@@ -200,8 +210,8 @@ function Dashboard({ user, navigate }) {
     <div className="stats-grid">
       {admin ? <>
         <DataCard label="Visitas registradas" icon="users" tone="violet" detail="Total registrado no clube" value={visitSummary?.total ?? "—"}/>
-        <DataCard label="Vendas concluídas" icon="bag" tone="mint" detail="Aguardando vendas"/>
-        <DataCard label="Pendências de atendimento" icon="clock" tone="amber" detail="Sem lançamento financeiro nesta etapa" value={visitSummary?.pendencia ?? "—"}/>
+        <DataCard label="Vendas registradas" icon="bag" tone="mint" detail="Títulos concluídos no cadastro" value={salesSummary?.vendas ?? "—"}/>
+        <DataCard label="Pendências financeiras" icon="clock" tone="amber" detail="Negociações ainda sem título" value={salesSummary?.pendencias ?? "—"}/>
         <DataCard label="Acertos financeiros" icon="wallet" tone="sky" detail="Aguardando fechamentos"/>
       </> : <>
         <DataCard label="Minhas vendas" icon="bag" tone="violet"/>
