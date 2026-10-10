@@ -88,7 +88,9 @@ final class ResetarVendasFinanceiroTestes extends Migration
                     // Entradas só podem ser eliminadas após ESTORNO/DEVOLUCAO.
                     $this->db->table($table)->whereIn('tipo',['ESTORNO','DEVOLUCAO'])->delete();
                 }
-                $this->db->table($table)->delete();
+                if(!$this->db->table($table)->emptyTable()){
+                    throw new RuntimeException('Não foi possível limpar '.$table.'.');
+                }
                 if($this->db->transStatus()===false){
                     throw new RuntimeException('Falha ao esvaziar '.$table.'. Reset revertido.');
                 }
