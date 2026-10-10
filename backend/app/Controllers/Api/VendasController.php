@@ -249,6 +249,138 @@ class VendasController extends CommercialBaseController
         }
     }
 
+    /**
+     * Correção de dados da operação: permitida só antes do primeiro movimento
+     * financeiro e antes de ajustar manualmente a comissão.
+     * Não troca cliente, visita ou situação; preserva antes/depois auditável.
+     */
+    public function editar(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $reason=$this->cleanText($data['justificativa']??null,500,true);
+        if($reason===false || mb_strlen($reason)<5){
+            return $this->errorResponse(422,'Informe uma justificativa de ao menos cinco caracteres.');
+        }
+        $db=db_connect();
+        $db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op){
+                $db->transRollback();
+                return $this->errorResponse(404,'Operação não encontrada.');
+            }
+            if($db->table('venda_recebimentos')->where('operacao_id',(int)$id)->countAllResults()>0
+                || $op['comissao_ajustada']!==null){
+                $db->transRollback();
+                return $this->errorResponse(409,'Esta operação já possui movimentação ou comissão ajustada. Estorne os lançamentos incorretos e confira o financeiro antes de alterar o cadastro.');
+            }
+            $versionId=$this->optionalId($data['plano_versao_id']??null);
+            $ruleId=$this->optionalId($data['regra_comissao_id']??null);
+            if(!$versionId || !$ruleId){
+                $db->transRollback();
+                return $this->errorResponse(422,'Informe plano e regra válidos.');
+            }
+            $plan=$db->table('plano_versoes')->where('id',$versionId)->get()->getRowArray();
+            $rule=$db->table('venda_regras_comissao')->where('id',$ruleId)->get()->getRowArray();
+            if(!$plan||!$rule||(!(bool)$op['historica'] && (!(bool)$plan['ativo'] || !(bool)$rule['ativo']))){
+                $db->transRollback();
+                return $this->errorResponse(422,'Plano ou regra não disponível. Para operações históricas, use versões e regras correspondentes à época.');
+            }
+            $discount=VendaMoney::cents($data['desconto_corretor']??null,true);
+            $table=VendaMoney::cents((string)$plan['valor']);
+            if($discount===null || $discount>=$table){
+                $db->transRollback();
+                return $this->errorResponse(422,'Desconto inválido ou superior ao valor de tabela.');
+            }
+            $estimate=VendaMoney::estimate($rule,$table,0,$discount);
+            if($estimate['valor']===null){
+                $db->transRollback();
+                return $this->errorResponse(422,$estimate['aviso']);
+            }
+            $day=(string)($data['data_negociacao']??'');
+            if(!$this->validateDate($day,false)){
+                $db->transRollback();
+                return $this->errorResponse(422,'Data da negociação inválida.');
+            }
+            $saleDate=null;
+            $start=null;
+            $expiry=null;
+            $number=null;
+            $returnDay=null;
+            if($op['situacao']==='VENDA'){
+                $number=$this->number($data['numero_titulo']??'');
+                $saleDate=(string)($data['data_venda']??'');
+                $start=(string)($data['data_inicio']??'');
+                if(!$number || !$this->validateDate($saleDate,false)
+                    || !$this->validateDate($start) || $saleDate<$day){
+                    $db->transRollback();
+                    return $this->errorResponse(422,'Confira os quatro números do título, data da venda e vigência.');
+                }
+                if($db->table('venda_operacoes')->where('numero_titulo',$number)
+                    ->where('sigla_plano',$plan['codigo'])->where('id !=',(int)$id)
+                    ->countAllResults()>0){
+                    $db->transRollback();
+                    return $this->errorResponse(409,'Já existe outra venda com esse número e sigla.');
+                }
+                $expiry=$this->expiry($start,(int)$plan['duracao_meses']);
+            }else{
+                $returnDay=$data['retorno_previsto']??null;
+                if($returnDay==='')$returnDay=null;
+                if($returnDay!==null && !$this->validateDate($returnDay)){
+                    $db->transRollback();
+                    return $this->errorResponse(422,'Data de retorno inválida.');
+                }
+            }
+            $notes=$this->cleanText($data['observacoes']??null,4000);
+            if($notes===false){
+                $db->transRollback();
+                return $this->errorResponse(422,'Observações com mais de 4000 caracteres.');
+            }
+            $visit=$op['visita_id'] ? $db->table('visitas')->where('id',$op['visita_id'])->get()->getRowArray():null;
+            $brokers=$this->participants($db,$data,$visit);
+            if(isset($brokers['error'])){
+                $db->transRollback();
+                return $this->errorResponse(422,$brokers['error']);
+            }
+            $new=[
+                'plano_versao_id'=>$versionId,'sigla_plano'=>$plan['codigo'],
+                'prazo_meses'=>(int)$plan['duracao_meses'],
+                'valor_tabela'=>VendaMoney::decimal($table),
+                'desconto_corretor'=>VendaMoney::decimal($discount),
+                'valor_cobrado'=>VendaMoney::decimal($table-$discount),
+                'regra_comissao_id'=>$ruleId,
+                'regra_snapshot'=>json_encode([
+                    'nome'=>$rule['nome'],'modalidade'=>$rule['modalidade'],
+                    'numerador'=>(int)$rule['numerador'],'denominador'=>(int)$rule['denominador'],
+                    'desconto_cartao'=>$rule['desconto_cartao'],
+                ],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'comissao_prevista'=>$estimate['valor'],
+                'observacao_comissao'=>$estimate['aviso'],
+                ...$brokers,
+                'numero_titulo'=>$number,'data_negociacao'=>$day,'data_venda'=>$saleDate,
+                'data_inicio'=>$start,'data_vencimento'=>$expiry,
+                'retorno_previsto'=>$returnDay,'observacoes'=>$notes,
+            ];
+            $before=array_intersect_key($op,$new);
+            $db->table('venda_operacoes')->where('id',(int)$id)
+                ->update([...$new,'atualizado_em'=>$this->nowLocal()]);
+            $db->table('venda_operacoes_auditoria')->insert([
+                'operacao_id'=>(int)$id,'acao'=>'EDITAR_DADOS',
+                'dados_antes'=>json_encode($before,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'dados_depois'=>json_encode($new,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'justificativa'=>$reason,
+                'usuario_id'=>(int)auth('session')->user()->id,
+                'criado_em'=>$this->nowLocal(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Cadastro corrigido. O histórico anterior foi preservado.');
+        }catch(Throwable $e){
+            $db->transRollback();
+            return $this->unexpected($e,'edição de venda');
+        }
+    }
+
     public function converter(int|string $id): ResponseInterface
     {
         if($denied=$this->guard())return $denied;
@@ -385,7 +517,7 @@ class VendasController extends CommercialBaseController
                 return $this->errorResponse(422,'A devolução não pode ser anterior ao recebimento original.');
             }
             $already=$db->table('venda_recebimentos')->selectSum('valor')
-                ->where('referencia_entrada_id',$reference)->where('tipo','DEVOLUCAO')
+                ->where('referencia_entrada_id',$reference)->whereIn('tipo',['DEVOLUCAO','ESTORNO'])
                 ->get()->getRowArray();
             $rem=VendaMoney::cents((string)$original['valor'])-
                 VendaMoney::cents((string)($already['valor']??'0'),true);
@@ -406,6 +538,59 @@ class VendasController extends CommercialBaseController
         }catch(Throwable $e){
             $db->transRollback();
             return $this->unexpected($e,'devolução financeira');
+        }
+    }
+
+    /**
+     * Correção contábil de erro de digitação: sem devolução real de dinheiro.
+     * Cria lançamento negativo ESTORNO com referência à entrada original.
+     * Valor = saldo ainda não revertido/devolvido da entrada.
+     */
+    public function estornar(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $reference=$this->optionalId($data['entrada_id']??null);
+        $reason=$this->cleanText($data['justificativa']??null,500,true);
+        if(!$reference||$reason===false||mb_strlen($reason)<5){
+            return $this->errorResponse(422,'Selecione o recebimento incorreto e informe o motivo do estorno (mínimo cinco caracteres).');
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            $original=$db->table('venda_recebimentos')
+                ->where('id',$reference)->where('operacao_id',(int)$id)->where('tipo','ENTRADA')
+                ->get()->getRowArray();
+            if(!$op||!$original){
+                $db->transRollback();
+                return $this->errorResponse(404,'Recebimento original não encontrado.');
+            }
+            $reverted=$db->table('venda_recebimentos')->selectSum('valor')
+                ->where('referencia_entrada_id',$reference)
+                ->whereIn('tipo',['ESTORNO','DEVOLUCAO'])->get()->getRowArray();
+            $remaining=VendaMoney::cents((string)$original['valor'])-
+                VendaMoney::cents((string)($reverted['valor']??'0'),true);
+            if($remaining<=0){
+                $db->transRollback();
+                return $this->errorResponse(409,'Esse recebimento já foi totalmente estornado/devolvido.');
+            }
+            $today=substr($this->nowLocal(),0,10);
+            $date=max($today,$original['data_movimento']);
+            $db->table('venda_recebimentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'ESTORNO',
+                'referencia_entrada_id'=>$reference,
+                'forma_id'=>$original['forma_id'],'detentor'=>$original['detentor'],
+                'valor'=>VendaMoney::decimal($remaining),
+                'data_movimento'=>$date,'observacoes'=>$reason,
+                'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_em'=>$this->nowLocal(),
+            ]);
+            $this->updateEstimate($db,(int)$id,$op);
+            $this->commitOrFail($db);
+            return $this->responseOK('Lançamento estornado. Não representa devolução de dinheiro. Cadastre o recebimento correto.');
+        }catch(Throwable $e){
+            $db->transRollback();
+            return $this->unexpected($e,'estorno de lançamento');
         }
     }
 
