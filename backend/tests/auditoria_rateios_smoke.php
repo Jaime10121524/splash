@@ -37,4 +37,4 @@ if(count($c['problemas'])<1)throw new RuntimeException('Rateio acima da comissã
 $d=AuditoriaRateios::analisar(60000,3,[]);
 eqv($d['parte_propria_cent'],60000,'Sem rateio, direito integral permanece com titular.');
 eqv($d['diferenca_cent'],0,'Sem rateio não pode duplicar valores.');
-echo "Auditoria de comissões por venda: 12 verificações OK\n";
+echo "Auditoria de comissões por venda: 13 verificações OK\n";
