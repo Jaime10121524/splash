@@ -1,0 +1,16 @@
+.fin-filters{padding:16px 20px;display:grid;gap:8px}
+.fin-filters>small{font-size:10px;color:var(--muted)}
+.fin-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}
+.fin-kpis>div{display:grid;gap:10px;border:1px solid var(--border);border-radius:13px;background:var(--surface);padding:17px}
+.fin-kpis span{font-size:11px;line-height:1.5;color:var(--muted-dark)}
+.fin-kpis strong{font-size:20px;overflow-wrap:anywhere;color:var(--text)}
+.fin-accounts,.fin-pending{display:grid}
+.fin-accounts article,.fin-pending article{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 20px;border-top:1px solid var(--border)}
+.fin-accounts article>div:first-child,.fin-pending article>div{display:grid;gap:6px}
+.fin-accounts strong,.fin-pending strong{font-size:12px;color:var(--text)}
+.fin-accounts small,.fin-pending small{font-size:10px;line-height:1.6;color:var(--muted-dark)}
+.fin-account-amounts{min-width:235px;display:grid;gap:5px;text-align:right}
+.fin-account-amounts span{font-size:10px;color:var(--muted-dark)}
+.fin-account-amounts strong{font-size:11px;margin-left:8px}
+.fin-note{padding:15px 20px;font-size:11px;color:var(--muted-dark);line-height:1.6}
+@media(max-width:680px){.fin-kpis{grid-template-columns:1fr 1fr}.fin-kpis>div{padding:13px}.fin-kpis strong{font-size:16px}.fin-accounts article,.fin-pending article{flex-wrap:wrap;padding:13px}.fin-account-amounts{min-width:0;width:100%;text-align:left}.fin-pending article>strong{width:100%}}
