@@ -90,11 +90,11 @@ export default function ConciliacaoCustodia({fechamentoId}){
   const hasBalance=Number(balances.saldo_conciliado)>0
   return <section className="com-panel cust-root" aria-label="Conciliação de custódia">
     <div className="com-panel-head">
-      <div><h2>5. Conciliação do dinheiro recebido</h2>
-        <p>Controle separado do caixa de {data?.responsavel_nome||'seu grupo'}, sem transferir as comissões de um titular para outro.</p></div>
+      <div><h2>Conferência opcional de caixa</h2>
+        <p>Confira dinheiro que ficou na conta de {data?.responsavel_nome||'seu grupo'}. Esta conferência é independente das quatro etapas do fechamento.</p></div>
     </div>
     <div className="cust-content">
-      <p className="cust-intro">O clube paga as comissões ao responsável pelo grupo. Ele paga os corretores, atendentes e gerentes. O saldo abaixo representa apenas o dinheiro registrado como disponível sob sua custódia; não é lucro pessoal nem significa que os titulares já receberam suas comissões.</p>
+      <p className="cust-intro">Este controle é útil somente quando você precisa acompanhar valores recebidos do clube que ainda estão sob sua guarda ou identificar Pix antigos. Exemplo: recebeu R$ 2.000, pagou R$ 1.500 aos participantes e ainda guarda R$ 500. Não é seu lucro, não quita automaticamente a comissão da Marta e não é obrigatório preencher nada.</p>
       {loading&&<div className="com-empty">Carregando conciliação...</div>}
       {error&&<p role="alert" className="com-alert error">{error}</p>}
       {notice&&<p role="status" className="com-alert success">{notice}</p>}
