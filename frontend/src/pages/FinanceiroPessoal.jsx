@@ -1,233 +1,266 @@
 import {useEffect,useState} from 'react'
 import {comercialGet,comercialPost,dateBR,localDateISO} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
+import {SurfaceModal} from '../components/ComercialForms.jsx'
 import './FinanceiroPessoal.css'
 
 const brl=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0))
-const decimal=raw=>{
-  const s=String(raw||'').trim()
-  const value=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s
-  return /^(0|[1-9]\d{0,9})(?:\.\d{1,2})?$/.test(value)?value:null
+const decimal=value=>{
+  const raw=String(value??'').trim()
+  const number=raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw
+  return /^(0|[1-9]\d{0,9})(?:\.\d{1,2})?$/.test(number)?number:null
 }
-const day=()=>localDateISO()
+const today=()=>localDateISO()
 
-/** Uma pessoa só acessa sua conta no servidor; o seletor administrativo não concede permissões. */
 export default function FinanceiroPessoal({role='admin',tab='despesas',start,end,initialPerson='' }){
   const admin=role==='admin'
   const [person,setPerson]=useState(initialPerson)
   const [people,setPeople]=useState([])
   const [data,setData]=useState(null)
-  const [busy,setBusy]=useState(true)
+  const [loading,setLoading]=useState(true)
   const [saving,setSaving]=useState(false)
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
-  const [form,setForm]=useState(null)
-  const [expense,setExpense]=useState({data_despesa:day(),categoria_id:'',valor:'',descricao:''})
+  const [modal,setModal]=useState(null)
+  const [formError,setFormError]=useState('')
+  const [owner,setOwner]=useState('')
+  const [expense,setExpense]=useState({data_despesa:today(),categoria_id:'',valor:'',descricao:''})
   const [category,setCategory]=useState('')
-  const [loan,setLoan]=useState({data_emprestimo:day(),valor:'',descricao:''})
-  const [cancelId,setCancelId]=useState(null)
-  const [cancelLoanId,setCancelLoanId]=useState(null)
-  const [cancelReason,setCancelReason]=useState('')
-  const load=async()=>{
-    const params=new URLSearchParams({inicio:start,fim:end})
-    if(admin&&person)params.set('pessoa_id',person)
-    const res=await comercialGet('/api/financeiro/pessoal?'+params)
-    setData(res)
+  const [loan,setLoan]=useState({data_emprestimo:today(),valor:'',descricao:''})
+  const [reason,setReason]=useState('')
+
+  async function load(){
+    const query=new URLSearchParams({inicio:start,fim:end})
+    if(admin&&person)query.set('pessoa_id',person)
+    const response=await comercialGet('/api/financeiro/pessoal?'+query)
+    setData(response)
   }
   useEffect(()=>{
-    let live=true
-    if(!admin)return
-    comercialGet('/api/pessoas').then(r=>{
-      if(live)setPeople((r.pessoas||[]).filter(p=>p.ativo))
-    }).catch(e=>{if(live)setError(e.message)})
-    return ()=>{live=false}
+    if(!admin)return undefined
+    let active=true
+    comercialGet('/api/pessoas')
+      .then(res=>{if(active)setPeople((res.pessoas||[]).filter(p=>p.ativo))})
+      .catch(err=>{if(active)setError(err.message)})
+    return ()=>{active=false}
   },[admin])
   useEffect(()=>{
-    let live=true
-    setBusy(true)
+    let active=true
+    setLoading(true)
     const params=new URLSearchParams({inicio:start,fim:end})
     if(admin&&person)params.set('pessoa_id',person)
     comercialGet('/api/financeiro/pessoal?'+params)
-      .then(res=>{if(live){setData(res);setError('')}})
-      .catch(e=>{if(live)setError(e.message)})
-      .finally(()=>{if(live)setBusy(false)})
-    return ()=>{live=false}
+      .then(res=>{if(active){setData(res);setError('')}})
+      .catch(err=>{if(active)setError(err.message)})
+      .finally(()=>{if(active)setLoading(false)})
+    return ()=>{active=false}
   },[admin,person,start,end])
-  const options=people.map(p=>({value:String(p.id),label:p.nome}))
-  async function submit(endpoint,payload,success){
-    setSaving(true);setError('')
+
+  const persons=people.map(p=>({value:String(p.id),label:p.nome}))
+  const owners=admin?persons:[]
+  const categories=(data?.categorias||[]).filter(c=>
+    c.pessoa_id===null||(!admin ? true : owner && String(c.pessoa_id)===String(owner))
+  )
+  const expenses=data?.despesas||[]
+  const loans=data?.emprestimos||[]
+  const expenseTotal=data?.resumo?.despesas_periodo||0
+  const loanBalance=data?.resumo?.saldo_emprestimos||0
+  function open(kind,row=null){
+    const initial=String(row?.pessoa_id||person||'')
+    setOwner(initial)
+    setFormError('');setReason('')
+    setModal({kind,id:row?.id??null})
+    if(kind==='expense'){
+      setExpense({data_despesa:row?.data_despesa||today(),
+        categoria_id:String(row?.categoria_id||''),valor:row?.valor||'',descricao:row?.descricao||''})
+    }
+    if(kind==='loan'){
+      setLoan({data_emprestimo:row?.data_emprestimo||today(),
+        valor:row?.valor||'',descricao:row?.descricao||''})
+    }
+    if(kind==='category')setCategory('')
+  }
+  function close(){if(!saving){setModal(null);setFormError('')}}
+  async function save(url,payload){
+    setSaving(true);setFormError('')
     try{
-      const result=await comercialPost(endpoint,payload)
-      setNotice(result.message||success)
-      setForm(null);setCancelId(null);setCancelLoanId(null);setCancelReason('')
-      await load()
-    }catch(e){setError(e.message)}
+      const response=await comercialPost(url,payload)
+      setNotice(response.message||'Registro atualizado.')
+      setModal(null);await load()
+    }catch(err){setFormError(err.message)}
     finally{setSaving(false)}
   }
-  const personForForm=admin?Number(person)||null:undefined
-  const ensurePerson=()=>!admin || !!person
-  const createExpense=e=>{
+  const validOwner=()=>!admin||!!owner
+  function submitExpense(e){
     e.preventDefault()
-    const valor=decimal(expense.valor)
-    if(!ensurePerson())return setError('Selecione uma pessoa para cadastrar uma despesa.')
-    if(!valor||Number(valor)<=0)return setError('Informe o valor da despesa.')
-    submit('/api/financeiro/despesas',{
-      ...expense,valor,pessoa_id:personForForm,
-      categoria_id:Number(expense.categoria_id),
-    },'Despesa registrada.')
+    const value=decimal(expense.valor)
+    if(!validOwner())return setFormError('Selecione a pessoa responsável pela despesa.')
+    if(!expense.categoria_id)return setFormError('Selecione uma categoria.')
+    if(!value||Number(value)<=0)return setFormError('Informe um valor válido.')
+    const payload={...expense,valor:value,categoria_id:Number(expense.categoria_id)}
+    if(admin)payload.pessoa_id=Number(owner)
+    save(modal.id?'/api/financeiro/despesas/'+modal.id+'/editar':'/api/financeiro/despesas',payload)
   }
-  const createCategory=e=>{
+  function submitLoan(e){
     e.preventDefault()
-    if(!ensurePerson())return setError('Selecione a pessoa que terá esta categoria.')
-    if(!category.trim())return setError('Informe o nome da categoria.')
-    submit('/api/financeiro/categorias',{nome:category,pessoa_id:personForForm},'Categoria salva.')
-    setCategory('')
+    if(!admin||!owner)return setFormError('Selecione quem recebeu o empréstimo.')
+    const value=decimal(loan.valor)
+    if(!value||Number(value)<=0)return setFormError('Informe um valor válido.')
+    save(modal.id?'/api/financeiro/emprestimos/'+modal.id+'/editar':'/api/financeiro/emprestimos',
+      {...loan,valor:value,pessoa_id:Number(owner)})
   }
-  const createLoan=e=>{
+  function submitCategory(e){
     e.preventDefault()
-    const valor=decimal(loan.valor)
-    if(!personForForm)return setError('Selecione quem recebeu o empréstimo.')
-    if(!valor||Number(valor)<=0)return setError('Informe o valor do empréstimo.')
-    submit('/api/financeiro/emprestimos',{...loan,valor,pessoa_id:personForForm},'Empréstimo registrado.')
+    if(!validOwner())return setFormError('Selecione a pessoa responsável pela categoria.')
+    if(!category.trim())return setFormError('Informe o nome da categoria.')
+    save('/api/financeiro/categorias',{nome:category.trim(),...(admin?{pessoa_id:Number(owner)}:{})})
   }
-  const cancelExpense=e=>{
+  function submitCancellation(e){
     e.preventDefault()
-    if(cancelReason.trim().length<5)return setError('Explique por que deseja cancelar a despesa.')
-    submit('/api/financeiro/despesas/'+cancelId+'/cancelar',{
-      justificativa:cancelReason.trim(),
-    },'Despesa cancelada.')
+    if(reason.trim().length<5)return setFormError('Informe o motivo com pelo menos cinco caracteres.')
+    const url=modal.kind==='cancelExpense'
+      ?'/api/financeiro/despesas/'+modal.id+'/cancelar'
+      :'/api/financeiro/emprestimos/'+modal.id+'/cancelar'
+    save(url,{justificativa:reason.trim()})
   }
-  const cancelLoan=e=>{
-    e.preventDefault()
-    if(cancelReason.trim().length<5)return setError('Explique o cancelamento do empréstimo.')
-    submit('/api/financeiro/emprestimos/'+cancelLoanId+'/cancelar',{
-      justificativa:cancelReason.trim(),
-    },'Empréstimo cancelado.')
-  }
-  const expenses=data?.despesas||[],loans=data?.emprestimos||[]
-  const loanBalance=Number(data?.resumo?.saldo_emprestimos||0)
+  const kind=modal?.kind
+  const caption=kind==='category'?'Nova categoria':
+    kind==='expense'?(modal.id?'Editar despesa':'Nova despesa'):
+    kind==='loan'?(modal.id?'Editar empréstimo':'Novo empréstimo'):
+    'Confirmar cancelamento'
+  const ownerField=admin&&['expense','loan','category'].includes(kind)
   return <div className="fp-main">
     <div className="fp-header">
-      <div><h2>{tab==='despesas'?'Controle de despesas':'Empréstimos do clube'}</h2>
-        <p>{tab==='despesas'?'Gastos por pessoa, categoria e período. Não são descontos automáticos de comissões.':
-          'Cada empréstimo pertence a uma pessoa. O valor a abater é informado no acerto da semana.'}</p></div>
-      {admin&&<label>Conta de
-        <FormControl type="select" value={person} onChange={v=>{setPerson(v);setForm(null)}}
-          options={[{value:'',label:'Todas as pessoas'},...options]}/></label>}
+      <div><h2>{tab==='despesas'?'Despesas':'Empréstimos'}</h2>
+        <p>{tab==='despesas'
+          ?'Gastos, categorias e correções individuais. Não são descontados automaticamente das comissões.'
+          :'Dívidas por pessoa, com valor emprestado, abatimentos negociados e saldo.'}</p></div>
+      {admin&&<label>Consultar conta
+        <FormControl type="select" value={person} onChange={setPerson}
+          options={[{value:'',label:'Todas as pessoas'},...persons]}/></label>}
     </div>
     {notice&&<div className="com-alert success" role="status">{notice}
       <button type="button" onClick={()=>setNotice('')}>Fechar</button></div>}
     {error&&<div className="com-alert error" role="alert">{error}
       <button type="button" onClick={()=>setError('')}>Fechar</button></div>}
-    {(data?.despesas?.length===500||data?.emprestimos?.length===500)&&
-      <div className="com-alert" role="status">O limite de 500 lançamentos foi atingido. Reduza o período ou a pessoa selecionada antes de considerar os totais completos.</div>}
-    {busy?<div className="com-panel"><div className="com-empty">Carregando o financeiro pessoal...</div></div>:<>
-      {tab==='despesas'?<>
-        <div className="fp-stats">
-          <div><span>Gastos ativos no período</span><strong>{brl(data?.resumo?.despesas_periodo)}</strong></div>
-          <div><span>Despesas cadastradas</span><strong>{expenses.filter(e=>e.situacao==='ATIVA').length}</strong></div>
-        </div>
-        <div className="fp-actions">
-          <button className="cm-button primary" type="button" onClick={()=>setForm(form==='expense'?null:'expense')}>+ Nova despesa</button>
-          <button className="vd-outline" type="button" onClick={()=>setForm(form==='category'?null:'category')}>+ Categoria</button>
-        </div>
-        {form==='category'&&<form className="fp-form" onSubmit={createCategory}>
-          <h3>Nova categoria pessoal</h3>
-          <label>Nome da categoria <input maxLength={90} value={category} onChange={e=>setCategory(e.target.value)}
-            placeholder="Ex.: Bonificações" required/></label>
-          <div className="fp-buttons"><button type="button" className="vd-outline" onClick={()=>setForm(null)}>Cancelar</button>
-            <button className="cm-button primary" disabled={saving} type="submit">Salvar categoria</button></div>
-        </form>}
-        {form==='expense'&&<form className="fp-form" onSubmit={createExpense}>
-          <h3>Registrar despesa</h3>
-          <div className="fp-grid">
-            <label>Data <FormControl type="date" value={expense.data_despesa}
-              onChange={v=>setExpense(x=>({...x,data_despesa:v}))}/></label>
-            <label>Categoria <FormControl type="select" value={expense.categoria_id}
-              onChange={v=>setExpense(x=>({...x,categoria_id:v}))}
-              options={(data?.categorias||[]).map(c=>({value:String(c.id),label:c.nome}))}
-              placeholder="Selecione"/></label>
-          </div>
-          <label>Valor gasto (R$) <input inputMode="decimal" value={expense.valor}
-            onChange={e=>setExpense(x=>({...x,valor:e.target.value}))} placeholder="Ex.: 45,00" required/></label>
-          <label>Descrição <textarea maxLength={500} rows={2} value={expense.descricao}
-            onChange={e=>setExpense(x=>({...x,descricao:e.target.value}))} placeholder="Ex.: Alimentação no clube" required/></label>
-          <div className="fp-buttons"><button type="button" className="vd-outline" onClick={()=>setForm(null)}>Cancelar</button>
-            <button className="cm-button primary" disabled={saving} type="submit">Registrar despesa</button></div>
-        </form>}
-        <section className="com-panel fp-list">
-          <div className="com-panel-head"><div><h2>Despesas do período</h2><p>Cada pessoa responde apenas pelos seus gastos.</p></div></div>
-          {expenses.length===0?<div className="com-empty">Nenhuma despesa cadastrada para o período.</div>:
-          expenses.map(e=><article key={e.id} className={e.situacao==='CANCELADA'?'fp-cancelled':''}>
-            <div><strong>{e.categoria_nome}</strong>
-              <small>{dateBR(e.data_despesa)}{admin?' · '+e.pessoa_nome:''}</small>
-              <small>{e.descricao}</small></div>
-            <div className="fp-end"><strong>{brl(e.valor)}</strong>
-              {e.situacao==='ATIVA'?<button type="button" className="vd-outline"
-                onClick={()=>{setCancelId(e.id);setCancelReason('')}}>Cancelar</button>:
-                <small>Cancelada</small>}</div>
-            {cancelId===e.id&&<form className="fp-cancel" onSubmit={cancelExpense}>
-              <label>Motivo do cancelamento
-                <textarea rows={2} maxLength={500} value={cancelReason}
-                  onChange={v=>setCancelReason(v.target.value)} required/></label>
-              <div className="fp-buttons">
-                <button className="vd-outline" type="button" onClick={()=>setCancelId(null)}>Voltar</button>
-                <button className="cm-button primary" type="submit" disabled={saving}>Confirmar cancelamento</button>
-              </div>
-            </form>}
-          </article>)}
-        </section>
-      </>:<>
-        <div className="fp-stats">
-          <div><span>Saldo de empréstimos</span><strong>{brl(loanBalance)}</strong></div>
-          <div><span>Empréstimos registrados</span><strong>{loans.length}</strong></div>
-        </div>
-        {admin&&<div className="fp-actions">
-          <button className="cm-button primary" type="button" onClick={()=>setForm(form==='loan'?null:'loan')}>+ Registrar empréstimo</button>
-        </div>}
-        {form==='loan'&&admin&&<form className="fp-form" onSubmit={createLoan}>
-          <h3>Empréstimo recebido do clube</h3>
-          <p className="fp-note">O empréstimo será lançado para a pessoa selecionada. Não haverá abatimento automático.</p>
-          <label>Data <FormControl type="date" value={loan.data_emprestimo}
-            onChange={v=>setLoan(x=>({...x,data_emprestimo:v}))}/></label>
-          <label>Valor emprestado (R$) <input inputMode="decimal" value={loan.valor}
-            onChange={e=>setLoan(x=>({...x,valor:e.target.value}))} placeholder="Ex.: 200,00" required/></label>
-          <label>Descrição <textarea maxLength={500} rows={2} value={loan.descricao}
-            onChange={e=>setLoan(x=>({...x,descricao:e.target.value}))} placeholder="Ex.: Empréstimo sem juros do clube" required/></label>
-          <div className="fp-buttons"><button className="vd-outline" type="button" onClick={()=>setForm(null)}>Cancelar</button>
-            <button className="cm-button primary" type="submit" disabled={saving}>Registrar empréstimo</button></div>
-        </form>}
-        <section className="com-panel fp-list">
-          <div className="com-panel-head"><div><h2>Empréstimos e abatimentos</h2>
-            <p>Os abatimentos efetuados em fechamentos aparecem no histórico.</p></div></div>
-          {loans.length===0?<div className="com-empty">Nenhum empréstimo cadastrado.</div>:
-          loans.map(l=><article key={l.id}>
-            <div><strong>Empréstimo #{l.id}</strong>
-              <small>{dateBR(l.data_emprestimo)}{admin?' · '+l.pessoa_nome:''}</small>
-              <small>{l.descricao}</small>
-              {l.abatimentos.length>0&&<div className="fp-history">{l.abatimentos.map(a=>
-                <small key={a.id}>Abatimento {dateBR(a.data_abate)} · Acerto #{a.lote_id}: {brl(a.valor)}</small>)}</div>}
+    {loading?<div className="com-panel"><div className="com-empty">Carregando lançamentos...</div></div>:tab==='despesas'?<>
+      <div className="fp-stats">
+        <div><span>Despesas ativas no período</span><strong>{brl(expenseTotal)}</strong></div>
+        <div><span>Lançamentos ativos</span><strong>{expenses.filter(e=>e.situacao==='ATIVA').length}</strong></div>
+      </div>
+      <div className="fp-actions">
+        <button type="button" className="cm-button primary" onClick={()=>open('expense')}>+ Nova despesa</button>
+        <button type="button" className="vd-outline" onClick={()=>open('category')}>+ Categoria</button>
+      </div>
+      <section className="com-panel fp-list">
+        <div className="com-panel-head"><div><h2>Despesas registradas</h2>
+          <p>Valores por categoria, data e responsável.</p></div></div>
+        {!expenses.length?<div className="com-empty">Nenhuma despesa no período.</div>:
+          expenses.map(item=><article key={item.id} className={item.situacao==='CANCELADA'?'fp-cancelled':''}>
+            <div><strong>{item.categoria_nome}</strong>
+              <small>{dateBR(item.data_despesa)}{admin?' · '+item.pessoa_nome:''}</small>
+              <small>{item.descricao}</small>
+              {item.situacao==='CANCELADA'&&<small>Cancelada: {item.justificativa_cancelamento||'Ver histórico'}</small>}
             </div>
             <div className="fp-end">
-              <small>Valor {brl(l.valor)}</small>
-              <small>Abatido {brl(l.abatido)}</small>
-              <strong>Falta {brl(l.saldo)}</strong>
-              {l.situacao==='CANCELADO'?<small>Cancelado: {l.justificativa_cancelamento}</small>:
-                admin && l.abatimentos.length===0?<button type="button" className="vd-outline"
-                  onClick={()=>{setCancelLoanId(l.id);setCancelReason('')}}>Cancelar empréstimo</button>:null}
+              <strong>{brl(item.valor)}</strong>
+              {item.situacao==='ATIVA'&&<div className="fp-row-actions">
+                <button type="button" className="vd-outline" onClick={()=>open('expense',item)}>Editar</button>
+                <button type="button" className="vd-outline" onClick={()=>open('cancelExpense',item)}>Cancelar</button>
+              </div>}
             </div>
-            {cancelLoanId===l.id&&<form className="fp-cancel" onSubmit={cancelLoan}>
-              <label>Motivo do cancelamento do empréstimo
-                <textarea rows={2} maxLength={500} value={cancelReason}
-                  onChange={e=>setCancelReason(e.target.value)} required/></label>
-              <div className="fp-buttons">
-                <button type="button" className="vd-outline" onClick={()=>setCancelLoanId(null)}>Voltar</button>
-                <button type="submit" className="cm-button primary" disabled={saving}>Confirmar cancelamento</button>
-              </div>
-            </form>}
           </article>)}
-        </section>
-      </>}
+      </section>
+    </>:<>
+      <div className="fp-stats">
+        <div><span>Saldo de empréstimos</span><strong>{brl(loanBalance)}</strong></div>
+        <div><span>Empréstimos registrados</span><strong>{loans.length}</strong></div>
+      </div>
+      {admin&&<div className="fp-actions">
+        <button type="button" className="cm-button primary" onClick={()=>open('loan')}>+ Novo empréstimo</button>
+      </div>}
+      <section className="com-panel fp-list">
+        <div className="com-panel-head"><div><h2>Empréstimos e abatimentos</h2>
+          <p>Os pagamentos de dívidas são lançados exclusivamente no fechamento.</p></div></div>
+        {!loans.length?<div className="com-empty">Nenhum empréstimo registrado.</div>:
+          loans.map(item=><article key={item.id} className={item.situacao==='CANCELADO'?'fp-cancelled':''}>
+            <div><strong>Empréstimo #{item.id}</strong>
+              <small>{dateBR(item.data_emprestimo)}{admin?' · '+item.pessoa_nome:''}</small>
+              <small>{item.descricao}</small>
+              {item.situacao==='CANCELADO'&&<small>Cancelado: {item.justificativa_cancelamento}</small>}
+              {!!item.abatimentos?.length&&<div className="fp-history">
+                {item.abatimentos.map(a=><small key={a.id}>
+                  Abatimento {dateBR(a.data_abate)} · Fechamento #{a.lote_id}: {brl(a.valor)}
+                </small>)}
+              </div>}
+            </div>
+            <div className="fp-end">
+              <small>Emprestado: {brl(item.valor)}</small>
+              <small>Já abatido: {brl(item.abatido)}</small>
+              <strong>Falta: {brl(item.saldo)}</strong>
+              {admin&&item.situacao==='ATIVO'&&!item.abatimentos?.length&&<div className="fp-row-actions">
+                <button type="button" className="vd-outline" onClick={()=>open('loan',item)}>Editar</button>
+                <button type="button" className="vd-outline" onClick={()=>open('cancelLoan',item)}>Cancelar</button>
+              </div>}
+            </div>
+          </article>)}
+      </section>
     </>}
+    {modal&&<SurfaceModal eyebrow="SPLASH / FINANCEIRO" title={caption} busy={saving} onClose={close}
+      subtitle={ownerField?'O lançamento será associado à pessoa selecionada.':undefined}>
+      {kind==='expense'&&<form className="fp-form fp-modal-form" onSubmit={submitExpense}>
+        {ownerField&&<label>Responsável pela despesa *
+          <FormControl type="select" value={owner} disabled={!!modal.id} onChange={v=>{
+            setOwner(v);setExpense(x=>({...x,categoria_id:''}))
+          }} options={owners} placeholder="Selecione uma pessoa" /></label>}
+        <div className="fp-grid">
+          <label>Data * <FormControl type="date" value={expense.data_despesa}
+            onChange={v=>setExpense(x=>({...x,data_despesa:v}))}/></label>
+          <label>Categoria * <FormControl type="select" value={expense.categoria_id}
+            onChange={v=>setExpense(x=>({...x,categoria_id:v}))}
+            options={categories.map(c=>({value:String(c.id),label:c.nome}))}
+            placeholder="Selecione a categoria"/></label>
+        </div>
+        <label>Valor (R$) * <input inputMode="decimal" value={expense.valor}
+          onChange={e=>setExpense(x=>({...x,valor:e.target.value}))} placeholder="Ex.: 45,00" required/></label>
+        <label>Descrição * <textarea rows={3} maxLength={500} value={expense.descricao}
+          onChange={e=>setExpense(x=>({...x,descricao:e.target.value}))} required/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="fp-buttons"><button className="vd-outline" type="button" onClick={close}>Cancelar</button>
+          <button className="cm-button primary" disabled={saving||!validOwner()} type="submit">
+            {modal.id?'Salvar alterações':'Registrar despesa'}</button></div>
+      </form>}
+      {kind==='category'&&<form className="fp-form fp-modal-form" onSubmit={submitCategory}>
+        {ownerField&&<label>Categoria para * <FormControl type="select" value={owner}
+          onChange={setOwner} options={owners} placeholder="Selecione uma pessoa"/></label>}
+        <label>Nome * <input value={category} maxLength={90} required
+          onChange={e=>setCategory(e.target.value)} placeholder="Ex.: Bonificações"/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="fp-buttons"><button type="button" className="vd-outline" onClick={close}>Cancelar</button>
+          <button type="submit" disabled={saving||!validOwner()} className="cm-button primary">Salvar categoria</button></div>
+      </form>}
+      {kind==='loan'&&<form className="fp-form fp-modal-form" onSubmit={submitLoan}>
+        {ownerField&&<label>Quem recebeu o empréstimo * <FormControl type="select"
+          value={owner} disabled={!!modal.id} onChange={setOwner}
+          options={owners} placeholder="Selecione a pessoa"/></label>}
+        <label>Data * <FormControl type="date" value={loan.data_emprestimo}
+          onChange={v=>setLoan(x=>({...x,data_emprestimo:v}))}/></label>
+        <label>Valor emprestado (R$) * <input inputMode="decimal" value={loan.valor} required
+          onChange={e=>setLoan(x=>({...x,valor:e.target.value}))} placeholder="Ex.: 200,00"/></label>
+        <label>Descrição * <textarea rows={3} maxLength={500} value={loan.descricao} required
+          onChange={e=>setLoan(x=>({...x,descricao:e.target.value}))}/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="fp-buttons"><button className="vd-outline" type="button" onClick={close}>Cancelar</button>
+          <button type="submit" disabled={saving||!validOwner()} className="cm-button primary">
+            {modal.id?'Salvar alterações':'Registrar empréstimo'}</button></div>
+      </form>}
+      {(kind==='cancelExpense'||kind==='cancelLoan')&&<form className="fp-form fp-modal-form" onSubmit={submitCancellation}>
+        <p className="fp-note">O registro permanecerá no histórico para auditoria.</p>
+        <label>Justificativa * <textarea rows={3} maxLength={500} value={reason} required
+          onChange={e=>setReason(e.target.value)} placeholder="Informe o motivo do cancelamento"/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="fp-buttons"><button className="vd-outline" type="button" onClick={close}>Voltar</button>
+          <button type="submit" className="cm-button primary" disabled={saving}>Confirmar cancelamento</button></div>
+      </form>}
+    </SurfaceModal>}
   </div>
 }
