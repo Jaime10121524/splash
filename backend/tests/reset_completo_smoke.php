@@ -79,6 +79,7 @@ if ($source===false || $command===false
     || str_contains($source,'SET FOREIGN_KEY_CHECKS')
     || str_contains($source,'TRUNCATE')
     || !str_contains($command,'(new ResetCompletoDadosTestes())->up()')
+    || !str_contains($command,'require_once APPPATH')
     || !str_contains($command,'countAllResults()')) {
     throw new RuntimeException('Proteções de migração/comando de limpeza estão incompletas.');
 }
