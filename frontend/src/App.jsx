@@ -6,6 +6,7 @@ import Clientes from './pages/Clientes.jsx'
 import Atendimentos from './pages/Atendimentos.jsx'
 import OrigensMotivos from './pages/OrigensMotivos.jsx'
 import Vendas from './pages/Vendas.jsx'
+import Fechamentos from './pages/Fechamentos.jsx'
 
 const paths = {
   grid: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
@@ -335,7 +336,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:(active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:(active==='fechamentos'||active==='financeiro')?<Fechamentos role={user.role}/>:active==='despesas'||active==='emprestimos'?<Fechamentos role={user.role}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
