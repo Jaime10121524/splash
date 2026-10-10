@@ -10,12 +10,59 @@
 .cm-form-fields>label,.cm-form-grid>label,.cm-form>label{display:grid;align-content:start;gap:7px;font-size:11px;color:var(--text);font-weight:800;min-width:0}
 .cm-form-fields label em,.cm-form label em{color:#db6178;font-style:normal}
 .cm-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.cm-form-fields input:not([type=checkbox]),.cm-form-fields textarea,.cm-form>input,.cm-form>textarea{border:1px solid var(--border);background:var(--surface-alt);border-radius:11px;color:var(--text);font:inherit;font-size:12px;padding:11px 12px;width:100%;min-width:0;outline:none;resize:vertical}
-.cm-form-fields input:not([type=checkbox]){height:46px}
+/* Base única para os controles nativos de TODOS os formulários comerciais.
+   Inclui campos dentro de .cm-form-grid (Numerador, Denominador, valores etc.).
+   Somente filhos diretos do label: não sobrescrever .ui-* nem o dinheiro com prefixo R$. */
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>textarea,
+.cm-form>input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+.cm-form>textarea{
+  display:block;
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  min-height:46px;
+  margin:0;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--surface-alt);
+  color:var(--text);
+  font:inherit;
+  font-size:12px;
+  font-weight:500;
+  outline:none;
+  padding:11px 12px;
+  transition:border-color .16s,box-shadow .16s;
+}
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+.cm-form>input:not([type=checkbox]):not([type=radio]):not([type=hidden]){
+  height:46px;
+}
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>textarea,
+.cm-form>textarea{height:auto;resize:vertical}
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>input:not([type=checkbox]):not([type=radio]):focus,
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>textarea:focus,
+.cm-form>input:not([type=checkbox]):not([type=radio]):focus,
+.cm-form>textarea:focus{
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(120,97,249,.13);
+}
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>input::placeholder,
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>textarea::placeholder,
+.cm-form>input::placeholder,
+.cm-form>textarea::placeholder{color:var(--muted)}
+/* Oculta as setas nativas, mas mantém teclado numérico e validação do type=number. */
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>input[type=number]{
+  -moz-appearance:textfield;
+  appearance:textfield;
+}
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>input[type=number]::-webkit-inner-spin-button,
+:is(.cm-form-fields,.cm-form,.cm-form-grid)>label>input[type=number]::-webkit-outer-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
 .cm-form-fields .ui-input,.cm-form .ui-input{height:46px;padding:0 12px;background:var(--surface-alt)}
 .cm-form-fields .ui-select-trigger,.cm-form .ui-select-trigger{display:flex}
-.cm-form-fields input:focus,.cm-form-fields textarea:focus,.cm-form input:focus,.cm-form textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(120,97,249,.13)}
-.cm-form-fields input::placeholder,.cm-form-fields textarea::placeholder{color:var(--muted)}
 .cm-form-actions{display:flex;justify-content:flex-end;align-items:center;gap:9px}
 .cm-button{min-height:43px;border-radius:11px;border:1px solid var(--border);padding:10px 15px;font:inherit;font-weight:800;font-size:11px;color:var(--text);background:var(--surface)}
 .cm-button:hover{border-color:var(--brand);color:var(--brand)}
