@@ -73,6 +73,7 @@ export default function FechamentosPeriodos({role='admin'}){
   const [link,setLink]=useState({child:'',boss:''})
   const [legacy,setLegacy]=useState(false)
   const [salesReviewed,setSalesReviewed]=useState(false)
+  const [showCustody,setShowCustody]=useState(false)
 
   const accounts=scope?.responsaveis||[]
   const selectable=accounts.filter(p=>p.pode_fechar)
@@ -116,7 +117,7 @@ export default function FechamentosPeriodos({role='admin'}){
       const result=await comercialPost(url,payload)
       setNotice(result.message)
       if(after==='new'){
-        setSalesReviewed(false)
+        setSalesReviewed(false);setShowCustody(false)
         await fetchLists();await fetchDetail(result.id)
       }else if(after==='groups'){
         await fetchLists()
@@ -136,6 +137,7 @@ export default function FechamentosPeriodos({role='admin'}){
     },'new')
   }
   async function view(id){
+    setShowCustody(false)
     setSalesReviewed(false)
     setLoading(true);resetError()
     try{await fetchDetail(id)}catch(e){setError(e.message)}
@@ -227,7 +229,7 @@ export default function FechamentosPeriodos({role='admin'}){
         {admin&&<button className="vd-outline" type="button" onClick={()=>setLegacy(v=>!v)}>
           {legacy?'Voltar ao fechamento':'Regras e ajustes anteriores'}</button>}
         {admin&&<button className="vd-outline" type="button" onClick={()=>setModal('vinculos')}>Responsabilidades</button>}
-        {current&&<button className="vd-outline" type="button" onClick={()=>{setCurrent(null);setLegacy(false);setSalesReviewed(false)}}>Voltar ao histórico</button>}
+        {current&&<button className="vd-outline" type="button" onClick={()=>{setCurrent(null);setLegacy(false);setSalesReviewed(false);setShowCustody(false)}}>Voltar ao histórico</button>}
       </div>
     </header>
     {legacy&&admin?<FechamentosLegado role={role}/>:<>
@@ -449,7 +451,13 @@ export default function FechamentosPeriodos({role='admin'}){
           </div>}
           <p className="fpw-help">{current.observacao} Valores pagos a um titular só devem ser baixados depois da transferência efetiva; o recebimento pelo responsável do grupo não equivale a esse pagamento.</p>
         </section>}
-        {currentStage===4&&<ConciliacaoCustodia fechamentoId={current.id}/>}
+        {currentStage===4&&<section className="fpw-optional-custody">
+          <div><strong>Controle opcional: dinheiro sob sua guarda</strong>
+            <p>Use somente se precisar conferir Pix antigos, saldo de caixa e valores devolvidos ao clube. Não altera comissões, repasses ou o resultado do fechamento.</p></div>
+          <button type="button" className="vd-outline" aria-expanded={showCustody}
+            onClick={()=>setShowCustody(v=>!v)}>{showCustody?'Ocultar controle de caixa':'Abrir conferência de caixa'}</button>
+        </section>}
+        {currentStage===4&&showCustody&&<ConciliacaoCustodia fechamentoId={current.id}/>}
       </>}
     </>}
     {modal&&<SurfaceModal eyebrow="SPLASH / FECHAMENTOS"
