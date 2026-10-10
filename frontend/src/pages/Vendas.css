@@ -47,3 +47,61 @@
 .vd-overview{grid-template-columns:1fr 1fr}.vd-overview>div:last-child{grid-column:1/-1}
 .vd-overview strong{font-size:13px}.vd-detail-title{flex-wrap:wrap}.vd-wrap .cm-button.primary{width:100%;flex:auto}
 }
+
+/* Campo de desconto: altura, bordas e foco alinhados ao SPLASH. */
+.vd-form .vd-money-control{
+  display:flex;
+  align-items:center;
+  width:100%;
+  min-width:0;
+  height:46px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--surface-alt);
+  color:var(--text);
+  transition:border-color .15s,box-shadow .15s;
+}
+.vd-form .vd-money-control:focus-within{
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(120,97,249,.13);
+}
+.vd-form .vd-money-prefix{
+  padding:0 12px;
+  font-size:12px;
+  font-weight:800;
+  color:var(--muted-dark);
+  white-space:nowrap;
+  border-right:1px solid var(--border);
+  line-height:20px;
+}
+.vd-form .vd-money-control input{
+  flex:1;
+  min-width:0;
+  width:100%;
+  height:100%;
+  border:0;
+  outline:none;
+  border-radius:0;
+  background:transparent;
+  padding:0 12px;
+  color:var(--text);
+  font:inherit;
+  font-size:13px;
+  font-weight:700;
+  box-shadow:none;
+  appearance:none;
+}
+.vd-form .vd-money-control input:focus{
+  outline:none;
+  box-shadow:none;
+}
+.vd-form .vd-money-control input::placeholder{color:var(--muted)}
+.vd-form .vd-field-help{
+  display:block;
+  margin-top:1px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:500;
+  line-height:1.55;
+}
