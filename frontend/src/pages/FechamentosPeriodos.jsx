@@ -220,7 +220,7 @@ export default function FechamentosPeriodos({role='admin'}){
     <header className="com-heading fpw-heading">
       <div><span className="com-eyebrow">SPLASH / FECHAMENTOS</span>
         <h1>Fechamento de período</h1>
-        <p>Receba do clube, abata dívidas negociadas e pague os envolvidos. Cada corretor responsável possui seu próprio fechamento.</p>
+        <p>Concilie o dinheiro recebido pelo responsável do grupo, sem transferir a titularidade das comissões. Depois registre os pagamentos efetivamente realizados.</p>
       </div>
       <div className="fpw-head-actions">
         {admin&&<button className="vd-outline" type="button" onClick={()=>setLegacy(v=>!v)}>
@@ -284,7 +284,7 @@ export default function FechamentosPeriodos({role='admin'}){
         </div>
         {currentStage===4&&<section className="fpw-stats">
           <div><span>Comissões nas vendas</span><strong>{money(current.resumo.comissoes)}</strong></div>
-          <div><span>Recebido do clube neste fechamento</span><strong>{money(amountPaid)}</strong></div>
+          <div><span>Recebido do clube por {current.responsavel_nome}</span><strong>{money(amountPaid)}</strong></div>
           <div><span>A receber do clube (estimativa)</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
           <div><span>Abatido em dívidas</span><strong>{money(current.resumo.abatido_dividas)}</strong></div>
           <div><span>Pago aos participantes neste fechamento</span><strong>{money(paidOut)}</strong></div>
@@ -300,7 +300,7 @@ export default function FechamentosPeriodos({role='admin'}){
                 <strong>{money(p.comissao)} comissão bruta</strong></summary>
               <div className="fpw-person-summary">
                 <span>Parte própria recebida anteriormente: <b>{money(p.titular_ja_recebido)}</b></span>
-                <span>Recebido do clube neste fechamento: <b>{money(p.recebido_clube)}</b></span>
+                <span>Entrada do clube referente a esta comissão (caixa de {current.responsavel_nome}): <b>{money(p.recebido_clube)}</b></span>
                 <span>Comissão ainda a receber (estimativa): <b>{money(p.a_receber_estimado)}</b></span>
                 <span>Comissão própria pendente: <b>{money(p.titular_pendente)}</b></span>
                 <span>Rateios devidos: <b>{money(p.repasse_total)}</b></span>
@@ -322,7 +322,7 @@ export default function FechamentosPeriodos({role='admin'}){
         {currentStage===2&&<>
           <section className="com-panel fpw-stage">
             <div className="com-panel-head"><div><h2>2. Dinheiro recebido do clube</h2>
-              <p>Registre o que realmente entrou na sua mão/conta, em nome do corretor correspondente. Não significa nova venda.</p></div>
+              <p>Recebedor do dinheiro: {current.responsavel_nome}. Escolha a qual corretor a comissão pertence; o valor permanece no caixa do responsável até o repasse efetivo.</p></div>
               <button type="button" className="cm-button primary" onClick={openEntry}>+ Registrar entrada</button></div>
             {current.entradas.length?<div className="fpw-lines">{current.entradas.map(entry=><div key={entry.id}>
               <div><strong>{entry.corretor_nome} · {entry.forma}</strong>
@@ -358,8 +358,8 @@ export default function FechamentosPeriodos({role='admin'}){
               onClick={()=>action('/api/fechamentos-periodos/'+current.id+'/voltar',{})}>← Voltar aos recebimentos</button>
           </div>
           <section className="com-panel fpw-stage">
-            <div className="com-panel-head"><div><h2>3.1 Comissões próprias de James, Marta, Helena e demais corretores</h2>
-              <p>Valores devidos diretamente a cada corretor titular. O abatimento negociado de sua dívida já liquida a parcela correspondente, sem saída de dinheiro.</p></div></div>
+            <div className="com-panel-head"><div><h2>3.1 Comissões próprias dos corretores titulares</h2>
+              <p>Quem recebeu o dinheiro do clube foi {current.responsavel_nome}. Só registre uma baixa aqui quando o titular efetivamente receber sua parte; recebimento centralizado não é pagamento ao titular. O abatimento de dívida não movimenta dinheiro.</p></div></div>
             <div className="fpw-payees">
               {current.corretores.map(p=><article key={p.pessoa_id}>
                 <div><strong>{p.nome}</strong><small>Parte própria {money(p.titular_total)} · Já liquidado {money(p.titular_ja_recebido)}</small></div>
@@ -418,17 +418,22 @@ export default function FechamentosPeriodos({role='admin'}){
             <button type="button" className="vd-outline fpw-print" onClick={printReport}>
               Imprimir / salvar em PDF</button></div>
           <div className="fpw-report-sums">
-            <div><span>Entradas reais do clube</span><strong>{money(current.resumo.recebido_clube)}</strong></div>
+            <div><span>Entradas do clube no caixa de {current.responsavel_nome}</span><strong>{money(current.resumo.recebido_clube)}</strong></div>
             <div><span>Valor ainda a receber do clube (estimativa)</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
             <div><span>Pagamentos realizados no fechamento</span><strong>{money(current.resumo.pagamentos_periodo)}</strong></div>
             <div><span>Dívidas compensadas (sem dinheiro)</span><strong>{money(current.resumo.abatido_dividas)}</strong></div>
             <div><span>Saldo das entradas após pagamentos</span><strong>{money(current.resumo.saldo_caixa_registrado)}</strong></div>
             <div><span>Despesas pessoais lançadas no período</span><strong>{money(current.resumo.despesas)}</strong></div>
-            <div><span>Resultado gerencial estimado do grupo</span><strong>{money(current.resumo.resultado_gerencial_estimado)}</strong></div>
+            <div><span>Resultado estimado dos corretores do grupo</span><strong>{money(groupResult)}</strong></div>
           </div>
-          <div className="fpw-report-persons">{current.corretores.map(p=><div key={p.pessoa_id}>
+          <div className="fpw-report-persons">{peopleReport.map(p=><div key={p.pessoa_id}>
             <strong>{p.nome}</strong>
-            <span>Comissões {money(p.comissao)} | Repasses {money(p.repasse_total)} | Despesas {money(p.despesas)}</span>
+            <div className="fpw-report-breakdown">
+              <span>Comissão das próprias vendas: <b>{money(p.comissao)}</b></span>
+              <span>Participações em outras vendas: <b>{money(p.participacoes_total)}</b> (já recebidas: {money(p.participacoes_recebidas)})</span>
+              <span>Repasses devidos a outros participantes: <b>{money(p.repasse_total)}</b></span>
+              <span>Despesas pessoais: <b>{money(p.despesas)}</b></span>
+            </div>
             <b>Resultado estimado: {money(p.resultado_estimado)}</b>
           </div>)}</div>
           <p className="fpw-help">{current.observacao} A comissão ainda a receber é uma estimativa calculada com lançamentos registrados; se o mesmo dinheiro já foi lançado como comissão do titular e como recebimento do clube, é necessária conciliação antes de tratar o saldo como definitivo.</p>
