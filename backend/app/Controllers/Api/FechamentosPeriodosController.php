@@ -231,6 +231,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             $income[(int)$item['pessoa_id']]=$item;
         }
         $total=0;
+        $semEntradaClube=0;
         $report['corretores']=$report['corretores']??[];
         foreach($report['corretores'] as &$person){
             $bonus=$income[(int)$person['pessoa_id']]??null;
@@ -242,10 +243,16 @@ class FechamentosPeriodosController extends CommercialBaseController
             $person['participacoes_recebidas']=$bonus['pago']??'0.00';
             $person['participacoes_pendentes']=$bonus['pendente']??'0.00';
             $person['resultado_estimado']=VendaMoney::decimal($base+$part-$repasses-$despesas);
+            $doClube=VendaMoney::cents((string)($person['recebido_clube']??'0'),true);
+            $dif=$base-$doClube;
+            $person['a_receber_estimado']=VendaMoney::decimal(max(0,$dif));
+            $person['excesso_a_conciliar']=VendaMoney::decimal(max(0,-$dif));
+            $semEntradaClube+=max(0,$dif);
             $total+=$base+$part-$repasses-$despesas;
         }
         unset($person);
         $report['resumo']['resultado_gerencial_estimado']=VendaMoney::decimal($total);
+        $report['resumo']['a_receber_estimado']=VendaMoney::decimal($semEntradaClube);
         return $report;
     }
 
@@ -412,11 +419,10 @@ class FechamentosPeriodosController extends CommercialBaseController
             $person['participacoes_total']=$participacao['total']??'0.00';
             $person['participacoes_recebidas']=$participacao['pago']??'0.00';
             $person['participacoes_pendentes']=$participacao['pendente']??'0.00';
-            // Estimativa: valores da comissão que ainda não constam como
-            // pagos ao titular, recebidos do clube ou abatidos neste período.
-            // Dinheiro retido anteriormente exige conciliação manual.
-            $falta=$person['comissao_cent']-$person['titular_pago_cent']
-                -$person['recebido_clube_cent']-$person['abatido_cent'];
+            // Recebimento do clube, pagamento ao titular e abatimento de dívida
+            // são eventos independentes. Somente entradas do clube reduzem a
+            // diferença bruta não conciliada (que não é uma cobrança exigível).
+            $falta=$person['comissao_cent']-$person['recebido_clube_cent'];
             $person['a_receber_estimado']=VendaMoney::decimal(max(0,$falta));
             $person['excesso_a_conciliar']=VendaMoney::decimal(max(0,-$falta));
             $estAReceber+=max(0,$falta);
