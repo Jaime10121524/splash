@@ -12,7 +12,7 @@ class ClientesController extends CommercialBaseController
 {
     public function index(): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
         $q=trim((string)$this->request->getGet('q'));
         if (mb_strlen($q)>120)return $this->errorResponse(422,'Pesquisa muito longa.');
         $page=max(1,min(100000,(int)($this->request->getGet('page')?:1)));
@@ -50,7 +50,7 @@ class ClientesController extends CommercialBaseController
 
     public function create(): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
         $db=db_connect();
         $input=$this->jsonPayload();
         $clean=ClienteRules::validate($db,$input);
@@ -77,7 +77,7 @@ class ClientesController extends CommercialBaseController
 
     public function update(int|string $id): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
         $db=db_connect();
         $db->transBegin();
         try{
@@ -112,7 +112,7 @@ class ClientesController extends CommercialBaseController
 
     public function corrente(int|string $id): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
         $db=db_connect();
         if (!$db->table('clientes')->where('id',(int)$id)->countAllResults()) {
             return $this->errorResponse(404,'Cliente não encontrado.');
