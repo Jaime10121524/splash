@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api;
 
-use App\Libraries\ConciliacaoCaixa;
 use App\Libraries\VendaMoney;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
@@ -24,9 +23,6 @@ final class PixCustodiaController extends CommercialBaseController
         $user=auth('session')->user();
         if(!$user || $user->isBanned())return $this->errorResponse(401,'Sessão expirada.');
         $admin=$user->inGroup('admin') && $user->can('closings.manage');
-        if(!$admin && (!$user->inGroup('corretor') && !$user->can('finance.own'))){
-            return $this->errorResponse(403,'Acesso negado.');
-        }
         if(!$admin && (!$user->inGroup('corretor') || !$user->can('finance.own'))){
             return $this->errorResponse(403,'Acesso negado.');
         }
@@ -116,9 +112,8 @@ final class PixCustodiaController extends CommercialBaseController
             }
         }
         $links=$db->table('fechamento_custodia_pix_vinculos v')
-            ->select('v.*,o.operacao_id,r.data_movimento')
+            ->select('v.*,r.operacao_id,r.data_movimento')
             ->join('venda_recebimentos r','r.id=v.recebimento_id')
-            ->join('venda_recebimentos o','o.id=v.recebimento_id')
             ->where('v.fechamento_id',(int)$id)->orderBy('v.id','DESC')
             ->get()->getResultArray();
         foreach($links as &$link){
