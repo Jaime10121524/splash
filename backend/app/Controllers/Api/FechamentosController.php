@@ -977,8 +977,11 @@ class FechamentosController extends CommercialBaseController
             ->join('pessoas b','b.id=r.beneficiario_pessoa_id')
             ->where('r.id',(int)$id)->get()->getRowArray();
         if(!$allocation)return $this->errorResponse(404,'Participação não encontrada.');
-        $moves=$db->table('comissao_repasses')->where('rateio_id',(int)$id)
-            ->orderBy('id','DESC')->get()->getResultArray();
+        $moves=$db->table('comissao_repasses m')
+            ->select('m.*,f.nome AS forma_nome')
+            ->join('venda_formas_pagamento f','f.id=m.forma_id','left')
+            ->where('m.rateio_id',(int)$id)
+            ->orderBy('m.id','DESC')->get()->getResultArray();
         return $this->response->setJSON(['rateio'=>$allocation,'movimentos'=>$moves,
             'pago'=>VendaMoney::decimal($this->sumPaid($db,(int)$id))])
             ->setHeader('Cache-Control','no-store');
