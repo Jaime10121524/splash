@@ -265,6 +265,13 @@ class FechamentosController extends CommercialBaseController
             ];
             unset($account['total_centavos'],$account['pago_centavos'],
                 $account['obrigações_centavos'],$account['obrigações_pagas_centavos']);
+            // Conta individual não recebe sequer no JSON os valores que deve
+            // repassar a terceiros; mostra somente o líquido que lhe pertence.
+            if(!$admin){
+                unset($account['resumo']['a_repassar'],
+                    $account['resumo']['repasses_ja_pagos'],
+                    $account['resumo']['repasses_pendentes']);
+            }
             usort($account['itens'],static fn($a,$b)=>strcmp($b['data_venda'],$a['data_venda']));
             $result[]=$account;
         }
