@@ -25,3 +25,10 @@
 .fp-cancel{flex-basis:100%;display:grid;gap:10px;padding:11px;border:1px solid var(--border);border-radius:9px}
 .fp-history{display:grid;gap:3px;background:var(--surface-alt);padding:9px;border-radius:9px}
 @media(max-width:760px){.fp-header>label{width:100%;min-width:0}.fp-stats>div{padding:13px}.fp-stats strong{font-size:16px}.fp-grid{grid-template-columns:1fr}.fp-list>article{padding:12px}.fp-end{text-align:left}.fp-actions>button{flex:1}}
+
+.fp-modal-form{border:0;background:transparent;padding:0;box-shadow:none;min-width:0}
+.fp-modal-form>label,.fp-modal-form .fp-grid>label{min-width:0;display:grid;gap:7px;font-size:11px;font-weight:800}
+.fp-row-actions{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.fp-row-actions button{min-height:35px;padding:7px 12px}
+.fp-modal-form .fp-buttons{padding-top:10px;border-top:1px solid var(--border)}
+@media(max-width:700px){.fp-row-actions{justify-content:flex-start}.fp-row-actions button{flex:1}.fp-modal-form .fp-grid{grid-template-columns:1fr}}
