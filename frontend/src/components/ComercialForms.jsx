@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FormControl } from './UiFields.jsx'
+import PhoneInput, { formatPhone } from './PhoneInput.jsx'
 import { comercialGet, personOptions } from '../lib/comercialApi.js'
 import './ComercialForms.css'
 
@@ -49,7 +50,7 @@ export function ClientFinder({ value, onChange, label='Pesquisar cliente', omitI
   return <div className="cm-client-finder">
     <span className="cm-field-label">{label}</span>
     {value ? <div className="cm-selected-client">
-      <div><strong>{value.nome}</strong><small>{value.telefone||'Sem telefone'}</small></div>
+      <div><strong>{value.nome}</strong><small>{formatPhone(value.telefone)||'Sem telefone'}</small></div>
       <button type="button" onClick={()=>{onChange(null);setQuery('')}}>Trocar</button>
     </div> : <>
       <input type="search" value={query} placeholder="Digite nome, telefone ou CPF..."
@@ -57,7 +58,7 @@ export function ClientFinder({ value, onChange, label='Pesquisar cliente', omitI
       {query.trim().length>=2 && <div className="cm-choices">
         {waiting ? <div className="cm-search-hint">Pesquisando...</div> : failed ? <div className="cm-search-hint">{failed}</div> :
           choices.length ? choices.map(c=><button type="button" key={c.id} onClick={()=>{onChange(c);setQuery('')}}>
-            <strong>{c.nome}</strong><small>{c.telefone}{c.dono_corrente_nome?' · Corrente: '+c.dono_corrente_nome:''}</small>
+            <strong>{c.nome}</strong><small>{formatPhone(c.telefone)}{c.dono_corrente_nome?' · Corrente: '+c.dono_corrente_nome:''}</small>
           </button>) : <div className="cm-search-hint">Nenhum cliente encontrado.</div>}
       </div>}
     </>}
@@ -101,8 +102,9 @@ export function ClientFields({ fields, onChange, catalogs, compact=false, origin
   return <div className="cm-form-fields">
     <label>Nome <em>*</em><input autoFocus required maxLength={160} value={fields.nome}
       onChange={e=>set('nome',e.target.value)} placeholder="Nome completo"/></label>
-    <label>Telefone <em>*</em><input required type="tel" inputMode="tel" maxLength={24}
-      placeholder="(11) 99999-9999" value={fields.telefone} onChange={e=>set('telefone',e.target.value)}/></label>
+    <label><span className="cm-field-heading">Telefone <em>*</em></span>
+      <PhoneInput required placeholder="(11) 99999-9999" value={fields.telefone}
+        onChange={value=>set('telefone',value)}/></label>
 
     {!compact && <>
       <div className="cm-form-grid">
