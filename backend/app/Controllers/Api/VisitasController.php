@@ -19,7 +19,7 @@ class VisitasController extends CommercialBaseController
 
     public function index(): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
 
         $dayStart=$this->request->getGet('inicio');
         $dayEnd=$this->request->getGet('fim');
@@ -85,7 +85,7 @@ class VisitasController extends CommercialBaseController
 
     public function chegada(): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
         $payload=$this->jsonPayload();
         $clientId=$this->optionalId($payload['cliente_id']??null);
         if($clientId===false)return $this->errorResponse(422,'Cliente inválido.');
@@ -161,7 +161,7 @@ class VisitasController extends CommercialBaseController
 
     public function iniciar(int|string $id): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
         $data=$this->jsonPayload();
         $primary=$this->optionalId($data['atendente_pessoa_id']??null);
         $secondary=$this->optionalId($data['atendente_adicional_pessoa_id']??null);
@@ -216,7 +216,7 @@ class VisitasController extends CommercialBaseController
 
     public function finalizar(int|string $id): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
         $input=$this->jsonPayload();
         $status=(string)($input['status']??'');
         if(!in_array($status,self::FINAL_STATES,true)){
