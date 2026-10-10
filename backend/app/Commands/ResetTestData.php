@@ -27,6 +27,14 @@ final class ResetTestData extends BaseCommand
             return;
         }
         $db=db_connect();
+        if(!in_array(strtolower((string)$db->hostname),['localhost','127.0.0.1','::1'],true)){
+            CLI::error('RESET BLOQUEADO: o banco de dados não está em host local.');
+            return;
+        }
+        if($db->table('migrations')->like('class','ResetarVendasFinanceiroTestes')->countAllResults()>0){
+            CLI::error('Esta migração de reset já foi executada. NÃO execute novamente: restaure um backup ou use uma base de testes nova.');
+            return;
+        }
         CLI::write('ATENÇÃO: exclusão IRREVERSÍVEL de vendas, recebimentos, comissões,');
         CLI::write('fechamentos, despesas e empréstimos do banco: '.$db->database);
         CLI::write('Cadastros, clientes, planos, usuários e configurações serão preservados.');
@@ -40,6 +48,7 @@ final class ResetTestData extends BaseCommand
         }catch(Throwable $error){
             CLI::error('RESET NÃO CONCLUÍDO: '.$error->getMessage());
             CLI::write('Não execute o reset novamente sem verificar os logs e fazer backup.');
+            throw $error;
         }finally{
             putenv('SPLASH_CONFIRM_RESET');
         }
