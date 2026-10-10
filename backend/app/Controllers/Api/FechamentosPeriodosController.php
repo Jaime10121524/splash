@@ -195,7 +195,7 @@ class FechamentosPeriodosController extends CommercialBaseController
                 return $this->errorResponse(409,'O período se sobrepõe a outro fechamento deste responsável (#'.$old['id'].').');
             }
             $sales=$db->table('venda_operacoes')
-                ->select('id,corretor_pessoa_id')
+                ->select('id,corretor_pessoa_id,valor_cobrado,comissao_prevista,comissao_ajustada')
                 ->whereIn('corretor_pessoa_id',$members)
                 ->where('situacao','VENDA')
                 ->where('data_venda >=',$start)->where('data_venda <=',$end)
@@ -203,8 +203,39 @@ class FechamentosPeriodosController extends CommercialBaseController
             if(count($sales)>500){
                 $db->transRollback();return $this->errorResponse(409,'Mais de 500 vendas. Reduza o período.');
             }
+            // O fechamento só pode congelar comissões apuradas de títulos
+            // quitados. Caso contrário, a venda apareceria no fechamento mas
+            // ainda não poderia aparecer no Financeiro do beneficiário.
+            $saleIds=array_map(static fn($x)=>(int)$x['id'],$sales);
+            $clientPaid=[];$statuses=[];$manual=[];
+            if($saleIds){
+                foreach($db->table('venda_recebimentos')->select('operacao_id,tipo,valor')
+                    ->whereIn('operacao_id',$saleIds)->get()->getResultArray() as $m){
+                    $oid=(int)$m['operacao_id'];
+                    $clientPaid[$oid]=($clientPaid[$oid]??0)
+                        +($m['tipo']==='ENTRADA'?1:-1)*VendaMoney::cents((string)$m['valor'],true);
+                }
+                foreach($db->table('comissao_auto_apuracoes')->select('operacao_id,status')
+                    ->whereIn('operacao_id',$saleIds)->get()->getResultArray() as $m){
+                    $statuses[(int)$m['operacao_id']]=$m['status'];
+                }
+                foreach($db->table('comissao_rateios')->select('operacao_id')
+                    ->whereIn('operacao_id',$saleIds)->get()->getResultArray() as $m){
+                    $manual[(int)$m['operacao_id']]=true;
+                }
+            }
             foreach($sales as $sale){
-                $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$sale['id']])->getRowArray();
+                $sid=(int)$sale['id'];
+                $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[$sid])->getRowArray();
+                $gross=$sale['comissao_ajustada']??$sale['comissao_prevista'];
+                if($gross===null || ($clientPaid[$sid]??0)!==VendaMoney::cents((string)$sale['valor_cobrado'],true)){
+                    $db->transRollback();
+                    return $this->errorResponse(409,'Venda #'.$sid.' ainda não foi quitada/apurada. Regularize em Vendas antes de abrir o fechamento.');
+                }
+                if((!isset($statuses[$sid]) || $statuses[$sid]==='REVISAR') && !isset($manual[$sid])){
+                    $db->transRollback();
+                    return $this->errorResponse(409,'Venda #'.$sid.' sem divisão de comissões conferida. Ajuste em Vendas antes do fechamento.');
+                }
                 if($db->table('fechamento_periodo_vendas')->where('operacao_id',(int)$sale['id'])->countAllResults()){
                     $db->transRollback();return $this->errorResponse(409,'Uma venda do período já pertence a outro fechamento. Consulte o histórico.');
                 }
