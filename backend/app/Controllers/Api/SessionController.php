@@ -102,7 +102,7 @@ class SessionController extends BaseController
             'role' => $user->inGroup('admin') ? 'admin'
                 : ($user->inGroup('corretor') ? 'corretor'
                 : ($user->inGroup('vendedor') ? 'vendedor'
-                : ($user->inGroup('gerente') ? 'gerente' : 'restrito'))),
+                : ($user->inGroup('gerente') ? 'gerente' : ($user->inGroup('operador') ? 'operador' : 'restrito')))),
             'groups' => $groups,
         ];
     }
