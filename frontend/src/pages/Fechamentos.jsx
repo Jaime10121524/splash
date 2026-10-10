@@ -520,7 +520,7 @@ export default function Fechamentos({role='admin'}){
         <div className="fc-ledger-moves">
           {dialog.line.movimentos.length?dialog.line.movimentos.map(m=><div key={m.id}>
             <div><strong>{m.tipo==='PAGAMENTO'?'Pagamento registrado':'Estorno de registro'}</strong>
-              <small>{dateBR(m.data)} · {m.observacoes||'Sem observação'}</small></div>
+              <small>{dateBR(m.data)} · {m.forma_nome||'Forma não informada'} · {m.observacoes||'Sem observação'}</small></div>
             <div><strong>{m.tipo==='PAGAMENTO'?'+':'−'}{money(m.valor)}</strong>
               {m.tipo==='PAGAMENTO'&&!dialog.line.movimentos.some(a=>a.tipo==='ESTORNO'&&Number(a.referencia_pagamento_id)===Number(m.id))&&
                 <button className="vd-outline" type="button" onClick={()=>{setReason('');setFormError('');setDialog({type:'ownerReverse',line:dialog.line,move:m})}}>Estornar</button>}
@@ -691,7 +691,7 @@ export default function Fechamentos({role='admin'}){
         </div>
         <div className="fc-ledger-moves">{detail.movimentos.length?detail.movimentos.map(m=><div key={m.id}>
           <div><strong>{m.tipo==='PAGAMENTO'?'Pagamento confirmado':'Estorno de lançamento'}</strong>
-            <small>{dateBR(m.data_pagamento)} · #{m.id}</small>
+            <small>{dateBR(m.data_pagamento)} · {m.forma_nome||'Forma não informada'} · #{m.id}</small>
             {m.observacoes&&<small>{m.observacoes}</small>}</div>
           <div><strong>{m.tipo==='PAGAMENTO'?'+':'−'}{money(m.valor)}</strong>
             {m.tipo==='PAGAMENTO'&&!detail.movimentos.some(x=>Number(x.referencia_pagamento_id)===Number(m.id))&&
