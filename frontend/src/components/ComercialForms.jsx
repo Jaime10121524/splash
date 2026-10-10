@@ -100,7 +100,7 @@ export function ClientFields({ fields, onChange, catalogs, compact=false, origin
   const inherited=!!referrer
   const ownerName=(catalogs.pessoas||[]).find(p=>String(p.id)===String(fields.dono_corrente_pessoa_id))?.nome
   return <div className="cm-form-fields">
-    <label>Nome <em>*</em><input autoFocus required maxLength={160} value={fields.nome}
+    <label><span className="field-caption">Nome <em>*</em></span><input autoFocus required maxLength={160} value={fields.nome}
       onChange={e=>set('nome',e.target.value)} placeholder="Nome completo"/></label>
     <label><span className="cm-field-heading">Telefone <em>*</em></span>
       <PhoneInput required placeholder="(11) 99999-9999" value={fields.telefone}
@@ -137,12 +137,12 @@ export function ClientFields({ fields, onChange, catalogs, compact=false, origin
       <strong>Corrente herdada da indicação</strong>
       <p>O responsável será determinado pelo cadastro do cliente indicador. Isso não transfere a corrente para o atendente.</p>
       {ownerName && <span>{ownerName}</span>}
-    </div> : <label>Dono da corrente <em>*</em><FormControl type="select" value={fields.dono_corrente_pessoa_id}
+    </div> : <label><span className="field-caption">Dono da corrente <em>*</em></span><FormControl type="select" value={fields.dono_corrente_pessoa_id}
       onChange={value=>set('dono_corrente_pessoa_id',value)} placeholder="Escolha o responsável"
       ariaLabel="Dono da corrente" options={owners}/></label>}
 
     {original && !inherited && String(original.dono_corrente_pessoa_id)!==String(fields.dono_corrente_pessoa_id) &&
-      <label>Justificativa da mudança da corrente <em>*</em>
+      <label><span className="field-caption">Justificativa da mudança da corrente <em>*</em></span>
         <textarea rows={2} value={fields.motivo_corrente}
           onChange={e=>set('motivo_corrente',e.target.value)} placeholder="Por que o dono da corrente foi alterado?"/>
       </label>}
