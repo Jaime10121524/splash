@@ -25,7 +25,7 @@ const blankMovement=()=>({valor:'',forma_id:'',detentor:'CORRETOR',
   data_movimento:localDateISO(),observacoes:'',entrada_id:''})
 const noop=()=>{}
 
-export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=noop,role='admin'}) {
+export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=noop,initialOperation=null,onOperationAccepted=noop,role='admin'}) {
   const [rows,setRows]=useState([])
   const [options,setOptions]=useState({planos:[],regras:[],formas:[],aplicacoes:[]})
   const [people,setPeople]=useState([])
@@ -82,6 +82,12 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     setFormError('');setDialog({type:'new'})
     onVisitAccepted()
   },[initialVisit?.id,role])
+
+  useEffect(()=>{
+    if(!initialOperation?.id||role!=='admin')return
+    openDetail(initialOperation)
+    onOperationAccepted()
+  },[initialOperation?.id,role])
 
   const setField=(key,value)=>setSaleForm(f=>({...f,[key]:value}))
   const plan=options.planos.find(p=>String(p.id)===String(saleForm.plano_versao_id))
