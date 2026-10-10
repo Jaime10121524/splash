@@ -98,6 +98,7 @@ export default function Fechamentos({role='admin'}){
     pending:r.pending+Number(a.resumo.pendente),
   }),{due:0,paid:0,pending:0})
   const openOwnPayment=line=>{
+    setMethodId(String(paymentMethods.find(m=>m.codigo==='PIX')?.id||paymentMethods[0]?.id||''))
     setAmount(Number(line.pendente).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}))
     setReason('');setDate(localDateISO());setFormError('')
     setDialog({type:'ownerPayment',line})
@@ -110,7 +111,7 @@ export default function Fechamentos({role='admin'}){
     setBusy(true);setFormError('')
     try{
       const result=await comercialPost('/api/fechamentos/titular/'+dialog.line.operacao_id+'/pagar',{
-        valor:value,data_pagamento:date,observacoes:reason.trim(),
+        valor:value,data_pagamento:date,observacoes:reason.trim(),forma_id:Number(methodId),
       })
       setNotice(result.message);setDialog(null)
       await reload()
@@ -169,6 +170,7 @@ export default function Fechamentos({role='admin'}){
   }
   async function openLedger(rateio,type='ledger'){
     setBusy(true);setFormError('')
+    setMethodId(String(paymentMethods.find(m=>m.codigo==='PIX')?.id||paymentMethods[0]?.id||''))
     try{
       const data=await comercialGet('/api/fechamentos/rateios/'+rateio.id)
       setDetail(data);setDate(localDateISO())
@@ -184,7 +186,7 @@ export default function Fechamentos({role='admin'}){
     setBusy(true);setFormError('')
     try{
       const result=await comercialPost('/api/fechamentos/rateios/'+dialog.rateio.id+'/pagar',{
-        valor:value,data_pagamento:date,observacoes:reason,
+        valor:value,data_pagamento:date,observacoes:reason,forma_id:Number(methodId),
       })
       setNotice(result.message)
       await reload()
@@ -282,6 +284,7 @@ export default function Fechamentos({role='admin'}){
     const initial=paymentMethods.find(f=>f.codigo==='PIX')||paymentMethods[0]
     setBatchEntries([{forma_id:String(initial?.id||''),valor:''}])
     setBatchKey(newKey())
+    setMethodId(String(initial?.id||''))
     setDialog({type:'batch',person})
   }
   function updateBatch(index,field,value){
@@ -363,10 +366,15 @@ export default function Fechamentos({role='admin'}){
           return <article className="fc-person-card" key={person.pessoa_id}>
             <div className="fc-person-top">
               <div><strong>{person.nome}</strong><small>{person.itens.length} participações de vendas</small></div>
-              <button type="button" className="vd-outline" aria-expanded={open}
-                onClick={()=>setOpenPersons(p=>({...p,[person.pessoa_id]:!p[person.pessoa_id]}))}>
-                {open?'Ocultar vendas':'Ver vendas'}
-              </button>
+              <div className="fc-person-actions">
+                <button type="button" className="cm-button primary"
+                  disabled={busy || Number(person.resumo.pendente)<=0}
+                  onClick={()=>openBatch(person)}>Registrar acerto da pessoa</button>
+                <button type="button" className="vd-outline" aria-expanded={open}
+                  onClick={()=>setOpenPersons(p=>({...p,[person.pessoa_id]:!p[person.pessoa_id]}))}>
+                  {open?'Ocultar vendas':'Ver vendas'}
+                </button>
+              </div>
             </div>
             <div className="fc-person-stats">
               <div><span>Total devido</span><strong>{money(person.resumo.total)}</strong></div>
@@ -442,13 +450,64 @@ export default function Fechamentos({role='admin'}){
     </>:null}
     {dialog&&<SurfaceModal
       eyebrow="SPLASH / FINANCEIRO"
-      title={dialog.type==='policy'?'Regras automáticas e feriados':
+      title={dialog.type==='batch'?'Acerto semanal por pessoa':dialog.type==='policy'?'Regras automáticas e feriados':
         dialog.type==='ownerPayment'?'Pagamentos da comissão do corretor':
         dialog.type==='ownerReverse'?'Estornar pagamento do corretor':
         dialog.type==='rateios'?'Distribuir comissão':dialog.type==='pay'?'Registrar repasse':
         dialog.type==='reverse'?'Estornar repasse':'Extrato do participante'}
-      subtitle={dialog.type==='rateios'?dialog.op.cliente_nome:dialog.rateio?.beneficiario_nome}
+      subtitle={dialog.type==='batch'?dialog.person.nome:dialog.type==='rateios'?dialog.op.cliente_nome:dialog.rateio?.beneficiario_nome}
       busy={busy} onClose={()=>setDialog(null)}>
+      {dialog.type==='batch'&&<form className="cm-form fc-batch-form" onSubmit={saveBatch}>
+        <div className="com-inform">Você paga uma única vez por pessoa. O SPLASH distribui os valores pelas vendas mais antigas com saldo pendente, preservando em cada venda quanto foi Pix, dinheiro ou outro meio. Nada é marcado pago antes de confirmar.</div>
+        <div className="fc-stats fc-ledger-summary">
+          <div><span>Comissões</span><strong>{money(dialog.person.resumo.total)}</strong></div>
+          <div><span>Já recebeu</span><strong>{money(dialog.person.resumo.pago)}</strong></div>
+          <div><span>Falta receber</span><strong>{money(dialog.person.resumo.pendente)}</strong></div>
+        </div>
+        <label>Data do acerto <FormControl type="date" value={date} onChange={setDate}/></label>
+        <div className="fc-batch-methods">
+          <strong>Como a pessoa recebeu?</strong>
+          {batchEntries.map((entry,i)=><div className="fc-batch-row" key={i}>
+            <label>Forma de pagamento
+              <FormControl type="select" value={entry.forma_id}
+                onChange={v=>updateBatch(i,'forma_id',v)}
+                options={paymentMethods.map(m=>({value:String(m.id),label:m.nome}))}
+                placeholder="Selecione"/></label>
+            <label>Valor (R$)
+              <input type="text" inputMode="decimal" value={entry.valor}
+                onChange={e=>updateBatch(i,'valor',e.target.value)}
+                placeholder="Ex.: 40,00"/></label>
+            <button className="vd-outline" type="button"
+              disabled={batchEntries.length===1}
+              onClick={()=>setBatchEntries(entries=>entries.filter((_,j)=>j!==i))}>Retirar</button>
+          </div>)}
+          <button type="button" className="vd-outline" disabled={batchEntries.length>=10}
+            onClick={()=>setBatchEntries(entries=>[...entries,{forma_id:String(paymentMethods[0]?.id||''),valor:''}])}>+ Outra forma de pagamento</button>
+        </div>
+        <div className="fc-batch-total">
+          <span>Total deste pagamento</span><strong>{money(batchSum)}</strong>
+          <small>Saldo disponível {money(dialog.person.resumo.pendente)}. Você pode pagar só uma parte agora.</small>
+        </div>
+        <label>Observações (opcional)
+          <textarea maxLength={500} rows={2} value={reason}
+            onChange={e=>setReason(e.target.value)} placeholder="Ex.: Fechamento de domingo"/></label>
+        <div className="fc-batch-sales">
+          <strong>Vendas que receberão a baixa (da mais antiga para a recente)</strong>
+          {[...dialog.person.itens].filter(x=>Number(x.pendente)>0)
+            .sort((a,b)=>a.data_venda.localeCompare(b.data_venda)||a.operacao_id-b.operacao_id)
+            .map((line,i)=><div key={i}>
+              <span>{line.descricao} · {line.titulo||'#'+line.operacao_id}</span>
+              <strong>Falta {money(line.pendente)}</strong>
+            </div>)}
+        </div>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="cm-form-actions">
+          <button type="button" className="cm-button" disabled={busy} onClick={()=>setDialog(null)}>Cancelar</button>
+          <button type="submit" className="cm-button primary"
+            disabled={busy || batchSum<=0 || batchSum>Number(dialog.person.resumo.pendente)+0.00001}>
+            {busy?'Registrando...':'Confirmar pagamento à pessoa'}</button>
+        </div>
+      </form>}
       {dialog.type==='ownerPayment'&&<div className="cm-form">
         <div className="com-inform">Parte própria do corretor depois das participações. Somente registre dinheiro que ele realmente recebeu ou reteve, inclusive quando a comissão ficou no Pix. Este registro não transfere dinheiro automaticamente.</div>
         <div className="fc-stats fc-ledger-summary">
@@ -467,6 +526,11 @@ export default function Fechamentos({role='admin'}){
           </div>):<p className="fc-hint">Nenhum pagamento registrado nesta comissão.</p>}
         </div>
         {Number(dialog.line.pendente)>0&&<form className="cm-form" onSubmit={recordOwnPayment}>
+          <label>Forma de pagamento
+            <FormControl type="select" value={methodId}
+              onChange={setMethodId}
+              options={paymentMethods.map(m=>({value:String(m.id),label:m.nome}))}
+              placeholder="Selecione como pagou"/></label>
           <label>Valor realmente pago/recebido (R$)
             <input type="text" inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Ex.: 150,00"/></label>
           <label>Data de pagamento <FormControl type="date" value={date} onChange={setDate}/></label>
@@ -578,6 +642,12 @@ export default function Fechamentos({role='admin'}){
       </div>}
       {dialog.type==='pay'&&<form className="cm-form" onSubmit={pay}>
         <div className="com-inform">Confirme somente dinheiro que já foi efetivamente pago ao beneficiário. Este botão não realiza transferência bancária.</div>
+          <label>Forma de pagamento
+            <FormControl type="select" value={methodId}
+              onChange={setMethodId}
+              options={paymentMethods.map(m=>({value:String(m.id),label:m.nome}))}
+              placeholder="Selecione como pagou"/></label>
+
         <label>Valor pago (R$) <input type="text" inputMode="decimal" required
           value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0,00"/></label>
         <label>Data do pagamento <FormControl type="date" value={date} onChange={setDate}/></label>
