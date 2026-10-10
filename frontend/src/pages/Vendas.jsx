@@ -110,7 +110,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   function openEdit(){
     if(!detail?.operacao) return
     const op=detail.operacao
-    if((detail.movimentos||[]).length || op.comissao_ajustada!==null) {
+    if(!detail.editavel) {
       setFormError('Não é permitido alterar as condições da venda depois de lançar recebimentos ou ajustar a comissão.')
       return
     }
@@ -465,7 +465,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions vd-wrap">
           <button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
-          <button type="button" className="cm-button" disabled={!!detail.movimentos.length || detail.operacao.comissao_ajustada!==null} onClick={openEdit}>Editar cadastro</button>
+          <button type="button" className="cm-button" disabled={!detail.editavel} onClick={openEdit}>Editar cadastro</button>
           <button type="button" className="cm-button" onClick={openAdjustment}>Ajustar comissão</button>
           <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
           <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
