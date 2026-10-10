@@ -528,7 +528,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <small>Atendimento, gerência, corretor e arredondamentos antes do fechamento semanal.</small>
         </div>
         {showRateios&&<RateiosVenda operacaoId={dialog.op.id} pessoas={people}
-          onSaved={async()=>{await refresh();setDetail(await comercialGet('/api/vendas/'+dialog.op.id))}}/>
+          onSaved={async()=>{await refresh();setDetail(await comercialGet('/api/vendas/'+dialog.op.id))}}/>}
         {!!detail.historico_correcoes?.length&&<div className="vd-corrections">
           <strong>Histórico de correções</strong>
           {detail.historico_correcoes.map(h=><div key={h.id}>
