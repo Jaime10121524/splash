@@ -311,3 +311,6 @@ a { text-decoration: none; }
   white-space:normal;
 }
 .field-caption em,.cm-field-heading em{color:#d45568!important;font-style:normal;flex-shrink:0;}
+
+.dashboard-columns.dashboard-operator{grid-template-columns:minmax(0,1fr)}
+.dashboard-operator .quick-panel{max-width:960px}
