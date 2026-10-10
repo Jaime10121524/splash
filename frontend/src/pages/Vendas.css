@@ -112,3 +112,8 @@
 .vd-corrections>div{display:grid;gap:4px;padding-top:8px;border-top:1px solid var(--border)}
 .vd-corrections small{font-size:10px;color:var(--muted)}
 .vd-corrections span{font-size:11px;line-height:1.5;color:var(--text)}
+
+.vd-discount-area{display:grid;gap:8px;min-width:0}
+.vd-form .vd-discount-check{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:11px;font-weight:800;line-height:1.5}
+.vd-discount-check input[type=checkbox]{width:17px;height:17px;accent-color:var(--brand);flex-shrink:0}
+.vd-discount-area>label:not(.vd-discount-check){display:grid;gap:7px;font-size:11px;font-weight:800}
