@@ -16,6 +16,8 @@ jobs:
           find backend/app -name '*.php' -type f -print0 | xargs -0 -n1 php -l
       - name: Financial calculation smoke test
         run: php backend/tests/venda_money_smoke.php
+      - name: Commission distribution smoke test
+        run: php backend/tests/rateio_rules_smoke.php
 
   frontend:
     name: React/Vite build
