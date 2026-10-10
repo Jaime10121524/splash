@@ -41,6 +41,9 @@ final class ResetCompletoTestes extends BaseCommand
         // histórico de migrations.
         putenv('SPLASH_CONFIRM_RESET_COMPLETO='.$phrase);
         try {
+            // Arquivo de migration nomeado com timestamp não é PSR-4 autoloadable.
+            // Carrega-o explicitamente sem registrar o reset no MigrationRunner.
+            require_once APPPATH.'Database/ResetScripts/2026-10-11-000001_ResetCompletoDadosTestes.php';
             (new ResetCompletoDadosTestes())->up();
             $failed = [];
             foreach (ResetCompletoDadosTestes::TABLES as $table) {
