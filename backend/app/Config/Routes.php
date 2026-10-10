@@ -90,6 +90,10 @@ $routes->group('api', static function ($routes): void {
     $routes->post('fechamentos-periodos/(:num)/titulares/(:num)/estornar','Api\FechamentosPeriodosController::estornarTitular/$1/$2',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/repasses/(:num)/estornar','Api\FechamentosPeriodosController::estornarRepasse/$1/$2',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/concluir','Api\FechamentosPeriodosController::concluir/$1',['filter'=>'csrf']);
+    // Conciliação de dinheiro custodiado pelo responsável (não liquida comissões).
+    $routes->get('fechamentos-periodos/(:num)/conciliacao','Api\\ConciliacaoCustodiaController::index/$1');
+    $routes->post('fechamentos-periodos/(:num)/conciliacao/movimentos','Api\\ConciliacaoCustodiaController::registrar/$1',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/conciliacao/movimentos/(:num)/estornar','Api\\ConciliacaoCustodiaController::estornar/$1/$2',['filter'=>'csrf']);
 
     $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
     $routes->get('fechamentos/meu', 'Api\FechamentosController::meu');
