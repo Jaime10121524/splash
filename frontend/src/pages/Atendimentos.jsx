@@ -3,6 +3,7 @@ import { ClientFields, ClientFinder, SurfaceModal, emptyClient } from '../compon
 import { FormControl } from '../components/UiFields.jsx'
 import { comercialGet, comercialPost, dateBR, localDateISO, personOptions, timeSpan } from '../lib/comercialApi.js'
 import './ComercialPages.css'
+import { formatPhone } from '../components/PhoneInput.jsx'
 
 const statusLabels={
   AGUARDANDO:'Aguardando', ATENDENDO:'Em atendimento',
@@ -169,7 +170,7 @@ export default function Atendimentos() {
                 <div className="com-visit-name"><strong>{v.cliente_nome}</strong>
                   <span className={'com-pill '+(v.status==='ATENDENDO'?'violet':v.status==='AGUARDANDO'?'muted':'good')}>
                     {statusLabels[v.status]||v.status}</span></div>
-                <small>{v.cliente_telefone} · Corrente: {v.dono_corrente_nome||'—'}</small>
+                <small>{formatPhone(v.cliente_telefone)} · Corrente: {v.dono_corrente_nome||'—'}</small>
                 <div className="com-visit-meta">
                   <span>Chegada: <b>{dateBR(v.chegada_em,true)}</b></span>
                   <span>Início: <b>{dateBR(v.inicio_em,true)}</b></span>
