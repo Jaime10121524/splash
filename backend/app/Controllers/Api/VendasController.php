@@ -136,7 +136,7 @@ class VendasController extends CommercialBaseController
         $history=$db->table('venda_operacoes_auditoria')->select('id,acao,justificativa,criado_em,usuario_id')
             ->where('operacao_id',(int)$id)->orderBy('id','DESC')->get()->getResultArray();
         $editavel=$op['comissao_ajustada']===null;
-        if($this->temRateio($db,(int)$id))$editavel=false;
+        if($this->temRateio($db,(int)$id)||$this->temPagamentoTitular($db,(int)$id))$editavel=false;
         foreach($movements as $mov){
             if($mov['tipo']==='DEVOLUCAO') $editavel=false;
         }
@@ -317,7 +317,7 @@ class VendasController extends CommercialBaseController
                 $net += $move['tipo']==='ENTRADA' ? $cent : -$cent;
                 if($move['tipo']==='DEVOLUCAO')$hasRealRefund=true;
             }
-            if($net!==0 || $hasRealRefund || $op['comissao_ajustada']!==null || $this->temRateio($db,(int)$id)){
+            if($net!==0 || $hasRealRefund || $op['comissao_ajustada']!==null || ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Cadastro protegido: existem pagamentos não estornados, devoluções reais ou comissão já ajustada. Apenas operações sem movimentação financeira válida podem ser corrigidas.');
             }
@@ -507,7 +507,7 @@ class VendasController extends CommercialBaseController
         $db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
-            if($op && $this->temRateio($db,(int)$id)){
+            if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
             }
@@ -569,7 +569,7 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
-            if($op && $this->temRateio($db,(int)$id)){
+            if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
             }
@@ -624,7 +624,7 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
-            if($op && $this->temRateio($db,(int)$id)){
+            if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
             }
@@ -676,7 +676,7 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
-            if($op && $this->temRateio($db,(int)$id)){
+            if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
             }
@@ -799,6 +799,12 @@ class VendasController extends CommercialBaseController
     private function temRateio($db,int $id): bool
     {
         return $db->table('comissao_rateios')->where('operacao_id',$id)->countAllResults()>0;
+    }
+
+    private function temPagamentoTitular($db,int $id): bool
+    {
+        return $db->table('comissao_titular_movimentos')
+            ->where('operacao_id',$id)->countAllResults()>0;
     }
 
     private function number(mixed $raw): ?string
