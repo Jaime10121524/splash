@@ -182,6 +182,7 @@ function DataCard({ label, icon, tone, detail, value = '—' }) {
 }
 function Dashboard({ user, navigate }) {
   const admin=user.role==='admin'
+  const operator=user.role==='operador'
   const [refresh,setRefresh]=useState(0)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
@@ -197,7 +198,7 @@ function Dashboard({ user, navigate }) {
     const query='?'+new URLSearchParams({inicio:start,fim:end})
     setPeriod(new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(now))
     setLoading(true);setError('')
-    const requests=[
+    const requests=operator?[]:[
       ['contas',getJSON('/api/fechamentos/contas'+query)],
       ['pessoal',getJSON('/api/financeiro/pessoal'+query)],
     ]
@@ -244,7 +245,7 @@ function Dashboard({ user, navigate }) {
       else if(results.some(x=>x.status==='rejected'))setError('Alguns indicadores não foram carregados; os demais estão atualizados.')
     }).finally(()=>{if(active)setLoading(false)})
     return ()=>{active=false}
-  },[admin,user.role,refresh])
+  },[admin,operator,user.role,refresh])
   const money=v=>v===undefined?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))
   const number=v=>v===undefined?'—':v
   return <>
@@ -253,11 +254,11 @@ function Dashboard({ user, navigate }) {
       <div className="today-pill"><Icon name="calendar" size={17}/>{formatToday()}</div></div>
     <div className="hero-panel">
       <div className="hero-copy"><span className="hero-pill"><Icon name="spark" size={15}/> PAINEL SPLASH</span>
-        <h2>{admin?'Operação e resultados em um só lugar.':'Acompanhe suas comissões e pagamentos.'}</h2>
+        <h2>{admin?'Operação e resultados em um só lugar.':operator?'Acompanhe chegadas e atendimentos.':'Acompanhe suas comissões e pagamentos.'}</h2>
         <p>{admin?'Vendas, visitas, comissões e acertos por pessoa, sem misturar os responsáveis.':
-          'Veja suas comissões, quanto recebeu e o que continua pendente.'}</p>
+          operator?'Registre chegadas e acompanhe os atendimentos do clube.':'Veja suas comissões, quanto recebeu e o que continua pendente.'}</p>
         <div className="hero-actions"><button type="button" className="button light"
-          onClick={()=>navigate(admin?'fechamentos':'financeiro')}>{admin?'Ver fechamentos':'Meu financeiro'}<Icon name="arrow" size={18}/></button>
+          onClick={()=>navigate(admin?'fechamentos':operator?'atendimentos':'financeiro')}>{admin?'Ver fechamentos':operator?'Atendimentos':'Meu financeiro'}<Icon name="arrow" size={18}/></button>
           <button type="button" className="button light" onClick={()=>setRefresh(v=>v+1)} disabled={loading}>
             <Icon name="refresh" size={16}/>{loading?'Atualizando':'Atualizar dados'}</button></div>
       </div>
@@ -268,12 +269,14 @@ function Dashboard({ user, navigate }) {
       <span className="hint-badge">{loading?'Atualizando…':error?'Dados parciais':'Dados conectados'}</span></div>
     {error&&<div className="com-alert error" role="status">{error}</div>}
     <div className="stats-grid">
-      {admin&&<>
+      {(admin||operator)&&<>
         <DataCard label="Visitas no período" icon="users" tone="violet" detail="Chegadas registradas" value={loading?'…':number(stats.visits)}/>
-        <DataCard label="Vendas cadastradas" icon="bag" tone="mint" detail="Total histórico do clube" value={loading?'…':number(stats.sales)}/>
-        <DataCard label="Pendências de negociação" icon="clock" tone="amber" detail="Total histórico em aberto" value={loading?'…':number(stats.pendingSales)}/>
+        {admin&&<>
+          <DataCard label="Vendas cadastradas" icon="bag" tone="mint" detail="Total histórico do clube" value={loading?'…':number(stats.sales)}/>
+          <DataCard label="Pendências de negociação" icon="clock" tone="amber" detail="Total histórico em aberto" value={loading?'…':number(stats.pendingSales)}/>
+        </>}
       </>}
-      <DataCard label={admin?'Comissões das contas':'Minhas comissões'} icon="wallet" tone="violet"
+      {!operator&&<><DataCard label={admin?'Comissões das contas':'Minhas comissões'} icon="wallet" tone="violet"
         detail="Direitos apurados no mês" value={loading?'…':money(stats.commission)}/>
       <DataCard label="Recebido em pagamentos" icon="check" tone="mint"
         detail="Baixas efetivamente registradas" value={loading?'…':money(stats.received)}/>
@@ -284,10 +287,10 @@ function Dashboard({ user, navigate }) {
       <DataCard label="Despesas no mês" icon="receipt" tone="amber"
         detail="Despesas pessoais registradas" value={loading?'…':money(stats.expenses)}/>
       <DataCard label="Saldo de empréstimos" icon="wallet" tone="sky"
-        detail="Valor ainda devido ao clube" value={loading?'…':money(stats.loans)}/>
+        detail="Valor ainda devido ao clube" value={loading?'…':money(stats.loans)}/></>}
     </div>
     <div className="dashboard-columns">
-      <section className="panel activity-panel"><div className="panel-head"><div><h3>Comissões recentes</h3>
+      {!operator&&<section className="panel activity-panel"><div className="panel-head"><div><h3>Comissões recentes</h3>
         <p>Últimos direitos apurados nas vendas do período</p></div></div>
         {activities.length===0?<NoData icon="chart" title="Sem lançamentos no período"
           description="Cadastre e apure uma venda para visualizar seus resultados."/>:
@@ -296,7 +299,7 @@ function Dashboard({ user, navigate }) {
               <small>{a.titulo||'Venda #'+a.id} · {a.data?new Date(a.data+'T12:00:00').toLocaleDateString('pt-BR'):''}</small></div>
             <div><strong>{money(a.total)}</strong><small>Falta {money(a.saldo)}</small></div>
           </div>)}</div>}
-      </section>
+      </section>}
       <section className="panel quick-panel"><div className="panel-head"><div><h3>Acesso rápido</h3>
         <p>Abra diretamente a função desejada</p></div></div>
         <div className="quick-links">
@@ -305,6 +308,8 @@ function Dashboard({ user, navigate }) {
             {label:'Vendas',detail:'Consultar negociações',id:'vendas',icon:'bag'},
             {label:'Fechamentos',detail:'Acertos por pessoa e empréstimos',id:'fechamentos',icon:'wallet'},
             {label:'Financeiro',detail:'Despesas e empréstimos',id:'financeiro',icon:'receipt'},
+          ]:operator?[
+            {label:'Atendimentos',detail:'Acompanhar visitantes',id:'atendimentos',icon:'clipboard'},
           ]:[
             {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
             {label:'Minhas despesas',detail:'Registrar gastos',id:'despesas',icon:'receipt'},
