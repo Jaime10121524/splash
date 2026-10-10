@@ -72,6 +72,20 @@ $routes->group('api', static function ($routes): void {
     $routes->post('financeiro/emprestimos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarEmprestimo/$1', ['filter'=>'csrf']);
     $routes->post('financeiro/emprestimos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarEmprestimo/$1', ['filter'=>'csrf']);
 
+    // Fechamento do período tem escopo próprio e NÃO agrega corretores independentes.
+    // Todas as rotas revalidam o responsável associado à sessão Shield.
+    $routes->get('fechamentos-periodos/escopos','Api\FechamentosPeriodosController::escopos');
+    $routes->post('fechamentos-periodos/vincular','Api\FechamentosPeriodosController::vincular',['filter'=>'csrf']);
+    $routes->get('fechamentos-periodos','Api\FechamentosPeriodosController::listar');
+    $routes->post('fechamentos-periodos','Api\FechamentosPeriodosController::abrir',['filter'=>'csrf']);
+    $routes->get('fechamentos-periodos/(:num)','Api\FechamentosPeriodosController::detalhe/$1');
+    $routes->post('fechamentos-periodos/(:num)/receber','Api\FechamentosPeriodosController::receber/$1',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/entradas/(:num)/excluir','Api\FechamentosPeriodosController::excluirEntrada/$1/$2',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/abater','Api\FechamentosPeriodosController::abater/$1',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/avancar','Api\FechamentosPeriodosController::avancar/$1',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/pagar','Api\FechamentosPeriodosController::pagar/$1',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/concluir','Api\FechamentosPeriodosController::concluir/$1',['filter'=>'csrf']);
+
     $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
     $routes->get('fechamentos/meu', 'Api\FechamentosController::meu');
     $routes->get('fechamentos/contas', 'Api\FechamentosController::contas');
