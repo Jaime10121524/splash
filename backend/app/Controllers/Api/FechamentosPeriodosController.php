@@ -231,7 +231,8 @@ class FechamentosPeriodosController extends CommercialBaseController
             $income[(int)$item['pessoa_id']]=$item;
         }
         $total=0;
-        foreach(($report['corretores']??[]) as &$person){
+        $report['corretores']=$report['corretores']??[];
+        foreach($report['corretores'] as &$person){
             $bonus=$income[(int)$person['pessoa_id']]??null;
             $part=VendaMoney::cents((string)($bonus['total']??'0'),true);
             $base=VendaMoney::cents((string)($person['comissao']??'0'),true);
