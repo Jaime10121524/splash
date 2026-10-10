@@ -130,15 +130,15 @@ class PessoasController extends BaseController
     {
         $name = trim(preg_replace('/\s+/u',' ', (string)($data['nome'] ?? '')) ?? '');
         $email = trim((string)($data['email'] ?? ''));
-        $phone = trim((string)($data['telefone'] ?? ''));
+        $phone = preg_replace('/\\D+/', '', (string)($data['telefone'] ?? ''));
         $note = trim((string)($data['observacoes'] ?? ''));
         $roles = $data['papeis'] ?? null;
         if ($name === '' || mb_strlen($name)>160) return ['error'=>'Informe o nome (até 160 caracteres).'];
         if ($email !== '' && (strlen($email)>254 || !filter_var($email,FILTER_VALIDATE_EMAIL))) {
             return ['error'=>'E-mail inválido.'];
         }
-        if (mb_strlen($phone)>25 || mb_strlen($note)>3000) {
-            return ['error'=>'Telefone ou observações ultrapassam o limite permitido.'];
+        if (($phone!=='' && !in_array(strlen($phone),[10,11],true)) || mb_strlen($note)>3000) {
+            return ['error'=>'Telefone precisa ter DDD e 10 ou 11 dígitos; observações até 3000 caracteres.'];
         }
         if (!is_array($roles) || count($roles)<1 || count($roles)>4
             || count(array_filter($roles,'is_string'))!==count($roles)
