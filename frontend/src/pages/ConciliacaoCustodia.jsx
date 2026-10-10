@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react'
 import {comercialGet,comercialPost,dateBR,localDateISO} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
 import {SurfaceModal} from '../components/ComercialForms.jsx'
+import PixVendaCustodia from './PixVendaCustodia.jsx'
 import './ConciliacaoCustodia.css'
 
 const money=value=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(value||0))
@@ -114,6 +115,7 @@ export default function ConciliacaoCustodia({fechamentoId}){
           <button type="button" className="cm-button primary" disabled={!hasBalance} onClick={()=>newMovement('REPASSE_CLUBE')}>+ Devolução ao clube</button>
         </div>
         <p className="cust-help">Não lance novamente o que já consta em “Recebido do clube” ou “Pagamentos realizados”. Despesas pessoais e abatimentos de empréstimos não diminuem automaticamente o dinheiro custodiado. O saldo anterior e o Pix retido só devem ser registrados quando realmente comprovados.</p>
+        <PixVendaCustodia fechamentoId={fechamentoId} responsavelNome={data.responsavel_nome} onChanged={refresh}/>
         <h3>Histórico de conciliação</h3>
         {(data.movimentos||[]).length===0?<div className="com-empty">Ainda não há movimentos manuais de custódia.</div>:
           <div className="cust-entries">{data.movimentos.map(item=><article key={item.id}>
