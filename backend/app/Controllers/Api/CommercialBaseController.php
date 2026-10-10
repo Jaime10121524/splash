@@ -24,6 +24,16 @@ abstract class CommercialBaseController extends BaseController
         return null;
     }
 
+    protected function authorizeOperations(): ?ResponseInterface
+    {
+        $user = auth('session')->user();
+        if ($user === null || $user->isBanned()) return $this->errorResponse(401, 'Faça login novamente.');
+        if (!$user->inGroup('admin') && (!$user->inGroup('operador') || !$user->can('visits.manage') || !$user->can('clients.manage'))) {
+            return $this->errorResponse(403, 'Apenas administrador ou operador de atendimentos.');
+        }
+        return null;
+    }
+
     protected function jsonPayload(): array
     {
         $value = $this->request->getJSON(true);
