@@ -19,7 +19,7 @@ const blank=()=>({
   regra_comissao_id:'',desconto_corretor:'0,00',numero_titulo:'',
   data_negociacao:localDateISO(),data_venda:localDateISO(),data_inicio:localDateISO(),
   retorno_previsto:'',observacoes:'',historica:false,
-  corretor_pessoa_id:'',segundo_corretor_pessoa_id:'',
+  corretor_pessoa_id:'',segundo_corretor_pessoa_id:'',justificativa:'',
 })
 const blankMovement=()=>({valor:'',forma_id:'',detentor:'CORRETOR',
   data_movimento:localDateISO(),observacoes:'',entrada_id:''})
@@ -107,6 +107,33 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const duePreview=discount!==null?selectedPlanTotal-Number(discount):null
   const viewOwn = role!=='admin'
 
+  function openEdit(){
+    if(!detail?.operacao) return
+    const op=detail.operacao
+    if((detail.movimentos||[]).length || op.comissao_ajustada!==null) {
+      setFormError('Não é permitido alterar as condições da venda depois de lançar recebimentos ou ajustar a comissão.')
+      return
+    }
+    setClient({id:Number(op.cliente_id),nome:dialog.op?.cliente_nome||client?.nome||'Cliente vinculado',telefone:dialog.op?.cliente_telefone||''})
+    setSaleForm({
+      ...blank(),situacao:op.situacao,
+      cliente_id:String(op.cliente_id),visita_id:op.visita_id?String(op.visita_id):'',
+      plano_versao_id:String(op.plano_versao_id),
+      regra_comissao_id:String(op.regra_comissao_id),
+      historica:!!op.historica,numero_titulo:op.numero_titulo||'',
+      corretor_pessoa_id:String(op.corretor_pessoa_id),
+      segundo_corretor_pessoa_id:op.segundo_corretor_pessoa_id?String(op.segundo_corretor_pessoa_id):'',
+      desconto_corretor:Number(op.desconto_corretor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),
+      data_negociacao:op.data_negociacao||localDateISO(),
+      data_venda:op.data_venda||localDateISO(),
+      data_inicio:op.data_inicio||localDateISO(),
+      retorno_previsto:op.retorno_previsto||'',
+      observacoes:op.observacoes||'',
+      justificativa:'',
+    })
+    setFormError('')
+    setDialog({type:'edit',op:dialog.op})
+  }
   function openNew(kind=tab==='pendencias'?'PENDENCIA':'VENDA') {
     setSaleForm({...blank(),situacao:kind})
     setClient(null);setLinkedVisit(null);setDetail(null);setFormError('');setDialog({type:'new'})
@@ -133,6 +160,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     if(!saleForm.corretor_pessoa_id)return setFormError('Informe o corretor responsável.')
     const parsed=moneyInput(saleForm.desconto_corretor)
     if(parsed===null)return setFormError('Informe desconto válido (ex.: 100,00).')
+    if(dialog.type==='edit' && saleForm.justificativa.trim().length<5)
+      return setFormError('Informe o motivo da correção (mínimo cinco caracteres).')
     if(saleForm.situacao==='VENDA'&&!/^\d{4}$/.test(saleForm.numero_titulo))
       return setFormError('O número do título precisa ter exatamente quatro algarismos.')
     setBusy(true)
@@ -147,11 +176,12 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         desconto_corretor:parsed,
         retorno_previsto:saleForm.retorno_previsto||null,
       }
-      const result=await comercialPost('/api/vendas',payload)
+      const editing=dialog.type==='edit'
+      const op=dialog.op
+      const result=await comercialPost(editing?'/api/vendas/'+op.id+'/editar':'/api/vendas',payload)
       setDialog(null);setNotice(result.message)
       await refresh()
-      // Abre extrato para permitir lançamento de entrada sem tela intermediária.
-      await openDetail({id:result.operacao_id})
+      await openDetail(editing?op:{id:result.operacao_id})
     }catch(e){setFormError(e.message)}
     finally{setBusy(false)}
   }
@@ -203,20 +233,25 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
 
   async function saveMovement(e) {
     e.preventDefault()
-    const parsed=moneyInput(moveForm.valor)
-    if(parsed===null||Number(parsed)<=0)return setFormError('Informe valor positivo (ex.: 200,00).')
+    const parsed=dialog.type==='reversal'?null:moneyInput(moveForm.valor)
+    if(dialog.type!=='reversal' && (parsed===null||Number(parsed)<=0))
+      return setFormError('Informe valor positivo (ex.: 200,00).')
     if(dialog.type==='receipt'&&!moveForm.forma_id)return setFormError('Selecione a forma de pagamento.')
-    if(dialog.type==='refund'&&!moveForm.entrada_id)return setFormError('Escolha o recebimento que será devolvido.')
-    if(dialog.type==='refund'&&!moveForm.observacoes.trim())return setFormError('Informe o motivo da devolução.')
+    if(['refund','reversal'].includes(dialog.type)&&!moveForm.entrada_id)
+      return setFormError('Escolha o recebimento original.')
+    if(['refund','reversal'].includes(dialog.type)&&moveForm.observacoes.trim().length<5)
+      return setFormError('Informe a justificativa (mínimo cinco caracteres).')
     setBusy(true);setFormError('')
     try{
-      const url='/api/vendas/'+dialog.op.id+(dialog.type==='refund'?'/devolver':'/receber')
-      const payload={
-        valor:parsed,data_movimento:moveForm.data_movimento,
-        observacoes:moveForm.observacoes,
-        ...(dialog.type==='refund' ? {entrada_id:Number(moveForm.entrada_id)} :
-          {forma_id:Number(moveForm.forma_id),detentor:moveForm.detentor}),
-      }
+      const url='/api/vendas/'+dialog.op.id+(
+        dialog.type==='refund'?'/devolver':dialog.type==='reversal'?'/estornar':'/receber')
+      const payload=dialog.type==='reversal'
+        ? {entrada_id:Number(moveForm.entrada_id),justificativa:moveForm.observacoes}
+        : {valor:parsed,data_movimento:moveForm.data_movimento,
+           observacoes:moveForm.observacoes,
+           ...(dialog.type==='refund'
+             ? {entrada_id:Number(moveForm.entrada_id)}
+             : {forma_id:Number(moveForm.forma_id),detentor:moveForm.detentor})}
       const result=await comercialPost(url,payload)
       setNotice(result.message)
       await refresh()
@@ -299,19 +334,23 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     {dialog&&<SurfaceModal
       title={dialog.type==='new'?(saleForm.situacao==='PENDENCIA'?'Nova pendência':'Nova venda'):
         dialog.type==='convert'?'Fechar pendência em venda':
-        dialog.type==='receipt'?'Registrar recebimento':dialog.type==='refund'?'Registrar devolução':
+        dialog.type==='receipt'?'Registrar recebimento':dialog.type==='refund'?'Devolver dinheiro':
+        dialog.type==='reversal'?'Estornar lançamento':dialog.type==='edit'?'Corrigir cadastro':
         dialog.type==='details'?'Extrato da operação':dialog.type==='adjust'?'Ajustar comissão':dialog.type==='setting'?'Cadastro financeiro':'Configurações de vendas'}
       subtitle={dialog.type==='details'||dialog.type==='receipt'||dialog.type==='refund'?dialog.op?.cliente_nome:''}
       busy={busy} onClose={()=>setDialog(null)}>
 
-      {dialog.type==='new'&&<form className="cm-form vd-form" onSubmit={saveSale}>
-        <label>Situação inicial
+      {['new','edit'].includes(dialog.type)&&<form className="cm-form vd-form" onSubmit={saveSale}>
+        {dialog.type==='edit'&&<div className="com-inform">
+          Corrija um erro cadastral antes do primeiro recebimento. A versão anterior ficará na auditoria. Após movimentar dinheiro, use Estornar lançamento e registre corretamente; Devolver é apenas para dinheiro realmente devolvido.
+        </div>}
+        {dialog.type==='new'&&<label>Situação inicial
           <FormControl type="select" value={saleForm.situacao} onChange={v=>setField('situacao',v)}
-            options={[{value:'VENDA',label:'Venda fechada'},{value:'PENDENCIA',label:'Pendência de negociação'}]}/></label>
-        <ClientFinder label="Cliente" value={client} onChange={selected=>{
+            options={[{value:'VENDA',label:'Venda fechada'},{value:'PENDENCIA',label:'Pendência de negociação'}]}/></label>}
+        {dialog.type==='new'?<ClientFinder label="Cliente" value={client} onChange={selected=>{
           setClient(selected);setField('cliente_id',selected?.id||'');setField('visita_id','')
-        }}/>
-        <label>Atendimento (se houver)
+        }}/>:<div className="vd-readonly">Cliente: {client?.nome||'Cliente vinculado'} (não alterável)</div>}
+        {dialog.type==='new'&&<label>Atendimento (se houver)
           <FormControl type="select" value={saleForm.visita_id} onChange={value=>{
             const picked=visits.find(v=>String(v.id)===value)
             setSaleForm(f=>({...f,visita_id:value,
@@ -320,10 +359,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
             }))
           }} options={[{value:'',label:'Sem vínculo direto'},...clientVisits.map(v=>({
             value:String(v.id),label:'#'+v.id+' · '+dateBR(v.chegada_em,true)+' · '+(v.status==='VENDA'?'Venda':'Pendência')
-          }))]}/></label>
+          }))]}/></label>}
         <label className="cm-status-switch"><span><strong>Cadastro histórico</strong>
           <small>Permite escolher versões antigas de planos e regras.</small></span>
-          <input type="checkbox" checked={saleForm.historica} onChange={e=>setField('historica',e.target.checked)}/></label>
+          <input type="checkbox" checked={saleForm.historica} disabled={dialog.type==='edit'} onChange={e=>setField('historica',e.target.checked)}/></label>
         <label><span className="field-caption">Plano e versão <em>*</em></span>
           <FormControl type="select" value={saleForm.plano_versao_id}
             onChange={v=>setField('plano_versao_id',v)} options={planChoices}
@@ -382,9 +421,13 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           onChange={v=>setField('retorno_previsto',v)}/></label>}
         <label>Observações<textarea rows={2} value={saleForm.observacoes}
           onChange={e=>setField('observacoes',e.target.value)} maxLength={4000}/></label>
+        {dialog.type==='edit'&&<label><span className="field-caption">Motivo da correção <em>*</em></span>
+          <textarea rows={2} maxLength={500} value={saleForm.justificativa}
+            placeholder="Ex.: Selecionei o plano errado"
+            onChange={e=>setField('justificativa',e.target.value)}/></label>}
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions"><button type="button" className="cm-button" onClick={()=>setDialog(null)} disabled={busy}>Cancelar</button>
-          <button type="submit" className="cm-button primary" disabled={busy}>{busy?'Salvando...':'Salvar operação'}</button></div>
+          <button type="submit" className="cm-button primary" disabled={busy}>{busy?'Salvando...':dialog.type==='edit'?'Salvar correção':'Salvar operação'}</button></div>
       </form>}
 
       {dialog.type==='convert'&&<form className="cm-form" onSubmit={saveConverter}>
