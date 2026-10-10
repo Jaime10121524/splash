@@ -50,7 +50,7 @@ class FechamentosController extends CommercialBaseController
     private function rows($db,string $start,string $end): array
     {
         $operations=$db->table('venda_operacoes o')
-            ->select('o.id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_cobrado,o.valor_tabela,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
+            ->select('o.id,o.visita_id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_cobrado,o.valor_tabela,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas p','p.id=o.corretor_pessoa_id','left')
             ->where('o.situacao','VENDA')
@@ -121,6 +121,269 @@ class FechamentosController extends CommercialBaseController
         }
         unset($operation);
         return $operations;
+    }
+
+
+    /**
+     * Extrato consolidado por pessoa: direitos a receber, recebidos e pendentes.
+     * O titular recebe apenas sua parcela após os rateios. Cada beneficiário
+     * vê suas participações e repasses; sem acesso a nomes de clientes.
+     */
+    private function contasPorPessoa($db,array $operations,bool $admin,?int $onlyPersonId=null): array
+    {
+        if(!$operations)return [];
+        $ids=array_column($operations,'id');
+        $ownerMovements=$db->table('comissao_titular_movimentos')
+            ->select('id,operacao_id,corretor_pessoa_id,tipo,valor,data_pagamento,observacoes,referencia_pagamento_id')
+            ->whereIn('operacao_id',$ids)->orderBy('id','ASC')->get()->getResultArray();
+        $ownerByOperation=[];
+        foreach($ownerMovements as $m){
+            $key=(int)$m['operacao_id'];
+            $ownerByOperation[$key]['saldo']=($ownerByOperation[$key]['saldo']??0)
+                +($m['tipo']==='PAGAMENTO'?1:-1)*VendaMoney::cents((string)$m['valor']);
+            $ownerByOperation[$key]['movimentos'][]=$m;
+        }
+        $allocIds=[];
+        foreach($operations as $op)foreach($op['rateios'] as $a)$allocIds[]=(int)$a['id'];
+        $history=[];
+        if($allocIds){
+            foreach($db->table('comissao_repasses')
+                ->select('id,rateio_id,tipo,valor,data_pagamento,observacoes,referencia_pagamento_id')
+                ->whereIn('rateio_id',$allocIds)->orderBy('id','ASC')->get()->getResultArray() as $m){
+                $history[(int)$m['rateio_id']][]=$m;
+            }
+        }
+        $accounts=[];
+        $personName=[];
+        if($admin){
+            foreach($db->table('pessoas')->select('id,nome')->get()->getResultArray() as $p){
+                $personName[(int)$p['id']]=$p['nome'];
+            }
+        }
+        $add=function(int $personId,string $name,array $line) use(&$accounts,$onlyPersonId,$admin,$personName){
+            if($onlyPersonId!==null && $personId!==$onlyPersonId)return;
+            $accounts[$personId]??=[
+                'pessoa_id'=>$personId,
+                'nome'=>$admin?($personName[$personId]??$name):$name,
+                'total_centavos'=>0,'pago_centavos'=>0,
+                'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,
+                'itens'=>[],
+            ];
+            $accounts[$personId]['total_centavos']+=$line['total_centavos'];
+            $accounts[$personId]['pago_centavos']+=$line['pago_centavos'];
+            $accounts[$personId]['itens'][]=$line;
+        };
+        foreach($operations as $op){
+            if($op['comissao_base']===null)continue;
+            $root=(int)$op['corretor_pessoa_id'];
+            $base=VendaMoney::cents((string)$op['comissao_base']);
+            $rootTransfer=0;
+            foreach($op['rateios'] as $a){
+                if((int)$a['responsavel_pessoa_id']===$root)$rootTransfer+=VendaMoney::cents((string)$a['valor']);
+            }
+            $rootTotal=$base-$rootTransfer;
+            if($rootTotal<0)continue;
+            $key=(int)$op['id'];
+            $paidOwner=$ownerByOperation[$key]['saldo']??0;
+            $sourceLabel='Corretor principal — parte própria';
+            $meta=[
+                'operacao_id'=>$key,
+                'visita_id'=>$op['visita_id']===null?null:(int)$op['visita_id'],
+                'data_venda'=>$op['data_venda'],
+                'titulo'=>trim((string)($op['numero_titulo']??'').' '.(string)($op['sigla_plano']??'')),
+                // Nenhum nome, telefone ou CPF de associado para não administrador.
+                'cliente_nome'=>$admin?$op['cliente_nome']:null,
+            ];
+            $add($root,(string)($op['corretor_nome']??'Corretor'),[
+                ...$meta,'tipo'=>'TITULAR','rateio_id'=>null,
+                'descricao'=>$sourceLabel,'pagador'=>'Clube / acerto do responsável',
+                'total_centavos'=>$rootTotal,'pago_centavos'=>$paidOwner,
+                'movimentos'=>array_map(static fn($m)=>[
+                    'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
+                    'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
+                    'observacoes'=>$m['observacoes'],
+                ],$ownerByOperation[$key]['movimentos']??[]),
+            ]);
+            foreach($op['rateios'] as $a){
+                $payee=(int)$a['beneficiario_pessoa_id'];
+                $paid=VendaMoney::cents((string)$a['pago'],true);
+                $outstanding=VendaMoney::cents((string)$a['valor']);
+                $add($payee,$admin?$a['beneficiario_nome']:'Sua conta',[
+                    ...$meta,'tipo'=>'PARTICIPACAO',
+                    'rateio_id'=>(int)$a['id'],
+                    'descricao'=>match($a['papel']){
+                        'ATENDENTE'=>'Atendimento','CORRETOR'=>'Divisão com corretor',
+                        'GERENTE'=>'Gerência',default=>'Participação',
+                    },
+                    'pagador'=>$admin?$a['origem_nome']:'Corretor responsável',
+                    'total_centavos'=>$outstanding,'pago_centavos'=>$paid,
+                    'movimentos'=>array_map(static fn($m)=>[
+                        'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
+                        'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
+                        'observacoes'=>$m['observacoes'],
+                    ],$history[(int)$a['id']]??[]),
+                ]);
+                if($onlyPersonId===null || (int)$a['responsavel_pessoa_id']===$onlyPersonId){
+                    $payer=(int)$a['responsavel_pessoa_id'];
+                    $accounts[$payer]??=[
+                        'pessoa_id'=>$payer,
+                        'nome'=>$admin?($personName[$payer]??$a['origem_nome']):'Sua conta',
+                        'total_centavos'=>0,'pago_centavos'=>0,
+                        'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,'itens'=>[],
+                    ];
+                    $accounts[$payer]['obrigações_centavos']+=$outstanding;
+                    $accounts[$payer]['obrigações_pagas_centavos']+=$paid;
+                }
+            }
+        }
+        $result=[];
+        foreach($accounts as $account){
+            foreach($account['itens'] as &$line){
+                $line['total']=VendaMoney::decimal($line['total_centavos']);
+                $line['pago']=VendaMoney::decimal($line['pago_centavos']);
+                $line['pendente']=VendaMoney::decimal(max(0,$line['total_centavos']-$line['pago_centavos']));
+                unset($line['total_centavos'],$line['pago_centavos']);
+            }
+            unset($line);
+            $due=$account['total_centavos'];
+            $paid=$account['pago_centavos'];
+            $account['resumo']=[
+                'total'=>VendaMoney::decimal($due),
+                'pago'=>VendaMoney::decimal($paid),
+                'pendente'=>VendaMoney::decimal(max(0,$due-$paid)),
+                'a_repassar'=>VendaMoney::decimal($account['obrigações_centavos']),
+                'repasses_ja_pagos'=>VendaMoney::decimal($account['obrigações_pagas_centavos']),
+                'repasses_pendentes'=>VendaMoney::decimal(max(0,
+                    $account['obrigações_centavos']-$account['obrigações_pagas_centavos'])),
+            ];
+            unset($account['total_centavos'],$account['pago_centavos'],
+                $account['obrigações_centavos'],$account['obrigações_pagas_centavos']);
+            usort($account['itens'],static fn($a,$b)=>strcmp($b['data_venda'],$a['data_venda']));
+            $result[]=$account;
+        }
+        usort($result,static fn($a,$b)=>strcmp($a['nome'],$b['nome']));
+        return $result;
+    }
+
+    public function contas(): ResponseInterface
+    {
+        $user=auth('session')->user();
+        if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
+        $admin=$user->inGroup('admin')&&$user->can('visits.manage');
+        $period=$this->period();
+        if($period instanceof ResponseInterface)return $period;
+        [$start,$end]=$period;
+        $db=db_connect();
+        $personId=null;
+        if(!$admin){
+            $person=$db->table('pessoas')->select('id')->where('user_id',(int)$user->id)
+                ->where('ativo',1)->get()->getRowArray();
+            if(!$person)return $this->errorResponse(403,'Seu usuário não possui pessoa ativa vinculada.');
+            $personId=(int)$person['id'];
+        }
+        else{
+            $wanted=$this->request->getGet('pessoa_id');
+            if($wanted!==null && $wanted!==''){
+                $personId=$this->optionalId($wanted);
+                if(!$personId)return $this->errorResponse(422,'Pessoa inválida.');
+            }
+        }
+        $operations=$this->rows($db,$start,$end);
+        $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId);
+        return $this->response->setJSON([
+            'inicio'=>$start,'fim'=>$end,
+            'contas'=>$accounts,
+            'limite_operacoes'=>500,'possivel_truncamento'=>count($operations)===500,
+            'aviso'=>'Somente comissões de vendas quitadas, rateios e pagamentos confirmados. Não inclui adiantamentos não conciliados, despesas, dívidas ou saldo do clube.',
+        ])->setHeader('Cache-Control','no-store');
+    }
+
+    private function ownerPaid($db,int $id): int
+    {
+        $net=0;
+        foreach($db->table('comissao_titular_movimentos')->select('tipo,valor')->where('operacao_id',$id)->get()->getResultArray() as $m){
+            $n=VendaMoney::cents((string)$m['valor'],true);
+            $net+=$m['tipo']==='PAGAMENTO'?$n:-$n;
+        }
+        return $net;
+    }
+
+    private function ownerDue($db,array $op): int
+    {
+        $amount=$this->commission($op);
+        if($amount===null)return 0;
+        foreach($db->table('comissao_rateios')
+            ->select('valor')->where('operacao_id',(int)$op['id'])
+            ->where('responsavel_pessoa_id',(int)$op['corretor_pessoa_id'])->get()->getResultArray() as $r){
+            $amount-=VendaMoney::cents((string)$r['valor'],true);
+        }
+        return $amount;
+    }
+
+    public function pagarTitular(int|string $id): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $input=$this->jsonPayload();
+        $value=$this->money($input['valor']??null);
+        $date=$input['data_pagamento']??null;
+        $reason=$this->cleanText($input['observacoes']??null,500,true);
+        if(!$value||!$this->validateDate($date,false)||$reason===false){
+            return $this->errorResponse(422,'Valor, data e descrição do pagamento são obrigatórios.');
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op||$op['situacao']!=='VENDA'||!$this->salePaid($db,$op)){
+                $db->transRollback();
+                return $this->errorResponse(409,'Só registre pagamentos de comissão em vendas quitadas.');
+            }
+            $due=$this->ownerDue($db,$op);
+            $paid=$this->ownerPaid($db,(int)$id);
+            if($value>$due-$paid || $due<=0){
+                $db->transRollback();
+                return $this->errorResponse(422,'Pagamento superior à parcela própria ainda pendente do corretor.');
+            }
+            $db->table('comissao_titular_movimentos')->insert([
+                'operacao_id'=>(int)$id,'corretor_pessoa_id'=>(int)$op['corretor_pessoa_id'],
+                'tipo'=>'PAGAMENTO','referencia_pagamento_id'=>null,
+                'valor'=>VendaMoney::decimal($value),'data_pagamento'=>$date,
+                'observacoes'=>$reason,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_em'=>$this->now(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Pagamento da parcela própria registrado. Nenhuma transferência bancária foi efetuada.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'pagamento de comissão do titular');
+        }
+    }
+
+    public function estornarTitular(int|string $id): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $reason=$this->cleanText($this->jsonPayload()['justificativa']??null,500,true);
+        if($reason===false||mb_strlen($reason)<5)return $this->errorResponse(422,'Justificativa de ao menos cinco caracteres.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $record=$db->table('comissao_titular_movimentos')->where('id',(int)$id)->where('tipo','PAGAMENTO')->get()->getRowArray();
+            if(!$record){
+                $db->transRollback();return $this->errorResponse(404,'Pagamento não encontrado.');
+            }
+            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$record['operacao_id']])->getRowArray();
+            if($db->table('comissao_titular_movimentos')->where('referencia_pagamento_id',(int)$id)->countAllResults()>0){
+                $db->transRollback();return $this->errorResponse(409,'Pagamento já estornado.');
+            }
+            $db->table('comissao_titular_movimentos')->insert([
+                'operacao_id'=>$record['operacao_id'],'corretor_pessoa_id'=>$record['corretor_pessoa_id'],
+                'tipo'=>'ESTORNO','referencia_pagamento_id'=>(int)$id,
+                'valor'=>$record['valor'],'data_pagamento'=>substr($this->now(),0,10),
+                'observacoes'=>$reason,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_em'=>$this->now(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Registro do pagamento do corretor estornado, preservando o histórico.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'estorno de pagamento do titular');
+        }
     }
 
     public function resumo(): ResponseInterface
@@ -316,6 +579,10 @@ class FechamentosController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(409,'Só é possível ratear uma venda com comissão calculada ou ajustada.');
             }
+            if($db->table('comissao_titular_movimentos')->where('operacao_id',(int)$id)->countAllResults()>0){
+                $db->transRollback();
+                return $this->errorResponse(409,'A parcela do corretor já possui pagamentos/estornos. Não é possível substituir as participações.');
+            }
             $old=$db->table('comissao_rateios')->where('operacao_id',(int)$id)->orderBy('id','ASC')->get()->getResultArray();
             if($old){
                 $oldIds=array_column($old,'id');
@@ -414,9 +681,8 @@ class FechamentosController extends CommercialBaseController
         }
         $db=db_connect();$db->transBegin();
         try{
-            $allocation=$db->query('SELECT r.*,o.corretor_pessoa_id,o.comissao_prevista,o.comissao_ajustada
-                FROM comissao_rateios r JOIN venda_operacoes o ON o.id=r.operacao_id
-                WHERE r.id=? FOR UPDATE',[(int)$id])->getRowArray();
+            $allocation=$db->table('comissao_rateios')->where('id',(int)$id)->get()->getRowArray();
+            if($allocation)$db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$allocation['operacao_id']])->getRowArray();
             if(!$allocation){
                 $db->transRollback();return $this->errorResponse(404,'Participação não encontrada.');
             }
