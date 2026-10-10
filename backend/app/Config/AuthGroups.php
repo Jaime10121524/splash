@@ -28,6 +28,10 @@ class AuthGroups extends ShieldAuthGroups
             'title' => 'Gerente',
             'description' => 'Somente valores e operações permitidas do gerente.',
         ],
+        'operador' => [
+            'title' => 'Operador de atendimentos',
+            'description' => 'Registra clientes e visitas de todos os corretores, sem financeiro.',
+        ],
         'restrito' => [
             'title' => 'Acesso restrito',
             'description' => 'Conta sem acesso comercial até a atribuição de um grupo.',
@@ -39,6 +43,7 @@ class AuthGroups extends ShieldAuthGroups
         'users.manage' => 'Administrar usuários',
         'settings.manage' => 'Alterar configurações e regras',
         'visits.manage' => 'Gerenciar atendimentos',
+        'clients.manage' => 'Gerenciar cadastro de clientes',
         'sales.all' => 'Consultar todas as vendas',
         'sales.own' => 'Consultar vendas próprias autorizadas',
         'finance.all' => 'Consultar todas as contas financeiras',
@@ -50,7 +55,7 @@ class AuthGroups extends ShieldAuthGroups
 
     public array $matrix = [
         'admin' => [
-            'admin.*', 'users.*', 'settings.*', 'visits.*',
+            'admin.*', 'users.*', 'settings.*', 'visits.*', 'clients.*',
             'sales.*', 'finance.*', 'expenses.*', 'closings.*', 'reports.*',
         ],
         'corretor' => [
@@ -62,6 +67,7 @@ class AuthGroups extends ShieldAuthGroups
         'gerente' => [
             'sales.own', 'finance.own', 'reports.own',
         ],
+        'operador' => ['visits.manage', 'clients.manage'],
         'restrito' => [],
     ];
 }
