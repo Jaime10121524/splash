@@ -64,6 +64,10 @@ $routes->group('api', static function ($routes): void {
     // Apuração individual: rateios, pagamentos manuais e extrato próprio.
     $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
     $routes->get('fechamentos/meu', 'Api\FechamentosController::meu');
+    $routes->post('fechamentos/sincronizar', 'Api\FechamentosController::sincronizar', ['filter'=>'csrf']);
+    $routes->get('fechamentos/politica', 'Api\FechamentosController::politica');
+    $routes->post('fechamentos/politica', 'Api\FechamentosController::salvarPolitica', ['filter'=>'csrf']);
+    $routes->post('fechamentos/feriados', 'Api\FechamentosController::salvarFeriado', ['filter'=>'csrf']);
     $routes->post('fechamentos/operacoes/(:num)/rateios', 'Api\FechamentosController::ratear/$1', ['filter'=>'csrf']);
     $routes->get('fechamentos/rateios/(:num)', 'Api\FechamentosController::extrato/$1');
     $routes->post('fechamentos/rateios/(:num)/pagar', 'Api\FechamentosController::pagar/$1', ['filter'=>'csrf']);
