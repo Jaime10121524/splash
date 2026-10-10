@@ -51,11 +51,11 @@ function Icon({ name, size = 20, stroke = 1.8, ...props }) {
 }
 
 const nav = [
-  { id: 'dashboard', label: 'Visão geral', icon: 'grid', roles: ['admin','corretor','vendedor','gerente'], section: 'Principal' },
-  { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin'], section: 'Operação' },
+  { id: 'dashboard', label: 'Visão geral', icon: 'grid', roles: ['admin','corretor','vendedor','gerente','operador'], section: 'Principal' },
+  { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin','operador'], section: 'Operação' },
   { id: 'planos', label: 'Planos', icon: 'tag', roles: ['admin'], section: 'Operação' },
   { id: 'pessoas', label: 'Pessoas', icon: 'users', roles: ['admin'], section: 'Operação' },
-  { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin'], section: 'Operação' },
+  { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin','operador'], section: 'Operação' },
   { id: 'vendas', label: 'Vendas', icon: 'bag', roles: ['admin','corretor','vendedor','gerente'], section: 'Operação' },
   { id: 'pendencias', label: 'Pendências', icon: 'clock', roles: ['admin'], section: 'Operação' },
   { id: 'titulos', label: 'Títulos e renovações', icon: 'calendar', roles: ['admin','corretor'], section: 'Operação' },
