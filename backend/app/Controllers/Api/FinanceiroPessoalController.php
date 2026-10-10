@@ -15,7 +15,7 @@ class FinanceiroPessoalController extends CommercialBaseController
         $user=auth('session')->user();
         if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
         $admin=$user->inGroup('admin')&&$user->can('visits.manage');
-        $allowed=$admin || $user->inGroup('corretor') || $user->inGroup('vendedor') || $user->inGroup('gerente');
+        $allowed=$admin || ($user->inGroup('corretor') && $user->can('finance.own'));
         if(!$allowed)return $this->errorResponse(403,'Acesso ao financeiro pessoal não autorizado.');
         $own=null;
         if(!$admin){
