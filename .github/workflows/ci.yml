@@ -18,6 +18,8 @@ jobs:
         run: php backend/tests/session_csrf_smoke.php
       - name: Lock completed sales and validate protected test reset
         run: php backend/tests/protecao_venda_fechada_smoke.php
+      - name: Complete commercial and financial reset inventory
+        run: php backend/tests/reset_completo_smoke.php
       - name: Financial calculation smoke test
         run: php backend/tests/venda_money_smoke.php
       - name: Commission distribution smoke test
