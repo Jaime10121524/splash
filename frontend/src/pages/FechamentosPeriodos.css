@@ -80,6 +80,18 @@
 .fpw-report-persons>div{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:13px}
 .fpw-report-persons strong,.fpw-report-persons b{font-size:12px}
 .fpw-report-persons span{font-size:11px;color:var(--muted-dark)}
+.fpw-report-persons>div{display:grid;grid-template-columns:minmax(130px,.7fr) minmax(270px,2fr) auto;align-items:start}
+.fpw-report-breakdown{display:grid;gap:7px;min-width:0}
+.fpw-report-breakdown span{line-height:1.5}
+.fpw-report-breakdown b{font-size:11px;color:var(--text)}
+.fpw-payment-groups{display:grid;gap:12px;padding:15px}
+.fpw-payment-person{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)}
+.fpw-payment-person-head{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-alt);padding:13px 16px}
+.fpw-payment-person-head strong{font-size:13px;color:var(--text)}
+.fpw-payment-person-head span{font-size:11px;font-weight:750;color:var(--muted-dark)}
+.fpw-payment-person .fpw-lines{padding-bottom:0}
+.fpw-payment-person .fpw-lines>div{min-width:0;flex-wrap:wrap}
+.fpw-payment-person .fpw-lines>div>div{min-width:0}
 .fpw-report>.fpw-help{padding:0 18px}
 .fpw-method{grid-template-columns:minmax(0,1fr) minmax(0,.75fr) auto;align-items:end}
 @media(max-width:960px){
@@ -102,6 +114,9 @@
  .fpw-form{padding:13px}
  .fpw-method{grid-template-columns:1fr 1fr}
  .fpw-method>button{grid-column:1/-1}
+ .fpw-report-persons>div{grid-template-columns:1fr}
+ .fpw-payment-person-head{flex-direction:column;align-items:flex-start}
+ .fpw-payment-person .fpw-lines>div{align-items:flex-start}
 }
 @media print {
  body *{visibility:hidden!important}
