@@ -175,6 +175,10 @@ class FechamentosController extends CommercialBaseController
         };
         foreach($operations as $op){
             if($op['comissao_base']===null)continue;
+            // Sem apuração concluída, não atribuir toda a comissão ao corretor
+            // quando atendente, gerente ou segundo corretor podem ter participação.
+            $approval=$op['apuracao_automatica']['status']??null;
+            if(($approval===null || $approval==='REVISAR') && !$op['rateios'])continue;
             $root=(int)$op['corretor_pessoa_id'];
             $base=VendaMoney::cents((string)$op['comissao_base']);
             $rootTransfer=0;
@@ -338,6 +342,13 @@ class FechamentosController extends CommercialBaseController
             if(!$op||$op['situacao']!=='VENDA'||!$this->salePaid($db,$op)){
                 $db->transRollback();
                 return $this->errorResponse(409,'Só registre pagamentos de comissão em vendas quitadas.');
+            }
+            $state=$db->table('comissao_auto_apuracoes')
+                ->where('operacao_id',(int)$id)->get()->getRowArray();
+            $hasRateios=$db->table('comissao_rateios')->where('operacao_id',(int)$id)->countAllResults()>0;
+            if((!$state || $state['status']==='REVISAR') && !$hasRateios){
+                $db->transRollback();
+                return $this->errorResponse(409,'Confira primeiro o rateio da venda. A parcela própria não pode ser paga antes da apuração.');
             }
             $due=$this->ownerDue($db,$op);
             $paid=$this->ownerPaid($db,(int)$id);
