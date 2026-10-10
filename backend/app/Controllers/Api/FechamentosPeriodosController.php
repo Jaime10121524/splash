@@ -170,6 +170,10 @@ class FechamentosPeriodosController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $db->query('SELECT id FROM pessoas WHERE id=? FOR UPDATE',[$root])->getRowArray();
+            if(!$db->table('pessoas')->where('id',$root)->where('ativo',1)->countAllResults()
+                || !$db->table('pessoa_papeis')->where('pessoa_id',$root)->where('papel','corretor')->countAllResults()){
+                $db->transRollback();return $this->errorResponse(422,'Responsável precisa ser um corretor ativo.');
+            }
             if($this->isDelegated($db,$root)){
                 $db->transRollback();return $this->errorResponse(409,'Este corretor é administrado por outro responsável e não pode abrir fechamento separado.');
             }
@@ -529,6 +533,42 @@ class FechamentosPeriodosController extends CommercialBaseController
             $this->commitOrFail($db);
             return $this->responseOK('Dívida abatida somente da pessoa vinculada ao empréstimo.');
         }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'abatimento de fechamento');}
+    }
+
+    public function desfazerAbate(int|string $id,int|string $abatimentoId): ResponseInterface
+    {
+        $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
+        $db=db_connect();$db->transBegin();
+        try{
+            $p=$this->editable($db,(int)$id,$actor,'RECEBIMENTOS');
+            if($p instanceof ResponseInterface){$db->transRollback();return $p;}
+            $entry=$db->table('fechamento_periodo_abates')->where('id',(int)$abatimentoId)
+                ->where('fechamento_id',(int)$id)->get()->getRowArray();
+            if(!$entry){$db->transRollback();return $this->errorResponse(404,'Abatimento não encontrado.');}
+            $db->query('SELECT id FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[(int)$entry['emprestimo_id']])->get()->getRowArray();
+            $db->table('fechamento_periodo_abates')->where('id',(int)$abatimentoId)->delete();
+            $db->table('financeiro_emprestimo_abates')->where('emprestimo_id',(int)$entry['emprestimo_id'])
+                ->where('lote_id',(int)$entry['lote_id'])->delete();
+            $db->table('comissao_lotes_pagamento')->where('id',(int)$entry['lote_id'])->delete();
+            $this->commitOrFail($db);
+            return $this->responseOK('Rascunho de abatimento desfeito; saldo do empréstimo restaurado.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'desfazer abatimento em rascunho');}
+    }
+
+    public function voltar(int|string $id): ResponseInterface
+    {
+        $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
+        $db=db_connect();$db->transBegin();
+        try{
+            $p=$this->editable($db,(int)$id,$actor,'REPASSES');
+            if($p instanceof ResponseInterface){$db->transRollback();return $p;}
+            if($db->table('fechamento_periodo_repasses')->where('fechamento_id',(int)$id)->countAllResults()){
+                $db->transRollback();return $this->errorResponse(409,'Já foram registrados repasses. Conclua ou estorne os pagamentos antes de voltar.');
+            }
+            $db->table('fechamento_periodos')->where('id',(int)$id)->update(['status'=>'RECEBIMENTOS']);
+            $this->commitOrFail($db);
+            return $this->responseOK('Voltou à etapa de recebimentos para conferência.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'voltar etapa de recebimento');}
     }
 
     public function avancar(int|string $id): ResponseInterface
