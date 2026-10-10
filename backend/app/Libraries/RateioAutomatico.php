@@ -79,7 +79,8 @@ final class RateioAutomatico
             if($id>0 && $id!==$root && !in_array($id,$receivers,true))$receivers[]=$id;
         }
         $out=[];$notes=[];
-        $payment='AVISTA';
+        // Sem modalidade conhecida, nunca atribuir adicional à vista por suposição.
+        $payment='DESCONHECIDA';
         $snap=json_decode((string)($op['regra_snapshot']??''),true);
         if(is_array($snap) && in_array(($snap['modalidade']??''),['AVISTA','CARTAO','MISTO'],true)){
             $payment=$snap['modalidade'];
@@ -117,8 +118,9 @@ final class RateioAutomatico
         }
         $manager=(int)($op['gerente_pessoa_id']??0);
         // Sem gerente vinculado, não se inventa pagamento.
-        // Dia útil e renovação de outro corretor são exceções informadas.
-        if($manager>0 && $manager!==$root && !$businessDay && !$renewalOther){
+        // Gerência cadastrada recebe percentual da tabela também em dia útil.
+        // A exceção histórica de renovação com outro corretor permanece vigente.
+        if($manager>0 && $manager!==$root && !$renewalOther){
             $value=self::customAmount($managerOverride,$table,self::fraction($table,$managerRate));
             if($managerOverride)$notes[]='Gerente: exceção configurada para esta versão do plano e forma de pagamento.';
             if($value>$available)return ['rateios'=>[],'avisos'=>['Comissão insuficiente para pagar gerente: revisar manualmente.']];
@@ -131,7 +133,7 @@ final class RateioAutomatico
             if($value>0)$out[]=['origem'=>$root,'destino'=>$second,'papel'=>'CORRETOR','valor'=>$value];
         }
         if($businessDay)$notes[]='Atendimento de dia útil, sujeito à conferência de feriados cadastrados.';
-        if($manager>0 && !$businessDay && !$renewalOther)$notes[]='Gerente incluído conforme cadastro da venda; confirmar eventual exceção de renovação.';
+        if($manager>0 && $manager!==$root && !$renewalOther)$notes[]='Gerência incluída conforme cadastro da venda.';
         $notes[]='Rateio automático é uma apuração; não registra pagamentos.';
         RateioRules::balances($root,$base,$out);
         return ['rateios'=>$out,'avisos'=>$notes];
