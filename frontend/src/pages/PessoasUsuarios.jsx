@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FormControl } from '../components/UiFields.jsx'
+import PhoneInput, { formatPhone } from '../components/PhoneInput.jsx'
 import './PessoasUsuarios.css'
 
 const papelOptions = [
@@ -222,7 +223,7 @@ export default function PessoasUsuarios({tab='pessoas'}) {
             const account=p.user_id?byUser.get(Number(p.user_id)):null
             return <article className="pu-entry" key={p.id}>
               <div className="pu-avatar">{initials(p.nome)}</div>
-              <div className="pu-entry-main"><strong>{p.nome}</strong><small>{p.telefone||p.email||'Sem contato informado'}</small>
+              <div className="pu-entry-main"><strong>{p.nome}</strong><small>{formatPhone(p.telefone)||p.email||'Sem contato informado'}</small>
                 <div className="pu-tags">{p.papeis.map(role=><Tag key={role} value={role}/>)}</div></div>
               <div className="pu-entry-status"><Status active={p.ativo}/><small>{account?'@'+account.username:'Sem acesso'}</small></div>
               <div className="pu-entry-actions">
@@ -265,8 +266,8 @@ export default function PessoasUsuarios({tab='pessoas'}) {
         <label>Nome completo <em>*</em><input autoFocus required maxLength={160} value={personForm.nome}
           onChange={e=>setPersonForm(f=>({...f,nome:e.target.value}))} placeholder="Nome do participante"/></label>
         <div className="pu-form-grid">
-          <label>Telefone<input type="tel" maxLength={25} value={personForm.telefone}
-            onChange={e=>setPersonForm(f=>({...f,telefone:e.target.value}))} placeholder="(00) 00000-0000"/></label>
+          <label>Telefone<PhoneInput value={personForm.telefone}
+            onChange={value=>setPersonForm(f=>({...f,telefone:value}))} placeholder="(00) 00000-0000"/></label>
           <label>E-mail<input type="email" maxLength={254} value={personForm.email}
             onChange={e=>setPersonForm(f=>({...f,email:e.target.value}))} placeholder="nome@exemplo.com"/></label>
         </div>
