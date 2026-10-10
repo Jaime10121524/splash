@@ -72,6 +72,8 @@ $routes->group('api', static function ($routes): void {
     $routes->post('fechamentos/sincronizar', 'Api\FechamentosController::sincronizar', ['filter'=>'csrf']);
     $routes->get('fechamentos/politica', 'Api\FechamentosController::politica');
     $routes->post('fechamentos/politica', 'Api\FechamentosController::salvarPolitica', ['filter'=>'csrf']);
+    $routes->post('fechamentos/excecoes', 'Api\FechamentosController::salvarExcecao', ['filter'=>'csrf']);
+    $routes->post('fechamentos/excecoes/(:num)/excluir', 'Api\FechamentosController::excluirExcecao/$1', ['filter'=>'csrf']);
     $routes->post('fechamentos/feriados', 'Api\FechamentosController::salvarFeriado', ['filter'=>'csrf']);
     $routes->post('fechamentos/operacoes/(:num)/rateios', 'Api\FechamentosController::ratear/$1', ['filter'=>'csrf']);
     $routes->get('fechamentos/rateios/(:num)', 'Api\FechamentosController::extrato/$1');
