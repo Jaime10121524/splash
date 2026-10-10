@@ -345,9 +345,14 @@ class FechamentosPeriodosController extends CommercialBaseController
         foreach($costRows as $cost){$c=VendaMoney::cents((string)$cost['valor'],true);$costs+=$c;$byPerson[(int)$cost['pessoa_id']]['despesas_cent']+=$c;}
         $paidInClosing=0;
         foreach(['fechamento_periodo_repasses','fechamento_periodo_titulares'] as $table){
-            $periodPayments=$db->table($table)->select('valor')
+            $periodPayments=$db->table($table)->select('valor,forma_id')
                 ->where('fechamento_id',$id)->where('situacao','ATIVO')->get()->getResultArray();
-            foreach($periodPayments as $m)$paidInClosing+=VendaMoney::cents((string)$m['valor'],true);
+            $internalId=$db->table('venda_formas_pagamento')->select('id')
+                ->where('codigo','ABATIMENTO_EMP')->get()->getRow('id');
+            foreach($periodPayments as $m){
+                if($table==='fechamento_periodo_titulares' && (int)$m['forma_id']===(int)$internalId)continue;
+                $paidInClosing+=VendaMoney::cents((string)$m['valor'],true);
+            }
         }
         $titularHistory=$db->table('fechamento_periodo_titulares f')
             ->select('f.id,f.operacao_id,f.valor,f.situacao,p.nome AS beneficiario_nome,m.nome AS forma_nome,v.corretor_pessoa_id')
@@ -631,6 +636,21 @@ class FechamentosPeriodosController extends CommercialBaseController
                 'criado_por_usuario_id'=>$actor['usuario_id'],'criado_em'=>$this->now(),
             ]);
             $lotId=(int)$db->insertID();
+            // A amortização também quita uma parcela da comissão PRÓPRIA,
+            // registrada com forma interna, sem contar como dinheiro físico.
+            $internal=$db->table('venda_formas_pagamento')
+                ->where('codigo','ABATIMENTO_EMP')->get()->getRowArray();
+            if(!$internal){
+                $db->transRollback();return $this->errorResponse(409,'Meio interno de abatimento não encontrado.');
+            }
+            try{
+                $this->registrarMovimentosTitular($db,(int)$id,(int)$loan['pessoa_id'],
+                    [['id'=>(int)$internal['id'],'cents'=>$amount]],
+                    $date,$actor['usuario_id'],$lotId);
+            }catch(DomainException $e){
+                $db->transRollback();return $this->errorResponse(422,
+                    'O abatimento precisa ser coberto pela comissão própria pendente. '.$e->getMessage());
+            }
             $db->table('financeiro_emprestimo_abates')->insert([
                 'emprestimo_id'=>$loanId,'lote_id'=>$lotId,
                 'valor'=>VendaMoney::decimal($amount),'data_abate'=>$date,
@@ -656,6 +676,13 @@ class FechamentosPeriodosController extends CommercialBaseController
                 ->where('fechamento_id',(int)$id)->get()->getRowArray();
             if(!$entry){$db->transRollback();return $this->errorResponse(404,'Abatimento não encontrado.');}
             $db->query('SELECT id FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[(int)$entry['emprestimo_id']])->get()->getRowArray();
+            $related=$db->table('comissao_titular_movimentos')->select('id')
+                ->where('lote_id',(int)$entry['lote_id'])->get()->getResultArray();
+            foreach($related as $m){
+                $db->table('fechamento_periodo_titulares')->where('movimento_id',(int)$m['id'])
+                    ->where('fechamento_id',(int)$id)->delete();
+            }
+            $db->table('comissao_titular_movimentos')->where('lote_id',(int)$entry['lote_id'])->delete();
             $db->table('fechamento_periodo_abates')->where('id',(int)$abatimentoId)->delete();
             $db->table('financeiro_emprestimo_abates')->where('emprestimo_id',(int)$entry['emprestimo_id'])
                 ->where('lote_id',(int)$entry['lote_id'])->delete();
