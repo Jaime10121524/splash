@@ -202,12 +202,12 @@ class FechamentosController extends CommercialBaseController
                 ...$meta,'tipo'=>'TITULAR','rateio_id'=>null,
                 'descricao'=>$sourceLabel,'pagador'=>'Clube / acerto do responsável',
                 'total_centavos'=>$rootTotal,'pago_centavos'=>$paidOwner,
-                'movimentos'=>array_map(static fn($m)=>[
+                'movimentos'=>array_map(static function($m) use($admin){ return [
                     'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                     'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
-                    'observacoes'=>$m['observacoes'],
+                    'observacoes'=>$admin?$m['observacoes']:null,
                     'referencia_pagamento_id'=>$m['referencia_pagamento_id']===null?null:(int)$m['referencia_pagamento_id'],
-                ],$ownerByOperation[$key]['movimentos']??[]),
+                ]; },$ownerByOperation[$key]['movimentos']??[]),
             ]);
             foreach($op['rateios'] as $a){
                 $payee=(int)$a['beneficiario_pessoa_id'];
@@ -222,12 +222,12 @@ class FechamentosController extends CommercialBaseController
                     },
                     'pagador'=>$admin?$a['origem_nome']:'Corretor responsável',
                     'total_centavos'=>$outstanding,'pago_centavos'=>$paid,
-                    'movimentos'=>array_map(static fn($m)=>[
+                    'movimentos'=>array_map(static function($m) use($admin){ return [
                         'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                         'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
-                        'observacoes'=>$m['observacoes'],
+                        'observacoes'=>$admin?$m['observacoes']:null,
                         'referencia_pagamento_id'=>$m['referencia_pagamento_id']===null?null:(int)$m['referencia_pagamento_id'],
-                    ],$history[(int)$a['id']]??[]),
+                    ]; },$history[(int)$a['id']]??[]),
                 ]);
                 if($onlyPersonId===null || (int)$a['responsavel_pessoa_id']===$onlyPersonId){
                     $payer=(int)$a['responsavel_pessoa_id'];
