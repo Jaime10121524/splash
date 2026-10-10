@@ -59,6 +59,7 @@ $routes->group('api', static function ($routes): void {
     $routes->post('vendas/regras/(:num)/editar', 'Api\VendasCatalogosController::regra/$1', ['filter'=>'csrf']);
     $routes->post('vendas/formas', 'Api\VendasCatalogosController::forma', ['filter'=>'csrf']);
     $routes->post('vendas/formas/(:num)/editar', 'Api\VendasCatalogosController::forma/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/aplicacoes/(:segment)', 'Api\VendasCatalogosController::aplicacao/$1', ['filter'=>'csrf']);
 });
 
 // Rotas internas do Shield: recuperação de acesso e gestão de sessão tradicional.
