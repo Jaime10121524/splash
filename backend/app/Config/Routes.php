@@ -113,6 +113,7 @@ $routes->group('api', static function ($routes): void {
     $routes->post('fechamentos/excecoes', 'Api\FechamentosController::salvarExcecao', ['filter'=>'csrf']);
     $routes->post('fechamentos/excecoes/(:num)/excluir', 'Api\FechamentosController::excluirExcecao/$1', ['filter'=>'csrf']);
     $routes->post('fechamentos/feriados', 'Api\FechamentosController::salvarFeriado', ['filter'=>'csrf']);
+    $routes->get('fechamentos/operacoes/(:num)/rateios', 'Api\\FechamentosController::rateiosVenda/$1');
     $routes->post('fechamentos/operacoes/(:num)/rateios', 'Api\FechamentosController::ratear/$1', ['filter'=>'csrf']);
     $routes->get('fechamentos/rateios/(:num)', 'Api\FechamentosController::extrato/$1');
     $routes->post('fechamentos/rateios/(:num)/pagar', 'Api\FechamentosController::pagar/$1', ['filter'=>'csrf']);
