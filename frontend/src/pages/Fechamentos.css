@@ -188,3 +188,13 @@
   .fc-batch-total strong{font-size:16px}
   .fc-exceptions-list>div{align-items:stretch;flex-direction:column}
 }
+
+
+.fc-settlements-list{display:grid}
+.fc-settlements-list>article{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-top:1px solid var(--border);padding:14px 20px}
+.fc-settlements-list>article>div{display:grid;gap:6px;min-width:0}
+.fc-settlements-list strong{font-size:12px;color:var(--text)}
+.fc-settlements-list small{font-size:10px;color:var(--muted-dark);line-height:1.5}
+.fc-settlement-methods{display:flex;flex-wrap:wrap;gap:7px}
+.fc-settlement-methods span{font-size:10px;color:var(--brand);background:var(--brand-light);padding:6px 9px;border-radius:9px}
+@media(max-width:680px){.fc-settlements-list>article{flex-direction:column;padding:12px}}
