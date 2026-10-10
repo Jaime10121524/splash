@@ -104,11 +104,28 @@ class FechamentosPeriodos extends Migration
         $this->forge->addForeignKey('rateio_id','comissao_rateios','id','RESTRICT','RESTRICT','fk_fe_pag_rateio');
         $this->forge->addForeignKey('movimento_id','comissao_repasses','id','RESTRICT','RESTRICT','fk_fe_pag_mov');
         $this->forge->createTable('fechamento_periodo_repasses',true);
+        $this->createEventTable();
+    }
+
+    // Chave por evento de caixa, para que o mesmo POST não lance dinheiro duas vezes.
+    private function createEventTable(): void
+    {
+        $this->forge->addField([
+            'id'=>['type'=>'INT','unsigned'=>true,'auto_increment'=>true],
+            'fechamento_id'=>['type'=>'INT','unsigned'=>true],
+            'chave_requisicao'=>['type'=>'VARCHAR','constraint'=>64],
+            'tipo'=>['type'=>'VARCHAR','constraint'=>16],
+            'criado_em'=>['type'=>'DATETIME'],
+        ]);
+        $this->forge->addKey('id',true);
+        $this->forge->addUniqueKey(['fechamento_id','chave_requisicao'],'uq_fe_evento_unico');
+        $this->forge->addForeignKey('fechamento_id','fechamento_periodos','id','RESTRICT','RESTRICT','fk_fe_evento_periodo');
+        $this->forge->createTable('fechamento_periodo_eventos',true);
     }
 
     public function down()
     {
-        foreach(['fechamento_periodo_repasses','fechamento_periodo_abates',
+        foreach(['fechamento_periodo_eventos','fechamento_periodo_repasses','fechamento_periodo_abates',
             'fechamento_periodo_entradas','fechamento_periodo_vendas',
             'fechamento_periodo_pessoas','fechamento_periodos',
             'fechamento_responsabilidades'] as $table)$this->forge->dropTable($table,true);
