@@ -4,7 +4,27 @@
 .fpw-head-actions>button{min-height:40px}
 .fpw-create{overflow:visible}
 .fpw-form,.fpw-modal-form{display:grid;gap:15px;padding:18px;min-width:0}
-.fpw-modal-form{padding:0}
+.cm-dialog > .fpw-modal-form{
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  padding:12px 25px 25px;
+  overflow-wrap:anywhere;
+}
+.cm-dialog > .fpw-modal-form > label,
+.cm-dialog > .fpw-modal-form > .fpw-two,
+.cm-dialog > .fpw-modal-form > .fpw-help,
+.cm-dialog > .fpw-modal-form > .fpw-actions{min-width:0}
+.cm-dialog > .fpw-modal-form :is(.ui-select-wrap,.ui-date-wrap,.ui-select-trigger,.ui-date-trigger,.ui-input){
+  width:100%;
+  min-width:0;
+  max-width:100%;
+}
+.cm-dialog > .fpw-modal-form .fpw-actions{
+  padding-top:12px;
+  margin-top:2px;
+  border-top:1px solid var(--border);
+}
 .fpw-form>label,.fpw-modal-form>label,.fpw-two>label{display:grid;gap:8px;min-width:0;color:var(--text);font-size:11px;font-weight:800}
 .fpw-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
 .fpw-form input,.fpw-modal-form input,.fpw-modal-form textarea{width:100%;box-sizing:border-box;min-width:0;border-radius:11px;border:1px solid var(--border);padding:11px 12px;background:var(--surface-alt);color:var(--text);font-size:12px;font-family:inherit;min-height:45px}
@@ -89,4 +109,10 @@
  .fpw-print,.com-panel-head button{display:none!important}
  .fpw-report-sums{grid-template-columns:repeat(3,minmax(0,1fr))}
  .fpw-report-sums>div{break-inside:avoid}
+}
+
+@media(max-width:650px){
+ .cm-dialog > .fpw-modal-form{padding:10px 17px 20px;gap:13px}
+ .cm-dialog > .fpw-modal-form .fpw-actions{flex-direction:column-reverse;align-items:stretch}
+ .cm-dialog > .fpw-modal-form .fpw-actions > button{width:100%}
 }
