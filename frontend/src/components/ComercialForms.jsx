@@ -4,7 +4,7 @@ import PhoneInput, { formatPhone } from './PhoneInput.jsx'
 import { comercialGet, personOptions } from '../lib/comercialApi.js'
 import './ComercialForms.css'
 
-export function SurfaceModal({ title, subtitle, children, onClose, busy }) {
+export function SurfaceModal({ title, subtitle, children, onClose, busy, eyebrow='SPLASH / COMERCIAL' }) {
   useEffect(() => {
     const handle = event => {
       if (event.key === 'Escape' && !busy) onClose()
@@ -17,7 +17,7 @@ export function SurfaceModal({ title, subtitle, children, onClose, busy }) {
   }}>
     <section className="cm-dialog" role="dialog" aria-modal="true" aria-labelledby="cm-title">
       <header className="cm-dialog-header">
-        <div><small>SPLASH / COMERCIAL</small><h2 id="cm-title">{title}</h2>
+        <div><small>{eyebrow}</small><h2 id="cm-title">{title}</h2>
           {subtitle && <p>{subtitle}</p>}</div>
         <button type="button" className="cm-close" onClick={onClose} disabled={busy} aria-label="Fechar">×</button>
       </header>
