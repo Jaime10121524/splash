@@ -49,4 +49,17 @@ $tables=['venda_operacoes','venda_recebimentos','comissao_rateios','comissao_rep
 foreach($tables as $table)if(!str_contains($reset,"'".$table."'")){
     throw new RuntimeException('Reset incompleto, tabela ausente: '.$table);
 }
-echo "Venda vinculada protegida e reset isolado: 5 grupos de verificações OK\n";
+$root=dirname(__DIR__).'/app/Controllers/Api/';
+$sale=file_get_contents($root.'VendasController.php');
+$closing=file_get_contents($root.'FechamentosController.php');
+if($sale===false||$closing===false
+    ||substr_count($sale,'impedeVendaFechada')<5
+    ||substr_count($closing,'ProtecaoVendaFechada::bloqueada')<5
+    ||!str_contains($sale,"'comissao_pendente'")
+    ||!str_contains($sale,"'comissoes'=>$comissaoStatus")){
+    throw new RuntimeException('Proteção ou exibição de saldo da venda foi perdida em alguma API.');
+}
+if(is_file(dirname(__DIR__).'/app/Database/Migrations/2026-10-10-235959_ResetarVendasFinanceiroTestes.php')){
+    throw new RuntimeException('Reset destrutivo não pode estar entre as migrations normais.');
+}
+echo "Venda vinculada protegida e reset isolado: 6 grupos de verificações OK\n";
