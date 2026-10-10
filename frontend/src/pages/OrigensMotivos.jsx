@@ -15,7 +15,7 @@ export default function OrigensMotivos() {
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [modal,setModal]=useState(null)
-  const [form,setForm]=useState({value:'',ativo:true})
+  const [form,setForm]=useState({value:'',ativo:true,permite_indicador:false})
   const [busy,setBusy]=useState(false)
   const [formError,setFormError]=useState('')
   async function load(){
@@ -27,7 +27,7 @@ export default function OrigensMotivos() {
   useEffect(()=>{load()},[])
   function open(item=null){
     setModal(item||'new')
-    setForm({value:item?.[configs[kind].key]||'',ativo:item?!!item.ativo:true})
+    setForm({value:item?.[configs[kind].key]||'',ativo:item?!!item.ativo:true,permite_indicador:!!item?.permite_indicador})
     setFormError('')
   }
   async function save(e){
@@ -35,7 +35,7 @@ export default function OrigensMotivos() {
     try {
       const opt=configs[kind],id=modal==='new'?null:modal.id
       const url='/api/comercial/'+opt.route+(id?'/'+id+'/editar':'')
-      const result=await comercialPost(url,{[opt.key]:form.value.trim(),ativo:form.ativo})
+      const result=await comercialPost(url,{[opt.key]:form.value.trim(),ativo:form.ativo,...(kind==='origens'?{permite_indicador:form.permite_indicador}:{})})
       setModal(null);setNotice(result.message)
       await load()
     }catch(e){setFormError(e.message)}
@@ -58,7 +58,7 @@ export default function OrigensMotivos() {
       {loading?<div className="com-empty">Carregando...</div>:rows.length===0?
         <div className="com-empty"><strong>Nenhum cadastro</strong><p>Crie o primeiro registro.</p></div>:
         <div className="com-config-list">{rows.map(row=><div className="com-config-entry" key={row.id}>
-          <div><strong>{row[opt.key]}</strong><small>Identificador {row.id}</small></div>
+          <div><strong>{row[opt.key]}</strong><small>{kind==='origens' && row.permite_indicador?'Permite informar cliente indicador · ':''}Identificador {row.id}</small></div>
           <span className={'com-pill '+(row.ativo?'good':'muted')}>{row.ativo?'Ativo':'Inativo'}</span>
           <button type="button" onClick={()=>open(row)}>Editar</button>
         </div>)}</div>}
@@ -70,6 +70,8 @@ export default function OrigensMotivos() {
         <label><span className="field-caption">Descrição <em>*</em></span><input autoFocus required maxLength={90}
           value={form.value} onChange={e=>setForm(f=>({...f,value:e.target.value}))}
           placeholder={kind==='origens'?'Ex.: Indicação':'Ex.: Preço'}/></label>
+        {kind==='origens'&&<label className="cm-status-switch"><span><strong>Origem de indicação</strong><small>Mostrar campo Quem indicou no cadastro do cliente</small></span>
+          <input type="checkbox" checked={form.permite_indicador} onChange={e=>setForm(f=>({...f,permite_indicador:e.target.checked}))}/></label>}
         <label className="cm-status-switch"><span><strong>Cadastro ativo</strong><small>Disponível em novos registros</small></span>
           <input type="checkbox" checked={form.ativo} onChange={e=>setForm(f=>({...f,ativo:e.target.checked}))}/></label>
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
