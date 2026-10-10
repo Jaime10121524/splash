@@ -372,21 +372,36 @@ function App() {
   async function login(username, password) {
     setBusy(true);setError('')
     try {
-      let token = session.csrf
-      if (!token) token = (await getJSON('/api/session')).csrf
+      // O CSRF em sessão gira a cada POST. Não reutilizar o token
+      // guardado no React após logout, troca de usuário ou outra operação.
+      const token = (await getJSON('/api/session')).csrf
+      if (!token?.header || !token?.hash) throw new Error('Não foi possível validar sua sessão. Tente novamente.')
       const data = await getJSON('/api/session/login', {method:'POST',headers:{'Content-Type':'application/json',[token.header]:token.hash},body:JSON.stringify({username,password})})
       setSession({status:'in',user:data.user,csrf:data.csrf})
       setCurrent('dashboard')
     } catch(e) {
       if (e.data?.csrf) setSession(s => ({...s,csrf:e.data.csrf}))
-      setError(e.status===403 ? 'Sessão de segurança expirada. Atualize a página e tente novamente.' : e.message)
+      else if (e.status===403) {
+        // Um token expirado antes de chegar ao controller não vem no JSON.
+        // Recarrega a sessão para o próximo envio, sem repetir a senha
+        // nem criar uma segunda tentativa automática de autenticação.
+        try {
+          const fresh = await getJSON('/api/session')
+          setSession({status:fresh.authenticated?'in':'out',user:fresh.user,csrf:fresh.csrf})
+        } catch { /* preserva o erro original */ }
+      }
+      setError(e.status===403 && !e.data?.message
+        ? 'A proteção da sessão foi renovada. Tente entrar novamente.'
+        : e.message)
     } finally {setBusy(false)}
   }
   async function logout() {
-    if (!session.csrf) return
-    setBusy(true)
+    setBusy(true);setError('')
     try {
-      const data = await getJSON('/api/session/logout',{method:'POST',headers:{[session.csrf.header]:session.csrf.hash}})
+      const token = (await getJSON('/api/session')).csrf
+      if (!token?.header || !token?.hash) throw new Error('Token de sessão indisponível.')
+      const data = await getJSON('/api/session/logout',{method:'POST',headers:{[token.header]:token.hash}})
+      // O backend gera um CSRF novo DEPOIS de encerrar a sessão Shield.
       setSession({status:'out',user:null,csrf:data.csrf})
       setCurrent('dashboard')
     } catch(e) {
