@@ -30,6 +30,8 @@ jobs:
         run: php backend/tests/fechamentos_escopo_smoke.php
       - name: Closing cash vs commission double-count regression
         run: php backend/tests/fechamento_conferencia_smoke.php
+      - name: Audit person-by-person commission distribution
+        run: php backend/tests/auditoria_rateios_smoke.php
       - name: Financial ledger permission and role isolation
         run: php backend/tests/extrato_permissoes_smoke.php
       - name: Central custody and reconciliation tests
