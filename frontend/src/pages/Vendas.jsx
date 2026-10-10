@@ -361,7 +361,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         <div className="vd-values"><span>Plano {currency(op.valor_cobrado)}</span>
           <strong>Recebido {currency(op.recebido)}</strong><small>Saldo {currency(op.saldo)}</small>
           <small>{op.comissao_ajustada!==null?'Comissão bruta ajustada: '+currency(op.comissao_ajustada):'Comissão bruta apurada: '+(op.comissao_prevista===null?'Após quitação':currency(op.comissao_prevista))}</small>
-          {op.comissao_pendente!==null&&<small><b>Comissão paga aos beneficiários: {currency(op.comissao_paga)}</b> · {Number(op.comissao_pendente)>0?'Falta pagar: '+currency(op.comissao_pendente):'Comissões quitadas'}</small>}
+          {op.comissao_pendente!==null&&<small><b>Comissão liquidada (pagamentos/abatimentos): {currency(op.comissao_paga)}</b> · {Number(op.comissao_pendente)>0?'Falta pagar: '+currency(op.comissao_pendente):'Comissões quitadas'}</small>}
         </div>
         <div className="com-actions"><button type="button" onClick={()=>openDetail(op)}>Extrato</button>
           {op.situacao==='PENDENCIA'&&<button type="button" className="primary" onClick={()=>openConvert(op)}>Fechar venda</button>}
@@ -529,14 +529,14 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
         <div className="vd-detail-title"><span>Comissão bruta desta venda: <strong>{detail.comissoes.bruta===null?'Ainda não apurada':currency(detail.comissoes.bruta)}</strong></span></div>
         <div className="vd-commission-summary" aria-label="Pagamentos das comissões">
-          <div><span>Comissões efetivamente pagas aos beneficiários</span><strong>{currency(detail.comissoes.direitos_pagos)}</strong></div>
+          <div><span>Comissões liquidadas (pagamento ou abatimento)</span><strong>{currency(detail.comissoes.direitos_pagos)}</strong></div>
           <div><span>Comissões ainda a pagar</span><strong>{detail.comissoes.direitos_pendentes===null?'A apurar':currency(detail.comissoes.direitos_pendentes)}</strong></div>
           <div><span>Situação das comissões</span><strong>{({QUITADA:'Quitadas',PARCIAL:'Parcialmente pagas',A_RECEBER:'Ainda não pagas',AGUARDANDO_APURACAO:'Aguardando apuração'})[detail.comissoes.status]||detail.comissoes.status}</strong></div>
         </div>
         {!!detail.comissoes.participantes?.length&&<div className="vd-commission-people">
           {detail.comissoes.participantes.map((item,i)=><div key={item.pessoa_id+'-'+item.papel+'-'+i}>
             <div><strong>{item.nome}</strong><small>{item.papel==='TITULAR'?'Comissão própria':item.papel==='ATENDENTE'?'Atendimento':item.papel==='GERENTE'?'Gerência':'Corretor'}</small></div>
-            <span>Ganhou {currency(item.devido)}</span><span>Recebeu {currency(item.pago)}</span>
+            <span>Ganhou {currency(item.devido)}</span><span>Liquidado {currency(item.pago)}</span>
             <b>A receber {currency(item.pendente)}</b>
           </div>)}
         </div>}
@@ -544,7 +544,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           {Number(detail.entrada_clube_para_titular_no_periodo)>0
             ? 'O clube depositou '+currency(detail.entrada_clube_para_titular_no_periodo)+' referente ao titular desta venda no fechamento #'+detail.fechamento.id+'. Este valor corresponde ao conjunto de vendas do titular no período, NÃO é um pagamento individual desta venda nem comprova que as pessoas receberam.'
             : 'Não há entrada do clube registrada para o titular desta venda neste fechamento.'}
-          {' '}Somente pagamentos lançados ao beneficiário reduzem o valor «a receber» de sua comissão.
+          {' '}Somente pagamentos e abatimentos registrados no direito de cada beneficiário reduzem seu saldo «a receber». Abatimento de empréstimo não é dinheiro transferido.
         </div>}
         {detail.operacao.ajuste_motivo&&<div className="com-inform">Justificativa do ajuste: {detail.operacao.ajuste_motivo}</div>}
         <div className="vd-rateios-toggle">
