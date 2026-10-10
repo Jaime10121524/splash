@@ -53,7 +53,7 @@ class VisitasController extends CommercialBaseController
         ", false)->get()->getRowArray();
 
         $visits=$build()
-            ->select('v.*, c.nome AS cliente_nome, c.telefone AS cliente_telefone, c.dono_corrente_pessoa_id, dono.nome AS dono_corrente_nome, p.nome AS atendente_nome, a.nome AS adicional_nome, m.descricao AS motivo_nome, cp.nome AS corretor_nome, scp.nome AS segundo_corretor_nome,
+            ->select('v.*, c.nome AS cliente_nome, c.telefone AS cliente_telefone, c.dono_corrente_pessoa_id, dono.nome AS dono_corrente_nome, p.nome AS atendente_nome, a.nome AS adicional_nome, m.descricao AS motivo_nome, cp.nome AS corretor_nome, scp.nome AS segundo_corretor_nome, op.id AS operacao_id, op.numero_titulo, op.sigla_plano AS titulo_sigla, op.situacao AS operacao_situacao,
                 (SELECT COALESCE(SUM(TIMESTAMPDIFF(SECOND,s.inicio_em,s.fim_em)),0) FROM visita_sessoes s WHERE s.visita_id=v.id AND s.fim_em IS NOT NULL) AS duracao_segundos', false)
             ->join('clientes c','c.id=v.cliente_id')
             ->join('pessoas dono','dono.id=c.dono_corrente_pessoa_id','left')
@@ -62,10 +62,11 @@ class VisitasController extends CommercialBaseController
             ->join('pessoas cp','cp.id=v.corretor_pessoa_id','left')
             ->join('pessoas scp','scp.id=v.segundo_corretor_pessoa_id','left')
             ->join('motivos_nao_venda m','m.id=v.motivo_nao_venda_id','left')
+            ->join('venda_operacoes op','op.visita_id=v.id','left')
             ->orderBy('v.id','DESC')->limit(150)->get()->getResultArray();
 
         foreach($visits as &$visit){
-            foreach(['id','cliente_id','atendente_pessoa_id','atendente_adicional_pessoa_id','motivo_nao_venda_id','dono_corrente_pessoa_id','corretor_pessoa_id','segundo_corretor_pessoa_id'] as $key){
+            foreach(['id','cliente_id','atendente_pessoa_id','atendente_adicional_pessoa_id','motivo_nao_venda_id','dono_corrente_pessoa_id','corretor_pessoa_id','segundo_corretor_pessoa_id','operacao_id'] as $key){
                 $visit[$key]=$visit[$key]===null?null:(int)$visit[$key];
             }
         }
