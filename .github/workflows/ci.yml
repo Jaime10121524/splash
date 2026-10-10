@@ -24,6 +24,8 @@ jobs:
         run: php backend/tests/financeiro_saldos_smoke.php
       - name: Weekly multi-method settlement and plan rules tests
         run: php backend/tests/fechamento_lote_smoke.php
+      - name: Personal finance, loan and settlement offset tests
+        run: php backend/tests/financeiro_emprestimos_smoke.php
 
   frontend:
     name: React/Vite build
