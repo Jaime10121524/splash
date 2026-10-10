@@ -233,11 +233,11 @@ export default function Fechamentos({role='admin'}){
     finally{setBusy(false)}
   }
 
-  const title=admin?'Apuração e repasses':'Meu financeiro'
+  const title=admin?'Fechamentos':'Meu financeiro'
   return <div className="com-page fc-page">
     <header className="com-heading">
-      <div><span className="com-eyebrow">SPLASH / FINANCEIRO</span><h1>{title}</h1>
-        <p>{admin?'Distribuição da comissão de cada venda, pagamentos e saldos por pessoa.':'Suas comissões apuradas, sem acesso ao financeiro dos demais.'}</p></div>
+      <div><span className="com-eyebrow">SPLASH / FECHAMENTOS</span><h1>{title}</h1>
+        <p>{admin?'Confira quanto pagar a cada pessoa, o que já foi pago e o que ainda está pendente.':'Suas comissões apuradas, sem acesso às demais contas.'}</p></div>
       {admin&&<div className="fc-header-buttons">
         <button className="vd-outline" type="button" disabled={busy} onClick={openPolicies}>Regras e feriados</button>
         <button className="com-main-button" type="button" disabled={busy} onClick={syncSales}>{busy?'Apurando...':'Apurar vendas anteriores'}</button>
@@ -361,6 +361,7 @@ export default function Fechamentos({role='admin'}){
       <p className="com-disclaimer">{report.aviso} O rateio não transfere dinheiro por si só; ao registrar um pagamento, confirme que ele realmente foi feito.</p>
     </>:null}
     {dialog&&<SurfaceModal
+      eyebrow="SPLASH / FINANCEIRO"
       title={dialog.type==='policy'?'Regras automáticas e feriados':
         dialog.type==='ownerPayment'?'Pagamentos da comissão do corretor':
         dialog.type==='ownerReverse'?'Estornar pagamento do corretor':
