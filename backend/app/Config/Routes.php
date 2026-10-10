@@ -66,8 +66,10 @@ $routes->group('api', static function ($routes): void {
     $routes->get('financeiro/pessoal', 'Api\\FinanceiroPessoalController::index');
     $routes->post('financeiro/categorias', 'Api\\FinanceiroPessoalController::cadastrarCategoria', ['filter'=>'csrf']);
     $routes->post('financeiro/despesas', 'Api\\FinanceiroPessoalController::cadastrarDespesa', ['filter'=>'csrf']);
+    $routes->post('financeiro/despesas/(:num)/editar', 'Api\\FinanceiroPessoalController::editarDespesa/$1', ['filter'=>'csrf']);
     $routes->post('financeiro/despesas/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarDespesa/$1', ['filter'=>'csrf']);
     $routes->post('financeiro/emprestimos', 'Api\\FinanceiroPessoalController::cadastrarEmprestimo', ['filter'=>'csrf']);
+    $routes->post('financeiro/emprestimos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarEmprestimo/$1', ['filter'=>'csrf']);
     $routes->post('financeiro/emprestimos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarEmprestimo/$1', ['filter'=>'csrf']);
 
     $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
