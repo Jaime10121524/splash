@@ -18,7 +18,7 @@ const stateOptions=[
 ]
 const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,venda:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
 
-export default function Atendimentos() {
+export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}}) {
   const [catalogs,setCatalogs]=useState({origens:[],motivos:[],pessoas:[]})
   const [visits,setVisits]=useState([])
   const [stats,setStats]=useState(initialStats)
@@ -45,6 +45,13 @@ export default function Atendimentos() {
   const [saving,setSaving]=useState(false)
 
   useEffect(()=>{comercialGet('/api/comercial/opcoes').then(setCatalogs).catch(e=>setError(e.message))},[])
+  useEffect(()=>{
+    if(!initialClient?.id)return
+    setMode('existing');setSelectedClient(initialClient)
+    setBroker('');setSecondBroker('')
+    setNewClient(emptyClient());setFormError('');setModal({type:'arrival'})
+    onClientAccepted()
+  },[initialClient?.id])
   useEffect(()=>{
     let active=true
     setLoading(true)
