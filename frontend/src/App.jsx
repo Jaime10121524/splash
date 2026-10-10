@@ -267,6 +267,7 @@ function App() {
   const [current, setCurrent] = useState('dashboard')
   const [arrivalClient, setArrivalClient] = useState(null)
   const [initialSaleVisit, setInitialSaleVisit] = useState(null)
+  const [initialSaleOperation, setInitialSaleOperation] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
   const [theme, setTheme] = useState('light')
@@ -311,7 +312,8 @@ function App() {
   }
   const go = (id, client = null) => {
     if(id==='atendimentos' && client?.id) setArrivalClient(client)
-    if((id==='vendas'||id==='pendencias') && client?.id) setInitialSaleVisit(client)
+    if((id==='vendas'||id==='pendencias') && client?.operacao_id) setInitialSaleOperation({id:client.operacao_id})
+    else if((id==='vendas'||id==='pendencias') && client?.id) setInitialSaleVisit(client)
     setCurrent(id);setNoticesOpen(false);window.scrollTo({top:0,behavior:'smooth'})
   }
   if (session.status==='loading') return <div className="splash-loading"><Brand/><span className="loading-spinner"/><p>Preparando seu espaço...</p></div>
@@ -333,7 +335,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:(active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:(active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
