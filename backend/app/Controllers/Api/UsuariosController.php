@@ -15,7 +15,7 @@ use Throwable;
  */
 class UsuariosController extends BaseController
 {
-    private const GROUPS = ['corretor','vendedor','gerente'];
+    private const GROUPS = ['corretor','vendedor','gerente','operador'];
 
     private function authorize(): ?ResponseInterface
     {
@@ -219,7 +219,7 @@ class UsuariosController extends BaseController
             return ['error'=>'Informe um e-mail válido para recuperar o acesso.'];
         }
         if(!in_array($group,self::GROUPS,true)){
-            return ['error'=>'Escolha um grupo válido (corretor, vendedor ou gerente).'];
+            return ['error'=>'Escolha um grupo válido (corretor, vendedor, gerente ou operador).'];
         }
         if($creating || $password!==''){
             if(strlen($password)<8 || strlen($password)>128 || !preg_match('/[A-Z]/',$password)
