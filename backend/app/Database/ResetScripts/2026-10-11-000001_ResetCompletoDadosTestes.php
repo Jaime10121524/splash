@@ -113,7 +113,7 @@ final class ResetCompletoDadosTestes extends Migration
                     // Quebrar esses vínculos de teste antes de limpar a tabela.
                     $this->db->table('clientes')->update(['indicador_cliente_id' => null]);
                 }
-                // DELETE é transacional; TRUNCATE causaria commit implícito.
+                // DELETE mantém atomicidade e permite rollback de toda a limpeza.
                 if (!$this->db->table($table)->emptyTable() || $this->db->transStatus() === false) {
                     throw new RuntimeException('Erro ao esvaziar '.$table.'. Toda a operação será revertida.');
                 }
