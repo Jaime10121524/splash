@@ -59,10 +59,14 @@ class FinanceiroPessoalController extends CommercialBaseController
             return $this->errorResponse(422,'Período inválido.');
         }
         $db=db_connect();
-        $categories=$db->table('financeiro_categorias_despesa')->where('ativo',1)
-            ->groupStart()->where('pessoa_id',null);
-        if($id)$categories->orWhere('pessoa_id',$id);
-        $categoryRows=$categories->groupEnd()->orderBy('nome','ASC')->get()->getResultArray();
+        $categories=$db->table('financeiro_categorias_despesa')->where('ativo',1);
+        if($id){
+            $categories->groupStart()->where('pessoa_id',null)
+                ->orWhere('pessoa_id',$id)->groupEnd();
+        }
+        // Administrador sem filtro vê categorias globais e pessoais para selecionar
+        // a categoria pertinente dentro do modal após escolher a pessoa.
+        $categoryRows=$categories->orderBy('nome','ASC')->get()->getResultArray();
 
         $expensesQuery=$db->table('financeiro_despesas d')
             ->select('d.id,d.pessoa_id,d.categoria_id,d.data_despesa,d.valor,d.descricao,d.situacao,d.justificativa_cancelamento,c.nome AS categoria_nome,p.nome AS pessoa_nome')
