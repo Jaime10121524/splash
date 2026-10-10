@@ -735,9 +735,10 @@ class FechamentosController extends CommercialBaseController
                     $db->transRollback();return $this->errorResponse(409,'Forma interna de abatimento não configurada.');
                 }
                 // Empréstimos são bloqueados em ordem determinística para impedir abatimento concorrente.
-                sort($loanIds);
+                $sortedLoanIds=array_keys($loanIds);
+                sort($sortedLoanIds,SORT_NUMERIC);
                 $locked=[];
-                foreach(array_keys($loanIds) as $loanId){
+                foreach($sortedLoanIds as $loanId){
                     $loan=$db->query('SELECT * FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[$loanId])->getRowArray();
                     if(!$loan||(int)$loan['pessoa_id']!==(int)$personId||$loan['situacao']!=='ATIVO'){
                         $db->transRollback();return $this->errorResponse(422,'Empréstimo não pertence à pessoa ou está inativo.');
