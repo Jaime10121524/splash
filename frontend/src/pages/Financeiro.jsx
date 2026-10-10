@@ -32,7 +32,7 @@ function buildLedger(accounts,personal){
       const own=line.tipo==='TITULAR'
       record.items.push({
         key:'I'+line.operacao_id+'_'+(line.rateio_id||'T'),tipo:own?'comissao':'atendimento',
-        direcao:'entrada',nome:own?'Comissão própria':line.descricao,
+        direcao:'entrada',titular_nome:account.nome,nome:own?'Minha comissão (após rateios)':line.descricao,
         data:line.data_venda,origem:line.titulo||'Venda #'+line.operacao_id,
         detalhe:line.visita_id?'Atendimento #'+line.visita_id:'',
         total:cents(line.total),recebido:cents(line.recebido),abatido:cents(line.abatido),
@@ -41,7 +41,7 @@ function buildLedger(accounts,personal){
     }
     for(const line of account.saidas||[]){
       record.items.push({
-        key:'R'+line.id,tipo:'repasse',direcao:'saida',
+        key:'R'+line.id,tipo:'repasse',direcao:'saida',titular_nome:account.nome,
         nome:line.beneficiario_nome||'Participante',
         detalhe:(line.origem_corretor_nome?'Venda de '+line.origem_corretor_nome+' · ':'')+({ATENDENTE:'Atendente',GERENTE:'Gerente',CORRETOR:'Corretor'}[line.papel]||'Participação'),
         data:line.data_venda,origem:line.titulo||'Venda #'+line.operacao_id,
@@ -52,7 +52,7 @@ function buildLedger(accounts,personal){
   for(const x of personal?.despesas||[]){
     if(x.situacao!=='ATIVA')continue
     person(x.pessoa_id,x.pessoa_nome).items.push({
-      key:'D'+x.id,tipo:'despesa',direcao:'saida',
+      key:'D'+x.id,tipo:'despesa',direcao:'saida',titular_nome:x.pessoa_nome,
       nome:x.categoria_nome||'Despesa',detalhe:x.descricao,
       data:x.data_despesa,total:cents(x.valor),pagoIndefinido:true,
     })
@@ -60,10 +60,10 @@ function buildLedger(accounts,personal){
   for(const x of personal?.emprestimos||[]){
     if(x.situacao==='CANCELADO')continue
     person(x.pessoa_id,x.pessoa_nome).items.push({
-      key:'E'+x.id,tipo:'emprestimo',direcao:'saida',
-      nome:'Empréstimo #'+x.id,detalhe:x.descricao,
-      data:x.data_emprestimo,total:cents(x.valor),recebido:cents(x.abatido),
-      pendente:cents(x.saldo),abatimentos:x.abatimentos||[],
+      key:'E'+x.id,tipo:'emprestimo',direcao:'saida',titular_nome:x.pessoa_nome,
+      nome:'Saldo do empréstimo #'+x.id,detalhe:x.descricao,
+      data:x.data_emprestimo,total:cents(x.saldo),recebido:cents(x.abatido),
+      pendente:cents(x.saldo),valor_original:cents(x.valor),abatimentos:x.abatimentos||[],
     })
   }
   return [...map.values()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
@@ -91,15 +91,18 @@ function Line({entry}){
       <span className="finx-arrow" aria-hidden="true">{isIn?'↗':'↘'}</span>
       <div className="finx-entry-text">
         <strong>{entry.nome}</strong>
+        {entry.mostrarPessoa&&<small>Conta de: {entry.titular_nome}</small>}
         <small>{entry.data?dateBR(entry.data):'Sem data'}{entry.origem?' · '+entry.origem:''}</small>
         {entry.detalhe&&<small>{entry.detalhe}</small>}
       </div>
       <div className="finx-entry-value">
         <strong>{isIn?'+':'−'} {cash(entry.total)}</strong>
         {entry.pagoIndefinido?<small>Despesa registrada · baixa não informada</small>:
-          <small>{isIn?'Recebido':'Liquidado'} {cash(entry.recebido||0)} · {isIn?'A receber':'Falta'} {cash(entry.pendente||0)}</small>}
+          <small>{entry.tipo==='emprestimo'?'Valor original '+cash(entry.valor_original)+' · Abatido '+cash(entry.recebido||0):
+            (isIn?'Recebido ':'Pago ')+cash(entry.recebido||0)+' · '+(isIn?'A receber ':'Pendente ')+cash(entry.pendente||0)}</small>}
         {entry.abatido>0&&<small>Abatido sem dinheiro: {cash(entry.abatido)}</small>}
-        {entry.tipo==='emprestimo'&&<small>Abatimento da dívida, não pagamento em dinheiro</small>}
+        {entry.tipo==='emprestimo'&&<small>Saldo atual da dívida; não é despesa deste mês.</small>}
+        {entry.tipo==='repasse'&&<small>Controle de pagamentos, não nova despesa sobre comissão já líquida.</small>}
       </div>
     </div>
     {hasDetail&&<div className="finx-entry-extra">
@@ -123,11 +126,7 @@ function Group({title,items,kind,subheading}){
   return <section className={'finx-group '+(positive?'finx-group-income':'finx-group-expense')}>
     <header className="finx-group-head">
       <div><h2>{title}</h2>{subheading&&<small>{subheading}</small>}</div>
-      <div className="finx-group-summary">
-        <strong>{positive?'+':'−'} {cash(positive?stats.ganhos:
-          stats.repasses+stats.despesas+stats.emprestimos)}</strong>
-        <small>{items.length} lançamento(s)</small>
-      </div>
+      <small className="finx-group-count">{items.length} lançamento(s)</small>
     </header>
     {items.slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||''))).map(x=><Line key={x.key} entry={x}/>)}
   </section>
