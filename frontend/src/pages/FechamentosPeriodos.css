@@ -92,6 +92,8 @@
 .fpw-payment-person .fpw-lines{padding-bottom:0}
 .fpw-payment-person .fpw-lines>div{min-width:0;flex-wrap:wrap}
 .fpw-payment-person .fpw-lines>div>div{min-width:0}
+.fpw-print-payments{display:none}
+
 .fpw-report>.fpw-help{padding:0 18px}
 .fpw-method{grid-template-columns:minmax(0,1fr) minmax(0,.75fr) auto;align-items:end}
 @media(max-width:960px){
@@ -125,6 +127,12 @@
  .fpw-print,.com-panel-head button{display:none!important}
  .fpw-report-sums{grid-template-columns:repeat(3,minmax(0,1fr))}
  .fpw-report-sums>div{break-inside:avoid}
+ .fpw-print-payments{display:grid;gap:11px;padding:15px}
+ .fpw-print-payments>div{border-top:1px solid #ccc;padding:9px 0;break-inside:avoid}
+ .fpw-print-payments h3{font-size:15px;margin:0}
+ .fpw-print-payments strong{font-size:12px}
+ .fpw-print-payments p{margin:3px 0;font-size:10px}
+
 }
 
 @media(max-width:650px){
