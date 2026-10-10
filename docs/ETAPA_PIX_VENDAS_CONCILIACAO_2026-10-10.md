@@ -2,7 +2,7 @@
 
 ## Onde acessar
 
-**Fechamentos → Fechamentos anteriores → abrir um fechamento CONCLUÍDO → 5. Conciliação do dinheiro recebido → Identificar Pix antigos pelas vendas.**
+**Fechamentos → Fechamentos anteriores → abrir um fechamento CONCLUÍDO → Abrir conferência de caixa → Identificar Pix antigos pelas vendas.**
 
 A nova busca usa os recebimentos já cadastrados nas vendas (`venda_recebimentos`), sem integração bancária e sem criar comissão ou pagamento.
 
@@ -18,7 +18,7 @@ A nova busca usa os recebimentos já cadastrados nas vendas (`venda_recebimentos
 
 ## Modos de conciliação
 
-1. **Associar ao lançamento existente:** há um Pix já informado na Etapa 5, ativo, deste mesmo fechamento e com o mesmo valor disponível da venda. A conciliação somente vincula origem e custódia; **não soma nada ao saldo novamente**.
+1. **Associar ao lançamento existente:** há um Pix já informado na conferência opcional de caixa, ativo, deste mesmo fechamento e com o mesmo valor disponível da venda. A conciliação somente vincula origem e custódia; **não soma nada ao saldo novamente**.
 2. **Reconhecer Pix ainda não lançado:** após conferir o comprovante e ter certeza de que não está nas entradas do clube, saldo anterior nem em outro registro, cria um único lançamento de `PIX_RETIDO` e o vincula à origem real da venda.
 3. **Desfazer vínculo:** exige justificativa; se o valor foi criado por essa conciliação, estorna também o lançamento de custódia, desde que não deixe o caixa negativo. Se era um lançamento manual, só desvincula e preserva o saldo informado anteriormente.
 4. O estorno direto de lançamento de custódia ainda associado a um Pix fica bloqueado. Para corrigi-lo, desvincule primeiro.
