@@ -388,29 +388,30 @@ export default function FechamentosPeriodos({role='admin'}){
             <button type="button" className="cm-button primary" disabled={busy}
               onClick={()=>{setModal('confirmar')}}>Concluir fechamento e guardar relatório →</button></div>
         </>}
-        {(currentStage===3||currentStage===4)&&((current.historico_repasses||[]).length>0 || (current.historico_titulares||[]).length>0)&&
+        {(currentStage===3||currentStage===4)&&paymentsByPerson.length>0&&
           <section className="com-panel fpw-stage fpw-payment-history">
-          <div className="com-panel-head"><div><h2>Pagamentos registrados neste fechamento</h2>
-            <p>Histórico por pessoa e forma de pagamento. Correções exigem estorno justificado antes da conclusão.</p></div></div>
-          <div className="fpw-lines">{(current.historico_titulares||[]).map(m=><div key={'T'+m.id}>
-            <div><strong>{m.beneficiario_nome} · Comissão própria · {m.forma_nome}</strong>
-              <small>{m.situacao==='ATIVO'?'Pagamento confirmado':'Estornado'} · Venda # {m.operacao_id}</small></div>
-            <strong>{money(m.valor)}</strong>
-            {current.status==='REPASSES'&&m.situacao==='ATIVO'&&m.forma_nome!=='Abatimento de empréstimo'&&
-              <button type="button" className="vd-outline" onClick={()=>{
-                setRecord({id:m.id,justificativa:'',isTitular:true});setModal('estorno')
-              }}>Estornar</button>}
-          </div>)}
-          {current.historico_repasses.map(m=><div key={'R'+m.id}>
-            <div><strong>{m.beneficiario_nome} · {m.forma_nome}</strong>
-              <small>{m.situacao==='ATIVO'?'Pagamento confirmado':'Estornado'} · Rateio # {m.rateio_id}</small></div>
-            <strong>{money(m.valor)}</strong>
-            {current.status==='REPASSES'&&m.situacao==='ATIVO'&&
-              <button type="button" className="vd-outline" onClick={()=>{
-                setRecord({id:m.id,justificativa:''});setModal('estorno')
-              }}>Estornar</button>}
-          </div>)}</div>
-        </section>}
+            <div className="com-panel-head"><div><h2>Pagamentos registrados por pessoa</h2>
+              <p>Comissões próprias e participações agrupadas por beneficiário. Cada lançamento e sua situação continuam identificados.</p></div></div>
+            <div className="fpw-payment-groups">
+              {paymentsByPerson.map(person=><article key={person.id} className="fpw-payment-person">
+                <div className="fpw-payment-person-head">
+                  <strong>{person.nome}</strong>
+                  <span>{money(person.totalCent/100)} confirmado · {person.entries.length} lançamento(s)</span>
+                </div>
+                <div className="fpw-lines">{person.entries.map(m=><div key={m.key}>
+                  <div><strong>{m.kind==='titular'?'Comissão própria':'Participação de outra venda'} · {m.forma_nome}</strong>
+                    <small>{m.situacao==='ATIVO'?'Pagamento confirmado':'Estornado'} · {m.kind==='titular'?'Venda #'+m.operacao_id:'Rateio #'+m.rateio_id}</small></div>
+                  <strong>{money(m.valor)}</strong>
+                  {current.status==='REPASSES'&&m.situacao==='ATIVO'&&
+                    (m.kind!=='titular'||m.forma_nome!=='Abatimento de empréstimo')&&
+                    <button type="button" className="vd-outline" onClick={()=>{
+                      setRecord({id:m.id,justificativa:'',isTitular:m.kind==='titular'})
+                      setModal('estorno')
+                    }}>Estornar</button>}
+                </div>)}</div>
+              </article>)}
+            </div>
+          </section>}
         {currentStage===4&&<section className="com-panel fpw-report" id="splash-fechamento-relatorio">
           <div className="com-panel-head"><div><h2>4. Resultado do período</h2>
             <p>Valores recebidos e pagos realmente registrados; resultado gerencial por corretor, sem somar lucros de pessoas distintas.</p></div>
