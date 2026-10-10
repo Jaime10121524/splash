@@ -252,7 +252,7 @@ class FechamentosPeriodosController extends CommercialBaseController
     {
         if($period['status']==='CONCLUIDO' && $period['resumo_concluido']){
             $frozen=json_decode((string)$period['resumo_concluido'],true);
-            if(is_array($frozen))return $frozen;
+            if(is_array($frozen))return $this->resultadoHistorico($frozen);
         }
         $id=(int)$period['id'];
         $members=$db->table('fechamento_periodo_pessoas m')->select('m.pessoa_id,p.nome')
