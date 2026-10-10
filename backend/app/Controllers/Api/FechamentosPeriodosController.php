@@ -462,6 +462,82 @@ class FechamentosPeriodosController extends CommercialBaseController
         return true;
     }
 
+    /** Parte própria disponível por venda, abatidos todos os rateios e pagamentos anteriores. */
+    private function titularDisponivel($db,int $periodId,int $personId,bool $lock=false): array
+    {
+        $rows=$db->table('fechamento_periodo_vendas f')
+            ->select('v.id,v.data_venda,v.corretor_pessoa_id,v.comissao_prevista,v.comissao_ajustada')
+            ->join('venda_operacoes v','v.id=f.operacao_id')
+            ->where('f.fechamento_id',$periodId)
+            ->where('v.corretor_pessoa_id',$personId)
+            ->orderBy('v.data_venda')->orderBy('v.id')->get()->getResultArray();
+        if(!$rows)return [];
+        $ids=array_map(static fn($x)=>(int)$x['id'],$rows);
+        if($lock){
+            $locked=$ids;sort($locked,SORT_NUMERIC);
+            foreach($locked as $id)$db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[$id])->get()->getRowArray();
+        }
+        $byRateio=[];
+        foreach($db->table('comissao_rateios')->select('operacao_id,responsavel_pessoa_id,valor')
+            ->whereIn('operacao_id',$ids)->where('responsavel_pessoa_id',$personId)->get()->getResultArray() as $r){
+            $id=(int)$r['operacao_id'];
+            $byRateio[$id]=($byRateio[$id]??0)+VendaMoney::cents((string)$r['valor'],true);
+        }
+        $byPaid=[];
+        foreach($db->table('comissao_titular_movimentos')->select('operacao_id,tipo,valor')
+            ->whereIn('operacao_id',$ids)->where('corretor_pessoa_id',$personId)->get()->getResultArray() as $r){
+            $id=(int)$r['operacao_id'];
+            $byPaid[$id]=($byPaid[$id]??0)
+                +($r['tipo']==='PAGAMENTO'?1:-1)*VendaMoney::cents((string)$r['valor'],true);
+        }
+        $result=[];
+        foreach($rows as $row){
+            $id=(int)$row['id'];
+            $value=$row['comissao_ajustada']??$row['comissao_prevista'];
+            if($value===null)continue;
+            $due=VendaMoney::cents((string)$value,true)-($byRateio[$id]??0)-($byPaid[$id]??0);
+            if($due>0)$result[]=['operacao_id'=>$id,'saldo'=>$due];
+        }
+        return $result;
+    }
+
+    /** Registra a comissão PRÓPRIA; não é uma segunda participação de atendente. */
+    private function registrarMovimentosTitular($db,int $periodId,int $personId,array $forms,
+        string $date,int $userId,?int $lotId=null): void
+    {
+        $available=$this->titularDisponivel($db,$periodId,$personId,true);
+        $total=array_sum(array_column($forms,'cents'));
+        if($total<=0||$total>array_sum(array_column($available,'saldo'))){
+            throw new \DomainException('Pagamento maior que a comissão própria pendente deste corretor.');
+        }
+        foreach($forms as $form){
+            $left=$form['cents'];
+            foreach($available as &$row){
+                if(!$left)break;
+                $value=min($left,$row['saldo']);
+                if(!$value)continue;
+                $db->table('comissao_titular_movimentos')->insert([
+                    'operacao_id'=>$row['operacao_id'],
+                    'corretor_pessoa_id'=>$personId,
+                    'tipo'=>'PAGAMENTO','referencia_pagamento_id'=>null,
+                    'valor'=>VendaMoney::decimal($value),'data_pagamento'=>$date,
+                    'observacoes'=>'Comissão própria no fechamento #'.$periodId,
+                    'lote_id'=>$lotId,'forma_id'=>$form['id'],
+                    'criado_por_usuario_id'=>$userId,'criado_em'=>$this->now(),
+                ]);
+                $movId=(int)$db->insertID();
+                $db->table('fechamento_periodo_titulares')->insert([
+                    'fechamento_id'=>$periodId,
+                    'operacao_id'=>$row['operacao_id'],
+                    'movimento_id'=>$movId,'forma_id'=>$form['id'],
+                    'valor'=>VendaMoney::decimal($value),'situacao'=>'ATIVO',
+                ]);
+                $row['saldo']-=$value;$left-=$value;
+            }
+            unset($row);
+        }
+    }
+
     public function receber(int|string $id): ResponseInterface
     {
         $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
@@ -721,6 +797,88 @@ class FechamentosPeriodosController extends CommercialBaseController
     }
 
     /** Um pagamento errado vira ESTORNO: não apaga o lançamento nem mexe no outro corretor. */
+    public function pagarTitular(int|string $id): ResponseInterface
+    {
+        $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
+        $data=$this->jsonPayload();
+        $person=$this->optionalId($data['corretor_pessoa_id']??null);
+        $date=(string)($data['data_pagamento']??'');
+        $forms=$data['formas']??null;
+        if(!$person||!$this->validateDate($date,false)||!is_array($forms)
+            ||count($forms)<1||count($forms)>8)return $this->errorResponse(422,'Corretor, data e formas são obrigatórios.');
+        $normalized=[];
+        foreach($forms as $f){
+            if(!is_array($f))return $this->errorResponse(422,'Forma inválida.');
+            $fid=$this->optionalId($f['forma_id']??null);
+            $v=$this->cents($f['valor']??null);
+            if(!$fid||!$v)return $this->errorResponse(422,'Informe forma e valor positivo.');
+            $normalized[]=['id'=>$fid,'cents'=>$v];
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $p=$this->editable($db,(int)$id,$actor,'REPASSES');
+            if($p instanceof ResponseInterface){$db->transRollback();return $p;}
+            if(!$db->table('fechamento_periodo_pessoas')->where('fechamento_id',(int)$id)
+                ->where('pessoa_id',$person)->countAllResults()){
+                $db->transRollback();return $this->errorResponse(403,'Corretor fora deste fechamento.');
+            }
+            foreach($normalized as $n)if(!$this->allowedMethod($db,$n['id'])){
+                $db->transRollback();return $this->errorResponse(422,'Forma de pagamento não permitida.');
+            }
+            $claimed=$this->registrarChave($db,(int)$id,'TITULAR',$data['chave_requisicao']??null);
+            if($claimed===null){$db->transRollback();return $this->errorResponse(422,'Chave do pagamento é obrigatória.');}
+            if($claimed===false){$db->transRollback();return $this->responseOK('Pagamento já registrado, sem duplicar.',200,['duplicado'=>true]);}
+            try{
+                $this->registrarMovimentosTitular($db,(int)$id,$person,$normalized,$date,$actor['usuario_id']);
+            }catch(\DomainException $e){
+                $db->transRollback();return $this->errorResponse(422,$e->getMessage());
+            }
+            $this->commitOrFail($db);
+            return $this->responseOK('Comissão própria do corretor paga e lançada no extrato individual.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'pagar titular por fechamento');}
+    }
+
+    public function estornarTitular(int|string $id,int|string $entryId): ResponseInterface
+    {
+        $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
+        $reason=$this->cleanText($this->jsonPayload()['justificativa']??null,500,true);
+        if($reason===false||mb_strlen((string)$reason)<5)return $this->errorResponse(422,'Informe justificativa de estorno.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $p=$this->editable($db,(int)$id,$actor,'REPASSES');
+            if($p instanceof ResponseInterface){$db->transRollback();return $p;}
+            $entry=$db->table('fechamento_periodo_titulares')
+                ->where('id',(int)$entryId)->where('fechamento_id',(int)$id)->get()->getRowArray();
+            if(!$entry){$db->transRollback();return $this->errorResponse(404,'Pagamento não encontrado.');}
+            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$entry['operacao_id']])->get()->getRowArray();
+            $entry=$db->table('fechamento_periodo_titulares')->where('id',(int)$entryId)->get()->getRowArray();
+            if($entry['situacao']!=='ATIVO'){
+                $db->transRollback();return $this->errorResponse(409,'Pagamento já estornado.');
+            }
+            $internal=$db->table('venda_formas_pagamento')
+                ->where('codigo','ABATIMENTO_EMP')->get()->getRowArray();
+            if($internal&&(int)$internal['id']===(int)$entry['forma_id']){
+                $db->transRollback();
+                return $this->errorResponse(409,'Abatimento de empréstimo é corrigido na etapa de recebimentos, não por estorno isolado.');
+            }
+            $sale=$db->table('venda_operacoes')->select('corretor_pessoa_id')
+                ->where('id',(int)$entry['operacao_id'])->get()->getRowArray();
+            $db->table('comissao_titular_movimentos')->insert([
+                'operacao_id'=>(int)$entry['operacao_id'],
+                'corretor_pessoa_id'=>(int)$sale['corretor_pessoa_id'],
+                'tipo'=>'ESTORNO','referencia_pagamento_id'=>(int)$entry['movimento_id'],
+                'valor'=>$entry['valor'],'data_pagamento'=>substr($this->now(),0,10),
+                'observacoes'=>$reason,'forma_id'=>(int)$entry['forma_id'],
+                'lote_id'=>null,'criado_por_usuario_id'=>$actor['usuario_id'],
+                'criado_em'=>$this->now(),
+            ]);
+            $db->table('fechamento_periodo_titulares')->where('id',(int)$entryId)
+                ->update(['situacao'=>'ESTORNADO']);
+            $this->commitOrFail($db);
+            return $this->responseOK('Pagamento do corretor estornado e comissão reaberta.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'estornar titular do fechamento');}
+    }
+
     public function estornarRepasse(int|string $id,int|string $entryId): ResponseInterface
     {
         $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
