@@ -190,6 +190,10 @@ class VendasController extends CommercialBaseController
                     return $this->errorResponse(422,'Informe número de título com quatro dígitos e datas válidas.');
                 }
                 $expiry=$this->expiry($start,(int)$plan['duracao_meses']);
+                if($this->numberExists($db,$number,(string)$plan['codigo'])){
+                    $db->transRollback();
+                    return $this->errorResponse(409,'Esse número e sigla já pertencem a outro título.');
+                }
             }
             $now=$this->nowLocal();
             $db->table('venda_operacoes')->insert([
@@ -249,6 +253,10 @@ class VendasController extends CommercialBaseController
                 return $this->errorResponse(422,'Informe número com quatro dígitos, data da venda e início válidos.');
             }
             $expiry=$this->expiry($start,(int)$op['prazo_meses']);
+            if($this->numberExists($db,$number,(string)$op['sigla_plano'])){
+                $db->transRollback();
+                return $this->errorResponse(409,'Esse número e sigla já pertencem a outro título.');
+            }
             $db->table('venda_operacoes')->where('id',(int)$id)->update([
                 'situacao'=>'VENDA','numero_titulo'=>$number,'data_venda'=>$date,
                 'data_inicio'=>$start,'data_vencimento'=>$expiry,'retorno_previsto'=>null,
@@ -357,6 +365,50 @@ class VendasController extends CommercialBaseController
             $db->transRollback();
             return $this->unexpected($e,'devolução financeira');
         }
+    }
+
+    public function ajustarComissao(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $amount=VendaMoney::cents($data['valor']??null,true);
+        $reason=$this->cleanText($data['justificativa']??null,500,true);
+        if($amount===null || $reason===false || mb_strlen($reason)<5){
+            return $this->errorResponse(422,'Informe a comissão ajustada e uma justificativa de pelo menos cinco caracteres.');
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op){
+                $db->transRollback();
+                return $this->errorResponse(404,'Venda ou pendência não encontrada.');
+            }
+            if($amount>VendaMoney::cents((string)$op['valor_cobrado'])){
+                $db->transRollback();
+                return $this->errorResponse(422,'Comissão ajustada não pode superar o valor cobrado do cliente.');
+            }
+            $before=$op['comissao_ajustada']??$op['comissao_prevista'];
+            $adjusted=VendaMoney::decimal($amount);
+            $db->table('venda_operacoes')->where('id',(int)$id)->update([
+                'comissao_ajustada'=>$adjusted,'ajuste_motivo'=>$reason,
+                'atualizado_em'=>$this->nowLocal(),
+            ]);
+            $db->table('venda_comissao_ajustes')->insert([
+                'operacao_id'=>(int)$id,'valor_anterior'=>$before,'valor_novo'=>$adjusted,
+                'justificativa'=>$reason,'usuario_id'=>(int)auth('session')->user()->id,
+                'criado_em'=>$this->nowLocal(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Comissão ajustada e registrada no histórico. Nenhum repasse foi realizado.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'ajustar comissão');
+        }
+    }
+
+    private function numberExists($db,string $number,string $sigla): bool
+    {
+        return $db->table('venda_operacoes')->where('numero_titulo',$number)
+            ->where('sigla_plano',$sigla)->countAllResults()>0;
     }
 
     private function participants($db,array $data,?array $visit): array
