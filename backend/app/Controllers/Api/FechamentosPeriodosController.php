@@ -343,10 +343,18 @@ class FechamentosPeriodosController extends CommercialBaseController
             ->where('situacao','ATIVA')->get()->getResultArray();
         $costs=0;
         foreach($costRows as $cost){$c=VendaMoney::cents((string)$cost['valor'],true);$costs+=$c;$byPerson[(int)$cost['pessoa_id']]['despesas_cent']+=$c;}
-        $periodPayments=$db->table('fechamento_periodo_repasses')->select('valor')
-            ->where('fechamento_id',$id)->where('situacao','ATIVO')->get()->getResultArray();
         $paidInClosing=0;
-        foreach($periodPayments as $m)$paidInClosing+=VendaMoney::cents((string)$m['valor'],true);
+        foreach(['fechamento_periodo_repasses','fechamento_periodo_titulares'] as $table){
+            $periodPayments=$db->table($table)->select('valor')
+                ->where('fechamento_id',$id)->where('situacao','ATIVO')->get()->getResultArray();
+            foreach($periodPayments as $m)$paidInClosing+=VendaMoney::cents((string)$m['valor'],true);
+        }
+        $titularHistory=$db->table('fechamento_periodo_titulares f')
+            ->select('f.id,f.operacao_id,f.valor,f.situacao,p.nome AS beneficiario_nome,m.nome AS forma_nome,v.corretor_pessoa_id')
+            ->join('venda_operacoes v','v.id=f.operacao_id')
+            ->join('pessoas p','p.id=v.corretor_pessoa_id')
+            ->join('venda_formas_pagamento m','m.id=f.forma_id')
+            ->where('f.fechamento_id',$id)->orderBy('f.id','DESC')->get()->getResultArray();
         $paymentHistory=$db->table('fechamento_periodo_repasses f')
             ->select('f.id,f.rateio_id,f.valor,f.situacao,b.nome AS beneficiario_nome,m.nome AS forma_nome,r.beneficiario_pessoa_id')
             ->join('comissao_rateios r','r.id=f.rateio_id')
@@ -375,6 +383,9 @@ class FechamentosPeriodosController extends CommercialBaseController
             $person['comissao']=VendaMoney::decimal($person['comissao_cent']);
             $person['recebido_clube']=VendaMoney::decimal($person['recebido_clube_cent']);
             $person['titular_ja_recebido']=VendaMoney::decimal($person['titular_pago_cent']);
+            $person['titular_total']=VendaMoney::decimal(max(0,$person['comissao_cent']-$person['repasse_cent']));
+            $person['titular_pendente']=VendaMoney::decimal(max(0,
+                $person['comissao_cent']-$person['repasse_cent']-$person['titular_pago_cent']));
             $person['repasse_total']=VendaMoney::decimal($person['repasse_cent']);
             $person['repasse_ja_pago']=VendaMoney::decimal($person['repasse_pago_cent']);
             $person['repasse_pendente']=VendaMoney::decimal(max(0,$person['repasse_cent']-$person['repasse_pago_cent']));
@@ -393,7 +404,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             'status'=>$period['status'],'concluido_em'=>$period['concluido_em'],
             'corretores'=>array_values($byPerson),'participantes'=>array_values($participant),
             'entradas'=>$entries,'abatimentos'=>$offsetRows,'emprestimos'=>$loans,
-            'historico_repasses'=>$paymentHistory,
+            'historico_repasses'=>$paymentHistory,'historico_titulares'=>$titularHistory,
             'quantidade_vendas'=>count($sales),
             'resumo'=>[
                 'comissoes'=>VendaMoney::decimal($gross),
@@ -586,7 +597,9 @@ class FechamentosPeriodosController extends CommercialBaseController
             $p=$this->editable($db,(int)$id,$actor,'REPASSES');
             if($p instanceof ResponseInterface){$db->transRollback();return $p;}
             if($db->table('fechamento_periodo_repasses')->where('fechamento_id',(int)$id)
-                ->where('situacao','ATIVO')->countAllResults()){
+                ->where('situacao','ATIVO')->countAllResults()
+                ||$db->table('fechamento_periodo_titulares')->where('fechamento_id',(int)$id)
+                    ->where('situacao','ATIVO')->countAllResults()){
                 $db->transRollback();return $this->errorResponse(409,'Já foram registrados repasses. Conclua ou estorne os pagamentos antes de voltar.');
             }
             $db->table('fechamento_periodos')->where('id',(int)$id)->update(['status'=>'RECEBIMENTOS']);
