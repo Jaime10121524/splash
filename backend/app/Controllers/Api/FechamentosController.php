@@ -6,6 +6,7 @@ namespace App\Controllers\Api;
 
 use App\Libraries\RateioRules;
 use App\Libraries\RateioAutomatico;
+use App\Libraries\ProtecaoVendaFechada;
 use App\Libraries\VendaMoney;
 use App\Libraries\SaldoComissao;
 use App\Libraries\ExtratoPermissoes;
@@ -452,6 +453,10 @@ class FechamentosController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(409,'Só registre pagamentos de comissão em vendas quitadas.');
             }
+            if(ProtecaoVendaFechada::bloqueada($db,(int)$id)){
+                $db->transRollback();return $this->errorResponse(409,
+                    'Esta venda pertence a um fechamento. Registre pagamentos somente no próprio fechamento enquanto estiver aberto.');
+            }
             $state=$db->table('comissao_auto_apuracoes')
                 ->where('operacao_id',(int)$id)->get()->getRowArray();
             $hasRateios=$db->table('comissao_rateios')->where('operacao_id',(int)$id)->countAllResults()>0;
@@ -496,6 +501,9 @@ class FechamentosController extends CommercialBaseController
                 $db->transRollback();return $this->errorResponse(404,'Pagamento não encontrado.');
             }
             $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$record['operacao_id']])->getRowArray();
+            if(ProtecaoVendaFechada::bloqueada($db,(int)$record['operacao_id'])){
+                $db->transRollback();return $this->errorResponse(409,ProtecaoVendaFechada::MESSAGE);
+            }
             $internalForm=$db->table('venda_formas_pagamento')->select('id')
                 ->where('codigo','ABATIMENTO_EMP')->get()->getRowArray();
             if($internalForm && (int)$record['forma_id']===(int)$internalForm['id']){
@@ -941,6 +949,7 @@ class FechamentosController extends CommercialBaseController
         $db=db_connect();
         $op=$db->table('venda_operacoes')->where('id',(int)$id)->get()->getRowArray();
         if(!$op)return $this->errorResponse(404,'Venda não encontrada.');
+        $fechamento=ProtecaoVendaFechada::fechamento($db,(int)$id);
         $rateios=$db->table('comissao_rateios r')
             ->select('r.*,p.nome AS beneficiario_nome')
             ->join('pessoas p','p.id=r.beneficiario_pessoa_id')
@@ -952,19 +961,22 @@ class FechamentosController extends CommercialBaseController
             ->where('operacao_id',(int)$id)->countAllResults()>0;
         $comissao=$this->commission($op);
         $quitada=$this->salePaid($db,$op);
-        $editavel=$op['situacao']==='VENDA' && $comissao!==null && $quitada
+        $editavel=$fechamento===null && $op['situacao']==='VENDA'
+            && $comissao!==null && $quitada
             && !$rateioMovimentado && !$titularMovimentado;
         return $this->response->setJSON([
             'operacao_id'=>(int)$id,
             'corretor_pessoa_id'=>(int)$op['corretor_pessoa_id'],
             'comissao_bruta'=>$comissao===null?null:VendaMoney::decimal($comissao),
             'quitada'=>$quitada,
-            'editavel'=>$editavel,
+            'editavel'=>$editavel,'fechamento'=>$fechamento,
             'rateios'=>$rateios,
-            'aviso'=>!$quitada?'Ajustes disponíveis após a quitação da venda.'
+            'aviso'=>$fechamento!==null?ProtecaoVendaFechada::MESSAGE
+                .' Fechamento #'.$fechamento['id'].'.'
+                :(!$quitada?'Ajustes disponíveis após a quitação da venda.'
                 :($rateioMovimentado||$titularMovimentado
                     ?'Rateios bloqueados por pagamentos/estornos já registrados. O histórico não será sobrescrito.'
-                    :'Confira e salve as participações antes do fechamento semanal.'),
+                    :'Confira e salve as participações antes do fechamento semanal.')),
         ])->setHeader('Cache-Control','no-store');
     }
 
@@ -980,6 +992,9 @@ class FechamentosController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(ProtecaoVendaFechada::bloqueada($db,(int)$id)){
+                $db->transRollback();return $this->errorResponse(409,ProtecaoVendaFechada::MESSAGE);
+            }
             if(!$op||$op['situacao']!=='VENDA'||$this->commission($op)===null
                 ||!$this->salePaid($db,$op)){
                 $db->transRollback();
@@ -1093,6 +1108,9 @@ class FechamentosController extends CommercialBaseController
             if(!$allocation){
                 $db->transRollback();return $this->errorResponse(404,'Participação não encontrada.');
             }
+            if(ProtecaoVendaFechada::bloqueada($db,(int)$allocation['operacao_id'])){
+                $db->transRollback();return $this->errorResponse(409,ProtecaoVendaFechada::MESSAGE);
+            }
             if(!$db->table('venda_formas_pagamento')->where('id',$formId)->where('ativo',1)->countAllResults()){
                 $db->transRollback();return $this->errorResponse(422,'Meio de pagamento inválido ou inativo.');
             }
@@ -1130,6 +1148,11 @@ class FechamentosController extends CommercialBaseController
                 WHERE m.id=? AND m.tipo=? FOR UPDATE',[(int)$id,'PAGAMENTO'])->getRowArray();
             if(!$pay){
                 $db->transRollback();return $this->errorResponse(404,'Repasse não encontrado.');
+            }
+            $alloc=$db->table('comissao_rateios')->select('operacao_id')
+                ->where('id',(int)$pay['rateio_id'])->get()->getRowArray();
+            if($alloc && ProtecaoVendaFechada::bloqueada($db,(int)$alloc['operacao_id'])){
+                $db->transRollback();return $this->errorResponse(409,ProtecaoVendaFechada::MESSAGE);
             }
             $internalForm=$db->table('venda_formas_pagamento')->select('id')
                 ->where('codigo','ABATIMENTO_EMP')->get()->getRowArray();
