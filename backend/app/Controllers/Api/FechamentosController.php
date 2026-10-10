@@ -136,7 +136,7 @@ class FechamentosController extends CommercialBaseController
         if(!$operations)return [];
         $ids=array_column($operations,'id');
         $ownerMovements=$db->table('comissao_titular_movimentos')
-            ->select('id,operacao_id,corretor_pessoa_id,tipo,valor,data_pagamento,observacoes,referencia_pagamento_id')
+            ->select('id,operacao_id,corretor_pessoa_id,tipo,valor,data_pagamento,observacoes,referencia_pagamento_id,forma_id')
             ->whereIn('operacao_id',$ids)->orderBy('id','ASC')->get()->getResultArray();
         $ownerByOperation=[];
         foreach($ownerMovements as $m){
@@ -150,10 +150,14 @@ class FechamentosController extends CommercialBaseController
         $history=[];
         if($allocIds){
             foreach($db->table('comissao_repasses')
-                ->select('id,rateio_id,tipo,valor,data_pagamento,observacoes,referencia_pagamento_id')
+                ->select('id,rateio_id,tipo,valor,data_pagamento,observacoes,referencia_pagamento_id,forma_id')
                 ->whereIn('rateio_id',$allocIds)->orderBy('id','ASC')->get()->getResultArray() as $m){
                 $history[(int)$m['rateio_id']][]=$m;
             }
+        }
+        $paymentMethods=[];
+        foreach($db->table('venda_formas_pagamento')->select('id,nome')->get()->getResultArray() as $method){
+            $paymentMethods[(int)$method['id']]=$method['nome'];
         }
         $accounts=[];
         $personName=[];
@@ -203,10 +207,11 @@ class FechamentosController extends CommercialBaseController
                 ...$meta,'tipo'=>'TITULAR','rateio_id'=>null,
                 'descricao'=>$sourceLabel,'pagador'=>'Clube / acerto do responsável',
                 'total_centavos'=>$rootTotal,'pago_centavos'=>$paidOwner,
-                'movimentos'=>array_map(static function($m) use($admin){ return [
+                'movimentos'=>array_map(static function($m) use($admin,$paymentMethods){ return [
                     'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                     'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
                     'observacoes'=>$admin?$m['observacoes']:null,
+                    'forma_nome'=>$m['forma_id']?($paymentMethods[(int)$m['forma_id']]??'Não identificada'):'Não informada',
                     'referencia_pagamento_id'=>$m['referencia_pagamento_id']===null?null:(int)$m['referencia_pagamento_id'],
                 ]; },$ownerByOperation[$key]['movimentos']??[]),
             ]);
@@ -227,6 +232,7 @@ class FechamentosController extends CommercialBaseController
                         'id'=>(int)$m['id'],'tipo'=>$m['tipo'],
                         'valor'=>$m['valor'],'data'=>$m['data_pagamento'],
                         'observacoes'=>$admin?$m['observacoes']:null,
+                        'forma_nome'=>$m['forma_id']?($paymentMethods[(int)$m['forma_id']]??'Não identificada'):'Não informada',
                         'referencia_pagamento_id'=>$m['referencia_pagamento_id']===null?null:(int)$m['referencia_pagamento_id'],
                     ]; },$history[(int)$a['id']]??[]),
                 ]);
