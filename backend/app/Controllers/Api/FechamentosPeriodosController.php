@@ -140,6 +140,11 @@ class FechamentosPeriodosController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(409,'Conclua os fechamentos abertos deste corretor antes de alterar sua administração.');
             }
+            if($boss!==null && $db->table('fechamento_periodos')
+                ->where('responsavel_pessoa_id',$boss)->where('status !=','CONCLUIDO')->countAllResults()){
+                $db->transRollback();
+                return $this->errorResponse(409,'Conclua primeiro o fechamento aberto do responsável antes de alterar sua equipe.');
+            }
             $db->table('fechamento_responsabilidades')->where('corretor_pessoa_id',$child)->delete();
             if($boss!==null)$db->table('fechamento_responsabilidades')->insert([
                 'corretor_pessoa_id'=>$child,'responsavel_pessoa_id'=>$boss,'criado_em'=>$this->now(),
