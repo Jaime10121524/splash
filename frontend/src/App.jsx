@@ -312,6 +312,7 @@ function Dashboard({ user, navigate }) {
             {label:'Atendimentos',detail:'Acompanhar visitantes',id:'atendimentos',icon:'clipboard'},
           ]:[
             {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
+            ...(user.role==='corretor'?[{label:'Meus fechamentos',detail:'Recebimentos e repasses por período',id:'fechamentos',icon:'arrows'}]:[]),
             {label:'Minhas despesas',detail:'Registrar gastos',id:'despesas',icon:'receipt'},
             {label:'Empréstimos',detail:'Consultar saldos',id:'emprestimos',icon:'arrows'},
           ]).map(item=><button key={item.id} type="button" className="quick-link" onClick={()=>navigate(item.id)}>
