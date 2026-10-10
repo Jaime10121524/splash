@@ -147,6 +147,9 @@ final class RateioAutomatico
     {
         $op=$db->table('venda_operacoes')->where('id',$id)->get()->getRowArray();
         if(!$op || $op['situacao']!=='VENDA')return ['status'=>'AGUARDANDO'];
+        if($db->table('fechamento_periodo_vendas')->where('operacao_id',$id)->countAllResults()>0){
+            return ['status'=>'VINCULADA_FECHAMENTO'];
+        }
         if($db->table('comissao_auto_apuracoes')->where('operacao_id',$id)->countAllResults()>0){
             return ['status'=>'JA_APURADA'];
         }
