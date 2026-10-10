@@ -409,6 +409,21 @@ class FechamentosPeriodosController extends CommercialBaseController
             ->where('codigo !=','ABATIMENTO_EMP')->countAllResults()>0;
     }
 
+    /** Requisição única por tentativa; lançamentos duplicados não entram duas vezes. */
+    private function registrarChave($db,int $period,string $type,mixed $raw): ?bool
+    {
+        if(!is_string($raw)||!preg_match('/^[A-Za-z0-9_-]{16,64}$/D',$raw))return null;
+        if($db->table('fechamento_periodo_eventos')
+            ->where('fechamento_id',$period)->where('chave_requisicao',$raw)->countAllResults()){
+            return false;
+        }
+        $db->table('fechamento_periodo_eventos')->insert([
+            'fechamento_id'=>$period,'chave_requisicao'=>$raw,
+            'tipo'=>$type,'criado_em'=>$this->now(),
+        ]);
+        return true;
+    }
+
     public function receber(int|string $id): ResponseInterface
     {
         $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
@@ -427,6 +442,13 @@ class FechamentosPeriodosController extends CommercialBaseController
             if(!$db->table('fechamento_periodo_pessoas')->where('fechamento_id',(int)$id)
                 ->where('pessoa_id',$person)->countAllResults()||!$this->allowedMethod($db,$method)){
                 $db->transRollback();return $this->errorResponse(422,'Pessoa fora do grupo ou forma inválida.');
+            }
+            $claimed=$this->registrarChave($db,(int)$id,'ENTRADA',$data['chave_requisicao']??null);
+            if($claimed===null){
+                $db->transRollback();return $this->errorResponse(422,'Chave única do lançamento é obrigatória.');
+            }
+            if($claimed===false){
+                $db->transRollback();return $this->responseOK('Lançamento já registrado; nenhuma duplicação.',200,['duplicado'=>true]);
             }
             $db->table('fechamento_periodo_entradas')->insert([
                 'fechamento_id'=>(int)$id,'corretor_pessoa_id'=>$person,
@@ -476,6 +498,13 @@ class FechamentosPeriodosController extends CommercialBaseController
                 ->where('emprestimo_id',$loanId)->get()->getResultArray() as $r)$paid+=VendaMoney::cents((string)$r['valor'],true);
             if($amount>VendaMoney::cents((string)$loan['valor'],true)-$paid){
                 $db->transRollback();return $this->errorResponse(422,'Abatimento supera o saldo da dívida.');
+            }
+            $claimed=$this->registrarChave($db,(int)$id,'ABATE',$data['chave_requisicao']??null);
+            if($claimed===null){
+                $db->transRollback();return $this->errorResponse(422,'Chave única do lançamento é obrigatória.');
+            }
+            if($claimed===false){
+                $db->transRollback();return $this->responseOK('Lançamento já registrado; nenhuma duplicação.',200,['duplicado'=>true]);
             }
             $db->table('comissao_lotes_pagamento')->insert([
                 'pessoa_id'=>(int)$loan['pessoa_id'],
@@ -575,6 +604,13 @@ class FechamentosPeriodosController extends CommercialBaseController
             }
             if($total>array_sum(array_column($available,'pendente'))){
                 $db->transRollback();return $this->errorResponse(422,'Pagamento maior que o total pendente ao participante.');
+            }
+            $claimed=$this->registrarChave($db,(int)$id,'REPASSE',$data['chave_requisicao']??null);
+            if($claimed===null){
+                $db->transRollback();return $this->errorResponse(422,'Chave única do lançamento é obrigatória.');
+            }
+            if($claimed===false){
+                $db->transRollback();return $this->responseOK('Lançamento já registrado; nenhuma duplicação.',200,['duplicado'=>true]);
             }
             $now=$this->now();
             foreach($payments as $payment){
