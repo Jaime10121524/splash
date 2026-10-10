@@ -6,6 +6,7 @@ const papelOptions = [
   { value:'corretor', label:'Corretor' },
   { value:'vendedor', label:'Vendedor' },
   { value:'gerente', label:'Gerente' },
+  { value:'operador', label:'Operador de atendimentos' },
 ]
 const userRoles = papelOptions
 const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],ativo:true})
@@ -27,7 +28,7 @@ function initials(name) {
   return String(name||'?').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('')
 }
 function roleLabel(role) {
-  return ({admin:'Administrador',corretor:'Corretor',vendedor:'Vendedor',gerente:'Gerente',restrito:'Restrito'})[role]||role
+  return ({admin:'Administrador',corretor:'Corretor',vendedor:'Vendedor',gerente:'Gerente',operador:'Operador',restrito:'Restrito'})[role]||role
 }
 function Status({active}) {
   return <span className={'pu-status '+(active?'active':'inactive')}>{active?'Ativo':'Inativo'}</span>
