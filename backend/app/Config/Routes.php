@@ -82,6 +82,8 @@ $routes->group('api', static function ($routes): void {
     $routes->post('fechamentos-periodos/(:num)/receber','Api\FechamentosPeriodosController::receber/$1',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/entradas/(:num)/excluir','Api\FechamentosPeriodosController::excluirEntrada/$1/$2',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/abater','Api\FechamentosPeriodosController::abater/$1',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/abates/(:num)/desfazer','Api\FechamentosPeriodosController::desfazerAbate/$1/$2',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/voltar','Api\FechamentosPeriodosController::voltar/$1',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/avancar','Api\FechamentosPeriodosController::avancar/$1',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/pagar','Api\FechamentosPeriodosController::pagar/$1',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/concluir','Api\FechamentosPeriodosController::concluir/$1',['filter'=>'csrf']);
