@@ -141,6 +141,7 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
   const [start,setStart]=useState(initialStart)
   const [end,setEnd]=useState(initialEnd)
   const [selected,setSelected]=useState('')
+  const [people,setPeople]=useState([])
   const [groupBy,setGroupBy]=useState('pessoa')
   const [direction,setDirection]=useState('todos')
   const [payload,setPayload]=useState(null)
@@ -148,6 +149,15 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
   const [busy,setBusy]=useState(true)
   const [error,setError]=useState('')
   const [partialError,setPartialError]=useState('')
+
+  useEffect(()=>{
+    if(!admin)return undefined
+    let active=true
+    comercialGet('/api/pessoas').then(data=>{
+      if(active)setPeople((data.pessoas||[]).filter(p=>p.ativo))
+    }).catch(()=>{})
+    return ()=>{active=false}
+  },[admin])
 
   useEffect(()=>{
     let active=true
@@ -179,7 +189,8 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
   const totals=sums(allLines)
   const general=totals.ganhos-totals.despesas
   const tabs=personalAllowed?[['extrato','Extrato geral'],['despesas','Despesas'],['emprestimos','Empréstimos']]:[['extrato','Meu extrato']]
-  const options=ledger.map(a=>({value:a.id,label:a.nome}))
+  const options=people.length?people.map(p=>({value:String(p.id),label:p.nome})):
+    ledger.map(a=>({value:a.id,label:a.nome}))
   const groups=groupBy==='tipo'
     ?typeOrder.map(type=>({key:type,title:typeTitle[type],
         items:visibleLines.filter(x=>x.tipo===type)})).filter(g=>g.items.length)
