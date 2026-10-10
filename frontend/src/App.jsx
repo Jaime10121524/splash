@@ -6,7 +6,7 @@ import Clientes from './pages/Clientes.jsx'
 import Atendimentos from './pages/Atendimentos.jsx'
 import OrigensMotivos from './pages/OrigensMotivos.jsx'
 import Vendas from './pages/Vendas.jsx'
-import Fechamentos from './pages/Fechamentos.jsx'
+import FechamentosPeriodos from './pages/FechamentosPeriodos.jsx'
 import Financeiro from './pages/Financeiro.jsx'
 
 const paths = {
@@ -65,7 +65,7 @@ const nav = [
   { id: 'financeiro', label: 'Financeiro', icon: 'wallet', roles: ['admin','corretor','vendedor','gerente'], section: 'Gestão' },
   { id: 'despesas', label: 'Minhas despesas', icon: 'receipt', roles: ['corretor'], section: 'Gestão' },
   { id: 'emprestimos', label: 'Meus empréstimos', icon: 'arrows', roles: ['corretor'], section: 'Gestão' },
-  { id: 'fechamentos', label: 'Fechamentos', icon: 'arrows', roles: ['admin'], section: 'Gestão' },
+  { id: 'fechamentos', label: 'Fechamentos', icon: 'arrows', roles: ['admin','corretor'], section: 'Gestão' },
   { id: 'relatorios', label: 'Relatórios', icon: 'chart', roles: ['admin','corretor','vendedor','gerente'], section: 'Gestão' },
   { id: 'usuarios', label: 'Usuários', icon: 'shield', roles: ['admin'], section: 'Sistema' },
   { id: 'origens', label: 'Origens e motivos', icon: 'tag', roles: ['admin'], section: 'Sistema' },
@@ -418,7 +418,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='fechamentos'?<Fechamentos role={user.role}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
