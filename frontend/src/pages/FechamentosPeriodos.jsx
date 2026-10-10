@@ -6,6 +6,7 @@ import FechamentosLegado from './Fechamentos.jsx'
 import './FechamentosPeriodos.css'
 
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0))
+const suggestedAmount=n=>Number(n)>0?Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):''
 const cleanMoney=v=>{
   const s=String(v||'').trim()
   const x=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s
@@ -39,6 +40,7 @@ export default function FechamentosPeriodos({role='admin'}){
   const [payee,setPayee]=useState(null)
   const [link,setLink]=useState({child:'',boss:''})
   const [legacy,setLegacy]=useState(false)
+  const [salesReviewed,setSalesReviewed]=useState(false)
 
   const accounts=scope?.responsaveis||[]
   const selectable=accounts.filter(p=>p.pode_fechar)
@@ -82,10 +84,12 @@ export default function FechamentosPeriodos({role='admin'}){
       const result=await comercialPost(url,payload)
       setNotice(result.message)
       if(after==='new'){
+        setSalesReviewed(false)
         await fetchLists();await fetchDetail(result.id)
       }else if(after==='groups'){
         await fetchLists()
       }else if(current){
+        if(url.endsWith('/voltar'))setSalesReviewed(true)
         await fetchDetail(current.id);await fetchLists()
       }
       setModal(null)
@@ -100,14 +104,16 @@ export default function FechamentosPeriodos({role='admin'}){
     },'new')
   }
   async function view(id){
+    setSalesReviewed(false)
     setLoading(true);resetError()
     try{await fetchDetail(id)}catch(e){setError(e.message)}
     finally{setLoading(false)}
   }
   function openEntry(){
     setNonce(requestKey())
-    setRecord({pessoa_id:String(current?.corretores?.[0]?.pessoa_id||''),
-      forma_id:String(methods[0]?.id||''),valor:'',data:localDateISO(),obs:''})
+    const first=current?.corretores?.[0]
+    setRecord({pessoa_id:String(first?.pessoa_id||''),
+      forma_id:String(methods[0]?.id||''),valor:suggestedAmount(first?.a_receber_estimado),data:localDateISO(),obs:''})
     setModal('entrada')
   }
   function openAbate(){
@@ -119,7 +125,7 @@ export default function FechamentosPeriodos({role='admin'}){
     setNonce(requestKey())
     setPayee({...person,type})
     setRecord({data:localDateISO()})
-    setPayMethods([{forma_id:String(methods[0]?.id||''),valor:''}])
+    setPayMethods([{forma_id:String(methods[0]?.id||''),valor:suggestedAmount(person.pendente)}])
     setModal('pagamento')
   }
   function saveEntry(e){
@@ -174,7 +180,8 @@ export default function FechamentosPeriodos({role='admin'}){
   const closeModal=()=>!busy&&setModal(null)
   const amountPaid=current?.resumo?.recebido_clube||'0.00'
   const paidOut=current?.resumo?.pagamentos_periodo||'0.00'
-  const statuses={RECEBIMENTOS:'2. Receber do clube',REPASSES:'3. Pagar participantes',CONCLUIDO:'4. Relatório concluído'}
+  const currentStage=!current?0:current.status==='CONCLUIDO'?4:current.status==='REPASSES'?3:salesReviewed?2:1
+  const stepLabels=['','1. Vendas do grupo','2. Receber do clube','3. Pagar participantes','4. Relatório concluído']
   return <div className="com-page fpw-page">
     <header className="com-heading fpw-heading">
       <div><span className="com-eyebrow">SPLASH / FECHAMENTOS</span>
@@ -185,7 +192,7 @@ export default function FechamentosPeriodos({role='admin'}){
         {admin&&<button className="vd-outline" type="button" onClick={()=>setLegacy(v=>!v)}>
           {legacy?'Voltar ao fechamento':'Regras e ajustes anteriores'}</button>}
         {admin&&<button className="vd-outline" type="button" onClick={()=>setModal('vinculos')}>Responsabilidades</button>}
-        {current&&<button className="vd-outline" type="button" onClick={()=>{setCurrent(null);setLegacy(false)}}>Voltar ao histórico</button>}
+        {current&&<button className="vd-outline" type="button" onClick={()=>{setCurrent(null);setLegacy(false);setSalesReviewed(false)}}>Voltar ao histórico</button>}
       </div>
     </header>
     {legacy&&admin?<FechamentosLegado role={role}/>:<>
@@ -234,15 +241,14 @@ export default function FechamentosPeriodos({role='admin'}){
         <div className="fpw-period-head">
           <div><h2>Fechamento #{current.id} — {current.responsavel_nome}</h2>
             <small>{dateBR(current.inicio)} a {dateBR(current.fim)} · {current.quantidade_vendas} venda(s)</small></div>
-          <span className={current.status==='CONCLUIDO'?'fpw-state done':'fpw-state'}>{statuses[current.status]}</span>
+          <span className={current.status==='CONCLUIDO'?'fpw-state done':'fpw-state'}>{stepLabels[currentStage]}</span>
         </div>
-        <div className="fpw-steps">
-          <span className="complete">1. Vendas do grupo</span>
-          <span className={current.status!=='CONCLUIDO'?'complete':''}>2. Recebimentos</span>
-          <span className={current.status==='REPASSES'?'complete':''}>3. Repasses</span>
-          <span className={current.status==='CONCLUIDO'?'complete':''}>4. Relatório</span>
+        <div className="fpw-steps" aria-label="Progresso do fechamento">
+          {[1,2,3,4].map(step=><span key={step}
+            className={currentStage===step?'active':currentStage>step?'complete':''}
+            aria-current={currentStage===step?'step':undefined}>{stepLabels[step]}</span>)}
         </div>
-        <section className="fpw-stats">
+        {currentStage===4&&<section className="fpw-stats">
           <div><span>Comissões nas vendas</span><strong>{money(current.resumo.comissoes)}</strong></div>
           <div><span>Recebido do clube neste fechamento</span><strong>{money(amountPaid)}</strong></div>
           <div><span>A receber do clube (estimativa)</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
@@ -250,14 +256,14 @@ export default function FechamentosPeriodos({role='admin'}){
           <div><span>Pago aos participantes neste fechamento</span><strong>{money(paidOut)}</strong></div>
           <div><span>Falta repassar aos participantes</span><strong>{money(current.resumo.rateios_pendentes)}</strong></div>
           <div><span>Saldo físico registrado após repasses</span><strong>{money(current.resumo.saldo_caixa_registrado)}</strong></div>
-        </section>
-        <section className="com-panel">
-          <div className="com-panel-head"><div><h2>Vendas e comissões por corretor</h2>
+        </section>}
+        {currentStage===1&&<section className="com-panel">
+          <div className="com-panel-head"><div><h2>1. Vendas e comissões por corretor</h2>
             <p>Somente as vendas pertencentes a este grupo. As contas pessoais continuam separadas.</p></div></div>
           <div className="fpw-people">
             {current.corretores.map(p=><details key={p.pessoa_id} className="fpw-person">
-              <summary><span><strong>{p.nome}</strong><small>{p.vendas.length} venda(s) · Bruta {money(p.comissao)}</small></span>
-                <strong>{money(p.resultado_estimado)} líquido estimado</strong></summary>
+              <summary><span><strong>{p.nome}</strong><small>{p.vendas.length} venda(s) · Antes dos rateios e despesas</small></span>
+                <strong>{money(p.comissao)} comissão bruta</strong></summary>
               <div className="fpw-person-summary">
                 <span>Parte própria recebida anteriormente: <b>{money(p.titular_ja_recebido)}</b></span>
                 <span>Recebido do clube neste fechamento: <b>{money(p.recebido_clube)}</b></span>
@@ -273,8 +279,13 @@ export default function FechamentosPeriodos({role='admin'}){
               </div>)}</div>
             </details>)}
           </div>
-        </section>
-        {current.status==='RECEBIMENTOS'&&<>
+        </section>}
+        {currentStage===1&&<div className="fpw-next">
+          <p className="fpw-help">Confira as vendas e a comissão bruta de cada corretor, sem descontar participantes, gerentes ou despesas. Nenhum pagamento será registrado nesta etapa.</p>
+          <button className="cm-button primary" type="button" onClick={()=>setSalesReviewed(true)}>
+            Continuar para recebimentos →</button>
+        </div>}
+        {currentStage===2&&<>
           <section className="com-panel fpw-stage">
             <div className="com-panel-head"><div><h2>2. Dinheiro recebido do clube</h2>
               <p>Registre o que realmente entrou na sua mão/conta, em nome do corretor correspondente. Não significa nova venda.</p></div>
@@ -299,12 +310,14 @@ export default function FechamentosPeriodos({role='admin'}){
                 onClick={()=>action('/api/fechamentos-periodos/'+current.id+'/abates/'+a.id+'/desfazer',{})}>Desfazer rascunho</button>
             </div>)}</div>}
           </section>
-          <div className="fpw-next"><p className="fpw-help">Após avançar, os recebimentos e abatimentos desta etapa ficam registrados. Confira os valores antes de seguir.</p>
+          <div className="fpw-next">
+            <button type="button" className="vd-outline" onClick={()=>setSalesReviewed(false)}>← Voltar às vendas</button>
+            <p className="fpw-help">Após avançar, os recebimentos e abatimentos desta etapa ficam registrados. Confira os valores antes de seguir.</p>
             <button className="cm-button primary" type="button" disabled={busy}
               onClick={()=>action('/api/fechamentos-periodos/'+current.id+'/avancar',{})}>
               Conferir e ir para os pagamentos →</button></div>
         </>}
-        {current.status==='REPASSES'&&<>
+        {currentStage===3&&<>
           <div className="fpw-next">
             <p className="fpw-help">Precisa corrigir entradas ou abatimentos? Volte antes de registrar pagamentos.</p>
             <button type="button" className="vd-outline" disabled={busy}
@@ -341,7 +354,7 @@ export default function FechamentosPeriodos({role='admin'}){
             <button type="button" className="cm-button primary" disabled={busy}
               onClick={()=>{setModal('confirmar')}}>Concluir fechamento e guardar relatório →</button></div>
         </>}
-        {((current.historico_repasses||[]).length>0 || (current.historico_titulares||[]).length>0)&&
+        {(currentStage===3||currentStage===4)&&((current.historico_repasses||[]).length>0 || (current.historico_titulares||[]).length>0)&&
           <section className="com-panel fpw-stage fpw-payment-history">
           <div className="com-panel-head"><div><h2>Pagamentos registrados neste fechamento</h2>
             <p>Histórico por pessoa e forma de pagamento. Correções exigem estorno justificado antes da conclusão.</p></div></div>
@@ -364,7 +377,7 @@ export default function FechamentosPeriodos({role='admin'}){
               }}>Estornar</button>}
           </div>)}</div>
         </section>}
-        <section className="com-panel fpw-report" id="splash-fechamento-relatorio">
+        {currentStage===4&&<section className="com-panel fpw-report" id="splash-fechamento-relatorio">
           <div className="com-panel-head"><div><h2>4. Resultado do período</h2>
             <p>Valores recebidos e pagos realmente registrados; resultado gerencial por corretor, sem somar lucros de pessoas distintas.</p></div>
             <button type="button" className="vd-outline fpw-print" onClick={printReport}>
@@ -384,8 +397,7 @@ export default function FechamentosPeriodos({role='admin'}){
             <b>Resultado estimado: {money(p.resultado_estimado)}</b>
           </div>)}</div>
           <p className="fpw-help">{current.observacao} A comissão ainda a receber é uma estimativa calculada com lançamentos registrados; se o mesmo dinheiro já foi lançado como comissão do titular e como recebimento do clube, é necessária conciliação antes de tratar o saldo como definitivo.</p>
-          {current.status!=='CONCLUIDO'&&<p className="fpw-help">Prévia. O relatório só ficará congelado e definitivo para consulta após confirmar a conclusão.</p>}
-        </section>
+        </section>}
       </>}
     </>}
     {modal&&<SurfaceModal eyebrow="SPLASH / FECHAMENTOS"
@@ -395,7 +407,7 @@ export default function FechamentosPeriodos({role='admin'}){
       onClose={closeModal} busy={busy}>
       {modal==='entrada'&&<form className="fpw-modal-form" onSubmit={saveEntry}>
         <label>De qual corretor é esta comissão? *
-          <FormControl type="select" value={record.pessoa_id} onChange={v=>setRecord(s=>({...s,pessoa_id:v}))}
+          <FormControl type="select" value={record.pessoa_id} onChange={v=>setRecord(s=>({...s,pessoa_id:v,valor:suggestedAmount(current?.corretores?.find(p=>String(p.pessoa_id)===v)?.a_receber_estimado)}))}
             options={(current?.corretores||[]).map(p=>({value:String(p.pessoa_id),label:p.nome}))}/></label>
         <div className="fpw-two">
           <label>Forma de recebimento *
@@ -416,7 +428,11 @@ export default function FechamentosPeriodos({role='admin'}){
       {modal==='abate'&&<form className="fpw-modal-form" onSubmit={saveAbate}>
         <p className="fpw-help">O abatimento reduz a dívida da pessoa e NÃO entra como dinheiro recebido do clube.</p>
         <label>Empréstimo *
-          <FormControl type="select" value={record.emprestimo_id} onChange={v=>setRecord(s=>({...s,emprestimo_id:v}))}
+          <FormControl type="select" value={record.emprestimo_id} onChange={v=>{
+               const selected=(current?.emprestimos||[]).find(l=>String(l.id)===v)
+               const due=current?.corretores?.find(p=>String(p.pessoa_id)===String(selected?.pessoa_id))
+               setRecord(s=>({...s,emprestimo_id:v,valor:suggestedAmount(Math.min(Number(selected?.saldo||0),Number(due?.titular_pendente||0)))}))
+             }}
             options={(current?.emprestimos||[]).filter(l=>Number(l.saldo)>0)
               .map(l=>({value:String(l.id),label:l.pessoa_nome+' · Empréstimo #'+l.id+' · Falta '+money(l.saldo)}))}
             placeholder="Selecione a dívida"/></label>
@@ -443,7 +459,11 @@ export default function FechamentosPeriodos({role='admin'}){
             onClick={()=>setPayMethods(old=>old.filter((_,j)=>j!==i))}>Retirar</button>}
         </div>)}
         <button type="button" className="vd-outline" disabled={payMethods.length>=8}
-          onClick={()=>setPayMethods(old=>[...old,{forma_id:String(methods[0]?.id||''),valor:''}])}>+ Outra forma</button>
+          onClick={()=>setPayMethods(old=>{
+             const allocated=old.reduce((n,x)=>n+(Number(cleanMoney(x.valor))||0),0)
+             const remainder=Math.max(0,Number(payee?.pendente||0)-allocated)
+             return [...old,{forma_id:String(methods[0]?.id||''),valor:suggestedAmount(remainder)}]
+           })}>+ Outra forma</button>
         <p className="fpw-help">Total informado: {money(payMethods.reduce((n,x)=>n+(Number(cleanMoney(x.valor))||0),0))}.</p>
         <div className="fpw-actions"><button type="button" className="vd-outline" onClick={closeModal}>Cancelar</button>
           <button type="submit" className="cm-button primary" disabled={busy}>Confirmar pagamento realizado</button></div>
