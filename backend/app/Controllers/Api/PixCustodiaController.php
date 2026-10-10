@@ -112,7 +112,7 @@ final class PixCustodiaController extends CommercialBaseController
             }
             foreach($rows as $row){
                 $rid=(int)$row['id'];
-                $available=max(0,VendaMoney::cents((string)$row['valor'],true)-($reversed[$rid]??0)); // replaced below
+                $available=max(0,VendaMoney::cents((string)$row['valor'],true)-($reversed[$rid]??0));
                 if($available<=0)continue;
                 $linked=isset($linkedIds[$rid]);
                 $candidates[]=[
