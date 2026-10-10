@@ -692,6 +692,14 @@ class FechamentosController extends CommercialBaseController
             }
             $values[$key]=$raw;
         }
+        foreach(['atendente_um_ano_valor','adicional_atendente_avista'] as $key){
+            $raw=(string)($payload[$key]??'');
+            $amount=VendaMoney::cents($raw,true);
+            if($amount===null || $amount>10000000){
+                return $this->errorResponse(422,'Valor inválido em '.$key.'. Informe entre R$ 0,00 e R$ 100.000,00.');
+            }
+            $values[$key]=VendaMoney::decimal($amount);
+        }
         $db=db_connect();$db->transBegin();
         try{
             $db->table('comissao_politicas')->where('id',1)->update([
