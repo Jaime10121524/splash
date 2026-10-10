@@ -19,7 +19,7 @@ const blank=()=>({
   desconto_corretor:'0,00',numero_titulo:'',
   data_negociacao:localDateISO(),data_venda:localDateISO(),data_inicio:localDateISO(),
   retorno_previsto:'',observacoes:'',historica:false,
-  corretor_pessoa_id:'',segundo_corretor_pessoa_id:'',justificativa:'',
+  corretor_pessoa_id:'',segundo_corretor_pessoa_id:'',gerente_pessoa_id:'',justificativa:'',
 })
 const blankMovement=()=>({valor:'',forma_id:'',detentor:'CORRETOR',
   data_movimento:localDateISO(),observacoes:'',entrada_id:''})
@@ -104,7 +104,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const clientVisits=[...visits,
     ...(linkedVisit && !visits.some(v=>Number(v.id)===Number(linkedVisit.id))?[linkedVisit]:[])
   ].filter(v=>client && Number(v.cliente_id)===Number(client.id)
-    && ['VENDA','PENDENCIA'].includes(v.status))
+    && !v.operacao_id
+    && (saleForm.situacao==='VENDA'?v.status==='VENDA':v.status==='PENDENCIA'))
   const currentMethod=options.formas.find(m=>String(m.id)===String(moveForm.forma_id))
   const entryRecords=(detail?.movimentos||[]).filter(r=>
     r.tipo==='ENTRADA' && Number(r.saldo_estornavel)>0)
@@ -128,6 +129,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       historica:!!op.historica,numero_titulo:op.numero_titulo||'',
       corretor_pessoa_id:String(op.corretor_pessoa_id),
       segundo_corretor_pessoa_id:op.segundo_corretor_pessoa_id?String(op.segundo_corretor_pessoa_id):'',
+      gerente_pessoa_id:op.gerente_pessoa_id?String(op.gerente_pessoa_id):'',
       desconto_corretor:Number(op.desconto_corretor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),
       data_negociacao:op.data_negociacao||localDateISO(),
       data_venda:op.data_venda||localDateISO(),
@@ -179,6 +181,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         visita_id:saleForm.visita_id?Number(saleForm.visita_id):null,
         corretor_pessoa_id:saleForm.corretor_pessoa_id?Number(saleForm.corretor_pessoa_id):null,
         segundo_corretor_pessoa_id:saleForm.segundo_corretor_pessoa_id?Number(saleForm.segundo_corretor_pessoa_id):null,
+        gerente_pessoa_id:saleForm.gerente_pessoa_id?Number(saleForm.gerente_pessoa_id):null,
         desconto_corretor:parsed,
         retorno_previsto:saleForm.retorno_previsto||null,
       }
@@ -373,9 +376,9 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         {dialog.type==='new'?<ClientFinder label="Cliente" value={client} onChange={selected=>{
           setClient(selected);setField('cliente_id',selected?.id||'');setField('visita_id','')
         }}/>:<div className="vd-readonly">Cliente: {client?.nome||'Cliente vinculado'} (não alterável)</div>}
-        {dialog.type==='new'&&<label>Atendimento (se houver)
+        {dialog.type==='new'&&<label>Atendimento disponível (opcional)
           <FormControl type="select" value={saleForm.visita_id} onChange={value=>{
-            const picked=visits.find(v=>String(v.id)===value)
+            const picked=clientVisits.find(v=>String(v.id)===value)
             setSaleForm(f=>({...f,visita_id:value,
               corretor_pessoa_id:picked?.corretor_pessoa_id?String(picked.corretor_pessoa_id):f.corretor_pessoa_id,
               segundo_corretor_pessoa_id:picked?.segundo_corretor_pessoa_id?String(picked.segundo_corretor_pessoa_id):f.segundo_corretor_pessoa_id,
@@ -405,6 +408,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
               onChange={v=>setField('segundo_corretor_pessoa_id',v)}
               options={[{value:'',label:'Nenhum'},...brokerChoices.filter(x=>x.value!==saleForm.corretor_pessoa_id)]}/></label>
         </div>
+        <label>Gerente responsável (opcional)
+          <FormControl type="select" value={saleForm.gerente_pessoa_id}
+            onChange={v=>setField('gerente_pessoa_id',v)}
+            options={[{value:'',label:'Sem gerente'},...personOptions(people,['gerente'])]}/></label>
         <div className="cm-form-grid">
           <label>Valor de tabela
             <div className="vd-readonly">{currency(selectedPlanTotal)}</div></label>
