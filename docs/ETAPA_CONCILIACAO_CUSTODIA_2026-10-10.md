@@ -18,6 +18,7 @@ A tela aparece após a conclusão do fechamento em **Fechamentos → Fechamento 
 - **Pix/dinheiro retido anteriormente:** recebimento real de cliente ou outra quantia já sob custódia do responsável, ainda não incluída nas entradas do clube. A origem deve ser comprovada.
 - **Dinheiro devolvido ao clube:** saída efetiva da posse do responsável, limitada ao saldo apurado disponível. Não é pagamento de comissão.
 - Cada registro exige data, valor positivo, referência do comprovante, descrição com pelo menos dez caracteres e chave única anti-duplicação.
+- A mesma referência de Pix retido não pode ser usada novamente em outro lançamento ativo do mesmo responsável, inclusive entre fechamentos distintos.
 - Erros são corrigidos por **estorno justificado**, nunca exclusão física; o histórico preserva autor e data.
 - A autorização do backend restringe o fechamento ao seu responsável ou ao administrador. Membros delegados não visualizam a custódia de terceiros.
 - Uma divergência negativa aponta entradas/documentos ausentes. Não cria automaticamente recebimentos fictícios para cobri-la.
