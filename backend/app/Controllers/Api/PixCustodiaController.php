@@ -93,11 +93,28 @@ final class PixCustodiaController extends CommercialBaseController
                 ->orderBy('r.data_movimento','DESC')->orderBy('r.id','DESC')->limit(501)
                 ->get()->getResultArray();
             $truncated=count($rows)>500;
-            foreach(array_slice($rows,0,500) as $row){
-                $available=$this->saldoRecebimento($db,(int)$row['id'],(string)$row['valor']);
+            $rows=array_slice($rows,0,500);
+            $receiptIds=array_map(static fn($row)=>(int)$row['id'],$rows);
+            $reversed=[];$linkedIds=[];
+            if($receiptIds){
+                foreach($db->table('venda_recebimentos')
+                    ->select('referencia_entrada_id,valor')
+                    ->whereIn('referencia_entrada_id',$receiptIds)
+                    ->whereIn('tipo',['ESTORNO','DEVOLUCAO'])->get()->getResultArray() as $refund){
+                    $key=(int)$refund['referencia_entrada_id'];
+                    $reversed[$key]=($reversed[$key]??0)+VendaMoney::cents((string)$refund['valor'],true);
+                }
+                foreach($db->table('fechamento_custodia_pix_vinculos')
+                    ->select('recebimento_id')->whereIn('recebimento_id',$receiptIds)
+                    ->where('situacao','ATIVO')->get()->getResultArray() as $bound){
+                    $linkedIds[(int)$bound['recebimento_id']]=true;
+                }
+            }
+            foreach($rows as $row){
+                $rid=(int)$row['id'];
+                $available=max(0,VendaMoney::cents((string)$row['valor'],true)-($reversed[$rid]??0)); // replaced below
                 if($available<=0)continue;
-                $linked=$db->table('fechamento_custodia_pix_vinculos')
-                    ->where('recebimento_id',(int)$row['id'])->where('situacao','ATIVO')->countAllResults()>0;
+                $linked=isset($linkedIds[$rid]);
                 $candidates[]=[
                     'id'=>(int)$row['id'],
                     'operacao_id'=>(int)$row['operacao_id'],
