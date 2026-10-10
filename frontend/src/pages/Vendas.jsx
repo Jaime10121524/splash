@@ -37,6 +37,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [notice,setNotice]=useState('')
   const [dialog,setDialog]=useState(null)
   const [client,setClient]=useState(null)
+  const [linkedVisit,setLinkedVisit]=useState(null)
   const [saleForm,setSaleForm]=useState(blank)
   const [moveForm,setMoveForm]=useState(blankMovement)
   const [detail,setDetail]=useState(null)
@@ -69,6 +70,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   useEffect(()=>{
     if(!initialVisit?.id||role!=='admin')return
     const visit=initialVisit
+    setLinkedVisit(visit)
     const form={...blank(),situacao:visit.status==='PENDENCIA'?'PENDENCIA':'VENDA',
       visita_id:String(visit.id),cliente_id:String(visit.cliente_id),
       corretor_pessoa_id:visit.corretor_pessoa_id?String(visit.corretor_pessoa_id):'',
@@ -90,7 +92,9 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     value:String(r.id),label:r.nome+(r.ativo?'':' (inativa)'),
   }))
   const brokerChoices=personOptions(people,['corretor'])
-  const clientVisits=visits.filter(v=>client && Number(v.cliente_id)===Number(client.id)
+  const clientVisits=[...visits,
+    ...(linkedVisit && !visits.some(v=>Number(v.id)===Number(linkedVisit.id))?[linkedVisit]:[])
+  ].filter(v=>client && Number(v.cliente_id)===Number(client.id)
     && ['VENDA','PENDENCIA'].includes(v.status))
   const currentMethod=options.formas.find(m=>String(m.id)===String(moveForm.forma_id))
   const entryRecords=(detail?.movimentos||[]).filter(r=>r.tipo==='ENTRADA')
@@ -101,7 +105,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
 
   function openNew(kind=tab==='pendencias'?'PENDENCIA':'VENDA') {
     setSaleForm({...blank(),situacao:kind})
-    setClient(null);setDetail(null);setFormError('');setDialog({type:'new'})
+    setClient(null);setLinkedVisit(null);setDetail(null);setFormError('');setDialog({type:'new'})
   }
   async function openDetail(op,type='details'){
     setBusy(true);setFormError('')
@@ -316,17 +320,17 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         <label className="cm-status-switch"><span><strong>Cadastro histórico</strong>
           <small>Permite escolher versões antigas de planos e regras.</small></span>
           <input type="checkbox" checked={saleForm.historica} onChange={e=>setField('historica',e.target.checked)}/></label>
-        <label>Plano e versão <em>*</em>
+        <label><span className="field-caption">Plano e versão <em>*</em></span>
           <FormControl type="select" value={saleForm.plano_versao_id}
             onChange={v=>setField('plano_versao_id',v)} options={planChoices}
             placeholder="Selecione o plano vendido"/></label>
-        <label>Regra de comissão <em>*</em>
+        <label><span className="field-caption">Regra de comissão <em>*</em></span>
           <FormControl type="select" value={saleForm.regra_comissao_id}
             onChange={v=>setField('regra_comissao_id',v)} options={ruleChoices}
             placeholder="Selecione a regra aplicada naquela venda"/></label>
         {rule&&<div className="com-inform">Modelo selecionado: {rule.nome}. A estimativa da comissão será mantida no histórico, sem gerar repasse agora.</div>}
         <div className="cm-form-grid">
-          <label>Corretor principal <em>*</em>
+          <label><span className="field-caption">Corretor principal <em>*</em></span>
             <FormControl type="select" value={saleForm.corretor_pessoa_id}
               disabled={!!saleForm.visita_id && !!visits.find(v=>String(v.id)===saleForm.visita_id)?.corretor_pessoa_id}
               onChange={v=>setField('corretor_pessoa_id',v)} options={brokerChoices}
@@ -348,7 +352,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         <label>Data da negociação <FormControl type="date" value={saleForm.data_negociacao}
           onChange={v=>setField('data_negociacao',v)}/></label>
         {saleForm.situacao==='VENDA'?<>
-          <label>Número individual do título <em>*</em>
+          <label><span className="field-caption">Número individual do título <em>*</em></span>
             <input type="text" inputMode="numeric" maxLength={4} placeholder="Ex.: 1567"
               value={saleForm.numero_titulo} onChange={e=>setField('numero_titulo',e.target.value.replace(/\D/g,'').slice(0,4))}/>
             <small>{plan?'Título: '+(saleForm.numero_titulo||'____')+' '+plan.codigo:'Selecione o plano para identificar a sigla.'}</small></label>
@@ -369,7 +373,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
 
       {dialog.type==='convert'&&<form className="cm-form" onSubmit={saveConverter}>
         <div className="com-inform">Os recebimentos e devoluções da pendência continuarão no mesmo extrato. Não haverá duplicação do valor.</div>
-        <label>Número do título <em>*</em><input type="text" inputMode="numeric" maxLength={4}
+        <label><span className="field-caption">Número do título <em>*</em></span><input type="text" inputMode="numeric" maxLength={4}
           value={saleForm.numero_titulo} onChange={e=>setField('numero_titulo',e.target.value.replace(/\D/g,'').slice(0,4))}
           placeholder="Ex.: 1567"/></label>
         <div className="cm-form-grid">
@@ -407,10 +411,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
 
       {dialog.type==='adjust'&&<form className="cm-form" onSubmit={saveAdjustment}>
         <div className="com-inform">O clube pode arredondar a comissão. O ajuste será registrado com justificativa e não realiza repasse financeiro.</div>
-        <label>Valor final da comissão (R$) <em>*</em>
+        <label><span className="field-caption">Valor final da comissão (R$) <em>*</em></span>
           <input type="text" inputMode="decimal" value={adjustment.valor}
             onChange={e=>setAdjustment(f=>({...f,valor:e.target.value}))} placeholder="Ex.: 306,65"/></label>
-        <label>Justificativa <em>*</em>
+        <label><span className="field-caption">Justificativa <em>*</em></span>
           <textarea rows={3} maxLength={500} value={adjustment.justificativa}
             onChange={e=>setAdjustment(f=>({...f,justificativa:e.target.value}))}
             placeholder="Ex.: Arredondamento confirmado pelo clube"/></label>
@@ -429,7 +433,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
             options={entryRecords.map(r=>({value:String(r.id),
               label:'#'+r.id+' · '+r.forma_nome+' · '+currency(r.valor)}))}
             placeholder="Escolha a entrada para devolver"/></label>:
-          <label>Forma de pagamento <em>*</em>
+          <label><span className="field-caption">Forma de pagamento <em>*</em></span>
             <FormControl type="select" value={moveForm.forma_id}
               onChange={v=>setMoveForm(f=>({...f,forma_id:v}))}
               options={options.formas.filter(x=>x.ativo).map(x=>({value:String(x.id),label:x.nome}))}
@@ -441,7 +445,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
                 onChange={v=>setMoveForm(f=>({...f,detentor:v}))}
                 options={[{value:'CORRETOR',label:'Com você'},{value:'EMPRESA',label:'Com a empresa'}]}/>}
         </label>}
-        <div className="cm-form-grid"><label>Valor (R$) <em>*</em>
+        <div className="cm-form-grid"><label><span className="field-caption">Valor (R$) <em>*</em></span>
           <input type="text" inputMode="decimal" value={moveForm.valor}
             onChange={e=>setMoveForm(f=>({...f,valor:e.target.value}))} placeholder="Ex.: 200,00"/></label>
           <label>Data do movimento <FormControl type="date" value={moveForm.data_movimento}
@@ -469,7 +473,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       </div>}
 
       {dialog.type==='setting'&&settingForm&&<form className="cm-form" onSubmit={saveSetting}>
-        <label>Descrição <em>*</em><input required maxLength={100} value={settingForm.nome}
+        <label><span className="field-caption">Descrição <em>*</em></span><input required maxLength={100} value={settingForm.nome}
           onChange={e=>setSettingForm(f=>({...f,nome:e.target.value}))}/></label>
         {setting==='regras'?<>
           <label>Modalidade <FormControl type="select" value={settingForm.modalidade}
@@ -484,7 +488,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
             onChange={e=>setSettingForm(f=>({...f,desconto_cartao:e.target.value}))} placeholder="Ex.: 8.000"/></label>
           <div className="com-inform">40% = numerador 40, denominador 100. Um terço = 1 e 3. O desconto é percentual da parcela da comissão sujeita à regra.</div>
         </>:<>
-          <label>Código <em>*</em><input maxLength={25} value={settingForm.codigo}
+          <label><span className="field-caption">Código <em>*</em></span><input maxLength={25} value={settingForm.codigo}
             onChange={e=>setSettingForm(f=>({...f,codigo:e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,'')}))}/></label>
           <label className="cm-status-switch"><span><strong>Cartão de crédito</strong><small>Valores retidos pela empresa</small></span>
             <input type="checkbox" checked={settingForm.credito} onChange={e=>setSettingForm(f=>({...f,credito:e.target.checked}))}/></label>
