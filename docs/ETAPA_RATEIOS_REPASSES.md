@@ -56,7 +56,7 @@ npm.cmd run dev
 
 ## Validações manuais
 
-1. Com título de R$ 1.176,00 integralmente quitado e comissão calculada, abra Fechamentos no período da venda.
+1. Com um título integralmente quitado e comissão de R$ 360,00 (já calculada ou ajustada com justificativa), abra Fechamentos no período da venda.
 2. Informe exemplo: corretor principal recebe base de R$ 360,00; rateio de R$ 150,00 para corretor secundário e R$ 60,00 para atendente, ambos pagos pelo corretor principal. Sobra R$ 150,00 para o principal.
 3. Teste um novo rateio de R$ 20,00 **pago pelo segundo corretor** a outro participante. O segundo fica com R$ 130,00. São saldos de pessoas distintas.
 4. Tente distribuir acima da comissão, incluir ciclo ou pagar a si mesmo: deve impedir.
