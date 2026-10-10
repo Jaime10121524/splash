@@ -242,6 +242,7 @@ export default function FechamentosPeriodos({role='admin'}){
         <section className="fpw-stats">
           <div><span>Comissões nas vendas</span><strong>{money(current.resumo.comissoes)}</strong></div>
           <div><span>Recebido do clube neste fechamento</span><strong>{money(amountPaid)}</strong></div>
+          <div><span>A receber do clube (estimativa)</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
           <div><span>Abatido em dívidas</span><strong>{money(current.resumo.abatido_dividas)}</strong></div>
           <div><span>Pago aos participantes neste fechamento</span><strong>{money(paidOut)}</strong></div>
           <div><span>Falta repassar aos participantes</span><strong>{money(current.resumo.rateios_pendentes)}</strong></div>
@@ -257,6 +258,7 @@ export default function FechamentosPeriodos({role='admin'}){
               <div className="fpw-person-summary">
                 <span>Parte própria recebida anteriormente: <b>{money(p.titular_ja_recebido)}</b></span>
                 <span>Recebido do clube neste fechamento: <b>{money(p.recebido_clube)}</b></span>
+                <span>Comissão ainda a receber (estimativa): <b>{money(p.a_receber_estimado)}</b></span>
                 <span>Rateios devidos: <b>{money(p.repasse_total)}</b></span>
                 <span>Rateios já pagos: <b>{money(p.repasse_ja_pago)}</b></span>
                 <span>Despesas próprias: <b>{money(p.despesas)}</b></span>
@@ -340,6 +342,7 @@ export default function FechamentosPeriodos({role='admin'}){
               Imprimir / salvar em PDF</button></div>
           <div className="fpw-report-sums">
             <div><span>Entradas reais do clube</span><strong>{money(current.resumo.recebido_clube)}</strong></div>
+            <div><span>Valor ainda a receber do clube (estimativa)</span><strong>{money(current.resumo.a_receber_estimado)}</strong></div>
             <div><span>Pagamentos realizados no fechamento</span><strong>{money(current.resumo.pagamentos_periodo)}</strong></div>
             <div><span>Dívidas compensadas (sem dinheiro)</span><strong>{money(current.resumo.abatido_dividas)}</strong></div>
             <div><span>Saldo das entradas após pagamentos</span><strong>{money(current.resumo.saldo_caixa_registrado)}</strong></div>
@@ -351,7 +354,7 @@ export default function FechamentosPeriodos({role='admin'}){
             <span>Comissões {money(p.comissao)} | Repasses {money(p.repasse_total)} | Despesas {money(p.despesas)}</span>
             <b>Resultado estimado: {money(p.resultado_estimado)}</b>
           </div>)}</div>
-          <p className="fpw-help">{current.observacao}</p>
+          <p className="fpw-help">{current.observacao} A comissão ainda a receber é uma estimativa calculada com lançamentos registrados; se o mesmo dinheiro já foi lançado como comissão do titular e como recebimento do clube, é necessária conciliação antes de tratar o saldo como definitivo.</p>
           {current.status!=='CONCLUIDO'&&<p className="fpw-help">Prévia. O relatório só ficará congelado e definitivo para consulta após confirmar a conclusão.</p>}
         </section>
       </>}
