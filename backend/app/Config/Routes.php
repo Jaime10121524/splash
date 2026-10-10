@@ -51,6 +51,7 @@ $routes->group('api', static function ($routes): void {
     $routes->post('vendas/(:num)/converter', 'Api\VendasController::converter/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/receber', 'Api\VendasController::receber/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/devolver', 'Api\VendasController::devolver/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/(:num)/ajustar-comissao', 'Api\VendasController::ajustarComissao/$1', ['filter'=>'csrf']);
     $routes->post('vendas/regras', 'Api\VendasCatalogosController::regra', ['filter'=>'csrf']);
     $routes->post('vendas/regras/(:num)/editar', 'Api\VendasCatalogosController::regra/$1', ['filter'=>'csrf']);
     $routes->post('vendas/formas', 'Api\VendasCatalogosController::forma', ['filter'=>'csrf']);
