@@ -507,7 +507,74 @@ class FechamentosController extends CommercialBaseController
         return $this->response->setJSON([
             'politica'=>$db->table('comissao_politicas')->where('id',1)->get()->getRowArray(),
             'feriados'=>$db->table('comissao_feriados')->orderBy('data','DESC')->limit(100)->get()->getResultArray(),
+            'excecoes'=>$db->table('comissao_excecoes_plano')->orderBy('id','DESC')->get()->getResultArray(),
+            'planos'=>$db->table('plano_versoes')->select('id,codigo,valor,duracao_meses,versao')
+                ->orderBy('id','DESC')->get()->getResultArray(),
         ])->setHeader('Cache-Control','no-store');
+    }
+
+    public function salvarExcecao(): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $body=$this->jsonPayload();
+        $version=$this->optionalId($body['plano_versao_id']??null);
+        $method=(string)($body['modalidade']??'');
+        $day=(string)($body['tipo_dia']??'');
+        $role=(string)($body['papel']??'');
+        $kind=(string)($body['tipo_calculo']??'');
+        $value=(string)($body['valor']??'');
+        $obs=$this->cleanText($body['observacoes']??null,350);
+        if(!$version||!in_array($method,['AVISTA','CARTAO','MISTO','TODOS'],true)
+            ||!in_array($day,['UTIL','OUTROS','TODOS'],true)
+            ||!in_array($role,['ATENDENTE','GERENTE'],true)
+            ||!in_array($kind,['FIXO','PERCENTUAL'],true)||$obs===false){
+            return $this->errorResponse(422,'Dados da regra de plano inválidos.');
+        }
+        $valueInCents=$this->money($value);
+        if($valueInCents===null || ($kind==='PERCENTUAL' && $valueInCents>10000)){
+            return $this->errorResponse(422,'Valor deve ser positivo; percentual não pode ultrapassar 100%.');
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $plan=$db->table('plano_versoes')->where('id',$version)->get()->getRowArray();
+            if(!$plan){
+                $db->transRollback();return $this->errorResponse(404,'Versão do plano não encontrada.');
+            }
+            $filter=['plano_versao_id'=>$version,'modalidade'=>$method,'tipo_dia'=>$day,'papel'=>$role];
+            $existing=$db->table('comissao_excecoes_plano')->where($filter)->get()->getRowArray();
+            $entry=[
+                'tipo_calculo'=>$kind,'valor'=>VendaMoney::decimal($valueInCents),
+                'observacoes'=>$obs,
+            ];
+            if($existing){
+                $db->table('comissao_excecoes_plano')->where('id',$existing['id'])->update($entry);
+            }else{
+                $db->table('comissao_excecoes_plano')->insert([
+                    ...$filter,...$entry,'criado_em'=>$this->now(),
+                ]);
+            }
+            $this->commitOrFail($db);
+            return $this->responseOK('Exceção registrada. Válida somente para próximas apurações.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'configurar exceção de comissão');
+        }
+    }
+
+    public function excluirExcecao(int|string $id): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $db=db_connect();$db->transBegin();
+        try{
+            $found=$db->table('comissao_excecoes_plano')->where('id',(int)$id)->get()->getRowArray();
+            if(!$found){
+                $db->transRollback();return $this->errorResponse(404,'Exceção não encontrada.');
+            }
+            $db->table('comissao_excecoes_plano')->where('id',(int)$id)->delete();
+            $this->commitOrFail($db);
+            return $this->responseOK('Regra excluída para futuras apurações. Rateios existentes não foram alterados.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'excluir exceção');
+        }
     }
 
     public function salvarPolitica(): ResponseInterface
