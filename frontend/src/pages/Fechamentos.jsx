@@ -27,6 +27,9 @@ export default function Fechamentos({role='admin'}){
   const [start,setStart]=useState(defaultStart)
   const [end,setEnd]=useState(defaultEnd)
   const [report,setReport]=useState(null)
+  const [accounts,setAccounts]=useState([])
+  const [showSales,setShowSales]=useState(false)
+  const [openPersons,setOpenPersons]=useState({})
   const [busy,setBusy]=useState(false)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
@@ -46,8 +49,20 @@ export default function Fechamentos({role='admin'}){
   async function reload(){
     if(!start||!end||start>end)throw new Error('Selecione início e fim válidos.')
     const endpoint=admin?'resumo':'meu'
-    const data=await comercialGet('/api/fechamentos/'+endpoint+'?'+new URLSearchParams({inicio:start,fim:end}))
-    setReport(data)
+    const query='?'+new URLSearchParams({inicio:start,fim:end})
+    if(admin){
+      const [data,accountData]=await Promise.all([
+        comercialGet('/api/fechamentos/'+endpoint+query),
+        comercialGet('/api/fechamentos/contas'+query),
+      ])
+      setReport(data);setAccounts(accountData.contas||[])
+    } else {
+      const [data,accountData]=await Promise.all([
+        comercialGet('/api/fechamentos/'+endpoint+query),
+        comercialGet('/api/fechamentos/contas'+query),
+      ])
+      setReport(data);setAccounts(accountData.contas||[])
+    }
   }
   useEffect(()=>{
     let active=true
@@ -63,6 +78,44 @@ export default function Fechamentos({role='admin'}){
   const personName=id=>people.find(p=>Number(p.id)===Number(id))?.nome||'Pessoa #'+id
   const totalSales=(report?.operacoes||[]).reduce((a,o)=>a+(o.comissao_base!==null?Number(o.comissao_base):0),0)
   const pendingSales=(report?.operacoes||[]).filter(o=>o.comissao_base===null).length
+  const totals=accounts.reduce((r,a)=>({
+    due:r.due+Number(a.resumo.total),
+    paid:r.paid+Number(a.resumo.pago),
+    pending:r.pending+Number(a.resumo.pendente),
+  }),{due:0,paid:0,pending:0})
+  const openOwnPayment=line=>{
+    setAmount(Number(line.pendente).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}))
+    setReason('');setDate(localDateISO());setFormError('')
+    setDialog({type:'ownerPayment',line})
+  }
+  const recordOwnPayment=async(event)=>{
+    event.preventDefault()
+    const value=numeric(amount)
+    if(!value||Number(value)<=0)return setFormError('Informe um valor válido.')
+    if(reason.trim().length<5)return setFormError('Explique o pagamento em pelo menos cinco caracteres.')
+    setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/fechamentos/titular/'+dialog.line.operacao_id+'/pagar',{
+        valor:value,data_pagamento:date,observacoes:reason.trim(),
+      })
+      setNotice(result.message);setDialog(null)
+      await reload()
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+  const reverseOwnPayment=async(event)=>{
+    event.preventDefault()
+    if(reason.trim().length<5)return setFormError('Informe o motivo do estorno.')
+    setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/fechamentos/titular/movimentos/'+dialog.move.id+'/estornar',{
+        justificativa:reason.trim(),
+      })
+      setNotice(result.message);setDialog(null)
+      await reload()
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
   function openRateios(op){
     setItems(op.rateios.length?op.rateios.map(a=>({
       responsavel_pessoa_id:String(a.responsavel_pessoa_id),
