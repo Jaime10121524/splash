@@ -208,7 +208,7 @@ export default function Atendimentos() {
           <div className="com-inform">A chegada será registrada com a hora do servidor. O cronômetro começa ao clicar em Iniciar atendimento.</div>
         </>}
         {modal.type==='start'&&<>
-          <label>Atendente principal <em>*</em>
+          <label><span className="field-caption">Atendente principal <em>*</em></span>
             <FormControl type="select" value={attendant} onChange={setAttendant} options={attOptions}
               disabled={!!modal.visit.atendente_pessoa_id}
               placeholder="Escolha o atendente" ariaLabel="Atendente principal"/></label>
@@ -220,12 +220,12 @@ export default function Atendimentos() {
           </div>}
         </>}
         {modal.type==='finish'&&<>
-          <label>Resultado <em>*</em>
+          <label><span className="field-caption">Resultado <em>*</em></span>
             <FormControl type="select" ariaLabel="Resultado do atendimento" value={outcome}
               onChange={setOutcome} options={stateOptions}/></label>
-          {outcome==='RETORNO'&&<label>Data prevista de retorno <em>*</em>
+          {outcome==='RETORNO'&&<label><span className="field-caption">Data prevista de retorno <em>*</em></span>
             <FormControl type="date" ariaLabel="Retorno previsto" value={returnDate} onChange={setReturnDate}/></label>}
-          {outcome==='SEM_VENDA'&&<label>Motivo de não venda <em>*</em>
+          {outcome==='SEM_VENDA'&&<label><span className="field-caption">Motivo de não venda <em>*</em></span>
             <FormControl type="select" ariaLabel="Motivo de não venda" value={reason} onChange={setReason}
               options={availableReasons} placeholder="Escolha o motivo"/></label>}
           <label>Observações<textarea rows={3} maxLength={3000} value={notes}
