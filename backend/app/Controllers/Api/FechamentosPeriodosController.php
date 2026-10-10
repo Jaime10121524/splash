@@ -411,6 +411,10 @@ class FechamentosPeriodosController extends CommercialBaseController
             $person['comissao_sem_conciliacao']=VendaMoney::decimal(max(0,$person['comissao_cent']-$person['titular_pago_cent']));
             foreach(array_keys($person) as $key)if(str_ends_with($key,'_cent'))unset($person[$key]);
         }unset($person);
+        $participacoesDoGrupo=0;
+        foreach($participacoesInternas as $receita){
+            $participacoesDoGrupo+=VendaMoney::cents((string)$receita['total'],true);
+        }
         return [
             'id'=>$id,'responsavel_pessoa_id'=>(int)$period['responsavel_pessoa_id'],
             'responsavel_nome'=>$period['responsavel_nome']??'',
