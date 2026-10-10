@@ -15,6 +15,7 @@ Exemplo com **Marta corretora, James atendente e nenhum gerente**:
 - Se Marta atender seu próprio cliente, não se cria pagamento de atendimento para ela mesma.
 - Se houver segundo corretor, a parcela é calculada sobre o **saldo da comissão após as participações**; o padrão configurável é 50% desse saldo.
 - O gerente só participa quando estiver **expressamente vinculado à venda** e quando se aplicar a regra configurada (inicialmente 5%, não em dia útil nem renovação identificada de outro corretor).
+- Quando a venda é lançada **sem visita vinculada**, o formulário permite selecionar um ou dois atendentes. Se houver visita, o sistema aproveita quem realmente atendeu nela.
 - Feriados municipais, estaduais e nacionais não são inferidos por suposição: é preciso cadastrar datas aplicáveis em **Fechamentos → Regras e feriados** antes de apurar. É possível ajustar os percentuais ali, sem afetar rateios existentes.
 - Se faltarem dados, a comissão for insuficiente ou um participante não tiver papel adequado, a operação fica **Para revisar**, sem atribuir rateio fictício.
 - Distribuições já salvas ou com pagamentos não são sobrescritas pelo gerador automático.
