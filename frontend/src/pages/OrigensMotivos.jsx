@@ -67,7 +67,7 @@ export default function OrigensMotivos() {
     {modal&&<SurfaceModal title={(modal==='new'?'Novo ':'Editar ')+opt.singular.toLowerCase()}
       onClose={()=>setModal(null)} busy={busy}>
       <form className="cm-form" onSubmit={save}>
-        <label>Descrição <em>*</em><input autoFocus required maxLength={90}
+        <label><span className="field-caption">Descrição <em>*</em></span><input autoFocus required maxLength={90}
           value={form.value} onChange={e=>setForm(f=>({...f,value:e.target.value}))}
           placeholder={kind==='origens'?'Ex.: Indicação':'Ex.: Preço'}/></label>
         <label className="cm-status-switch"><span><strong>Cadastro ativo</strong><small>Disponível em novos registros</small></span>
