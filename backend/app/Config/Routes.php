@@ -65,6 +65,8 @@ $routes->group('api', static function ($routes): void {
     $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
     $routes->get('fechamentos/meu', 'Api\FechamentosController::meu');
     $routes->get('fechamentos/contas', 'Api\FechamentosController::contas');
+    $routes->get('fechamentos/formas', 'Api\FechamentosController::formasPagamento');
+    $routes->post('fechamentos/pagamentos-lote', 'Api\FechamentosController::pagarEmLote', ['filter'=>'csrf']);
     $routes->post('fechamentos/titular/(:num)/pagar', 'Api\FechamentosController::pagarTitular/$1', ['filter'=>'csrf']);
     $routes->post('fechamentos/titular/movimentos/(:num)/estornar', 'Api\FechamentosController::estornarTitular/$1', ['filter'=>'csrf']);
     $routes->post('fechamentos/sincronizar', 'Api\FechamentosController::sincronizar', ['filter'=>'csrf']);
