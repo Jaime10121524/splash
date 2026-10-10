@@ -6,6 +6,7 @@ namespace App\Controllers\Api;
 use App\Libraries\VendaMoney;
 use App\Libraries\FechamentoEscopo;
 use App\Libraries\FechamentoConferencia;
+use App\Libraries\AuditoriaRateios;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -482,6 +483,144 @@ class FechamentosPeriodosController extends CommercialBaseController
         if($p instanceof ResponseInterface)return $p;
         $data=$this->resumo($db,$p);
         return $this->response->setJSON(['fechamento'=>$data])->setHeader('Cache-Control','no-store');
+    }
+
+    /**
+     * Auditoria sob demanda, apenas leitura. Compara a comissão BRUTA
+     * congelada na seleção de vendas com os créditos por beneficiário usados
+     * pelo Financeiro. Não mistura recebimento do clube com pagamento pessoal.
+     */
+    public function auditoriaRateios(int|string $id): ResponseInterface
+    {
+        $actor=$this->acesso();
+        if($actor instanceof ResponseInterface)return $actor;
+        $db=db_connect();
+        $period=$this->getPeriod($db,(int)$id,$actor);
+        if($period instanceof ResponseInterface)return $period;
+        $sales=$db->table('fechamento_periodo_vendas f')
+            ->select('v.id,v.corretor_pessoa_id,v.numero_titulo,v.sigla_plano,v.data_venda,v.situacao,v.comissao_prevista,v.comissao_ajustada,v.valor_cobrado,p.nome AS titular_nome')
+            ->join('venda_operacoes v','v.id=f.operacao_id')
+            ->join('pessoas p','p.id=v.corretor_pessoa_id')
+            ->where('f.fechamento_id',(int)$id)->orderBy('v.data_venda')->orderBy('v.id')
+            ->get()->getResultArray();
+        if(!$sales){
+            return $this->response->setJSON([
+                'resumo'=>['vendas'=>0,'conferidas'=>0,'revisar'=>0,'fora_financeiro'=>0],
+                'vendas'=>[],
+                'aviso'=>'O fechamento não tem vendas para conferir.',
+            ])->setHeader('Cache-Control','no-store');
+        }
+        $ids=array_map(static fn($v)=>(int)$v['id'],$sales);
+        $rateios=$db->table('comissao_rateios r')
+            ->select('r.id,r.operacao_id,r.responsavel_pessoa_id,r.beneficiario_pessoa_id,r.papel,r.valor,p.nome AS beneficiario_nome')
+            ->join('pessoas p','p.id=r.beneficiario_pessoa_id')
+            ->whereIn('r.operacao_id',$ids)->orderBy('r.id')->get()->getResultArray();
+        $bySale=[];
+        $rids=[];
+        foreach($rateios as $r){
+            $bySale[(int)$r['operacao_id']][]=$r;
+            $rids[]=(int)$r['id'];
+        }
+        $rateioPago=[];
+        if($rids){
+            foreach($db->table('comissao_repasses')->select('rateio_id,tipo,valor')
+                ->whereIn('rateio_id',$rids)->get()->getResultArray() as $m){
+                $rid=(int)$m['rateio_id'];
+                $rateioPago[$rid]=($rateioPago[$rid]??0)+($m['tipo']==='PAGAMENTO'?1:-1)
+                    *VendaMoney::cents((string)$m['valor'],true);
+            }
+        }
+        $titularPago=[];
+        foreach($db->table('comissao_titular_movimentos')->select('operacao_id,tipo,valor')
+            ->whereIn('operacao_id',$ids)->get()->getResultArray() as $m){
+            $oid=(int)$m['operacao_id'];
+            $titularPago[$oid]=($titularPago[$oid]??0)+($m['tipo']==='PAGAMENTO'?1:-1)
+                *VendaMoney::cents((string)$m['valor'],true);
+        }
+        $recebido=[];
+        foreach($db->table('venda_recebimentos')->select('operacao_id,tipo,valor')
+            ->whereIn('operacao_id',$ids)->get()->getResultArray() as $m){
+            $oid=(int)$m['operacao_id'];
+            $recebido[$oid]=($recebido[$oid]??0)+($m['tipo']==='ENTRADA'?1:-1)
+                *VendaMoney::cents((string)$m['valor'],true);
+        }
+        $aprovacao=[];
+        foreach($db->table('comissao_auto_apuracoes')->select('operacao_id,status')
+            ->whereIn('operacao_id',$ids)->get()->getResultArray() as $m){
+            $aprovacao[(int)$m['operacao_id']]=$m['status'];
+        }
+        $result=[];$ok=0;$revisar=0;$fora=0;
+        foreach($sales as $sale){
+            $sid=(int)$sale['id'];
+            $base=$sale['comissao_ajustada']??$sale['comissao_prevista'];
+            $bruta=$base===null?null:VendaMoney::cents((string)$base,true);
+            $alocacoes=[];
+            foreach($bySale[$sid]??[] as $r){
+                $alocacoes[]=[
+                    'id'=>(int)$r['id'],
+                    'responsavel_pessoa_id'=>(int)$r['responsavel_pessoa_id'],
+                    'beneficiario_pessoa_id'=>(int)$r['beneficiario_pessoa_id'],
+                    'beneficiario_nome'=>$r['beneficiario_nome'],
+                    'papel'=>$r['papel'],
+                    'valor_cent'=>VendaMoney::cents((string)$r['valor'],true),
+                    'pago_cent'=>$rateioPago[(int)$r['id']]??0,
+                ];
+            }
+            $reasons=[];
+            $statusFin='APTA';
+            if($sale['situacao']!=='VENDA'){
+                $statusFin='OPERACAO_ALTERADA';
+                $reasons[]='A operação não está mais com situação VENDA.';
+            } elseif($bruta===null){
+                $statusFin='SEM_COMISSAO';
+                $reasons[]='A comissão ainda não está definida.';
+            } elseif(($recebido[$sid]??0)!==VendaMoney::cents((string)$sale['valor_cobrado'],true)){
+                $statusFin='VENDA_NAO_QUITADA';
+                $reasons[]='O Financeiro só apresenta a comissão quando o valor integral da venda está quitado.';
+            } elseif((($aprovacao[$sid]??null)===null || ($aprovacao[$sid]??null)==='REVISAR') && !$alocacoes){
+                $statusFin='AGUARDANDO_APURACAO';
+                $reasons[]='A distribuição ainda não foi apurada.';
+            }
+            $line=null;
+            if($bruta!==null){
+                $line=AuditoriaRateios::analisar($bruta,(int)$sale['corretor_pessoa_id'],$alocacoes,$titularPago[$sid]??0);
+                $reasons=array_merge($reasons,$line['problemas']);
+            }
+            $inconsistente=($line!==null && $line['problemas']!==[]);
+            if($inconsistente)$revisar++;
+            elseif($statusFin==='APTA')$ok++;
+            else $fora++;
+            $result[]=[
+                'operacao_id'=>$sid,
+                'titulo'=>trim((string)$sale['numero_titulo'].' '.(string)$sale['sigla_plano']),
+                'data_venda'=>$sale['data_venda'],
+                'titular_nome'=>$sale['titular_nome'],
+                'status_financeiro'=>$statusFin,
+                'revisar'=>$inconsistente,
+                'motivos'=>array_values(array_unique($reasons)),
+                'bruta'=>$bruta===null?null:VendaMoney::decimal($bruta),
+                'parte_propria'=>$line===null?null:VendaMoney::decimal($line['parte_propria_cent']),
+                'rateios'=>$line===null?null:VendaMoney::decimal($line['rateios_cent']),
+                'total_distribuido'=>$line===null?null:VendaMoney::decimal($line['creditos_financeiro_cent']),
+                'diferenca'=>$line===null?null:VendaMoney::decimal($line['diferenca_cent']),
+                'participantes'=>$line===null?[]:array_merge([[
+                    'pessoa_id'=>(int)$sale['corretor_pessoa_id'],
+                    'nome'=>$sale['titular_nome'],'funcao'=>'Comissão própria',
+                    'valor'=>VendaMoney::decimal($line['parte_propria_cent']),
+                    'pago'=>VendaMoney::decimal($titularPago[$sid]??0),
+                ]],array_map(static fn($a)=>[
+                    'pessoa_id'=>$a['pessoa_id'],'nome'=>$a['nome'],
+                    'funcao'=>$a['funcao'],'valor'=>VendaMoney::decimal($a['valor_cent']),
+                    'pago'=>VendaMoney::decimal($a['pago_cent']),
+                ],$line['pessoas'])),
+            ];
+        }
+        return $this->response->setJSON([
+            'fechamento_id'=>(int)$id,
+            'resumo'=>['vendas'=>count($result),'conferidas'=>$ok,'revisar'=>$revisar,'fora_financeiro'=>$fora],
+            'vendas'=>$result,
+            'aviso'=>'Comparação de direitos por venda. A comissão bruta do Fechamento só coincide com a soma das participações quando os rateios são válidos. Vendas não quitadas ou ainda não apuradas podem aparecer no Fechamento sem estar no Financeiro. O extrato financeiro tem limite próprio de 500 vendas por período, portanto a indicação APTA não garante presença nessa consulta. Nada é pago ou alterado.',
+        ])->setHeader('Cache-Control','no-store');
     }
 
     private function editable($db,int $id,array $actor,string $stage): array|ResponseInterface
