@@ -360,7 +360,9 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         </div>
         <div className="vd-values"><span>Plano {currency(op.valor_cobrado)}</span>
           <strong>Recebido {currency(op.recebido)}</strong><small>Saldo {currency(op.saldo)}</small>
-          <small>{op.comissao_ajustada!==null?'Comissão bruta ajustada: '+currency(op.comissao_ajustada):'Comissão bruta apurada: '+(op.comissao_prevista===null?'Após quitação':currency(op.comissao_prevista))}</small></div>
+          <small>{op.comissao_ajustada!==null?'Comissão bruta ajustada: '+currency(op.comissao_ajustada):'Comissão bruta apurada: '+(op.comissao_prevista===null?'Após quitação':currency(op.comissao_prevista))}</small>
+          {op.comissao_pendente!==null&&<small><b>Comissão paga aos beneficiários: {currency(op.comissao_paga)}</b> · {Number(op.comissao_pendente)>0?'Falta pagar: '+currency(op.comissao_pendente):'Comissões quitadas'}</small>}
+        </div>
         <div className="com-actions"><button type="button" onClick={()=>openDetail(op)}>Extrato</button>
           {op.situacao==='PENDENCIA'&&<button type="button" className="primary" onClick={()=>openConvert(op)}>Fechar venda</button>}
         </div>
