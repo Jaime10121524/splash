@@ -65,14 +65,6 @@ export default function Clientes({navigate}) {
     }catch(e){setFormError(e.message)}
     finally{setSaving(false)}
   }
-  async function register(client){
-    setSaving(true)
-    try{
-      const result=await comercialPost('/api/atendimentos/chegada',{cliente_id:client.id})
-      setNotice(result.message+' Confira em Atendimentos.')
-    }catch(e){setError(e.message)}
-    finally{setSaving(false)}
-  }
   const pages=Math.max(1,Math.ceil(total/25))
   return <div className="com-page">
     <header className="com-heading"><div><span className="com-eyebrow">OPERAÇÃO / CLIENTES</span>
@@ -109,7 +101,7 @@ export default function Clientes({navigate}) {
               <button type="button" onClick={()=>openClient(c)}>Editar</button>
               <button type="button" onClick={()=>openHistory(c)}>Corrente</button>
               <button type="button" className="primary" disabled={saving || !c.ativo}
-                onClick={()=>register(c)}>Registrar chegada</button>
+                onClick={()=>navigate('atendimentos',c)}>Registrar chegada</button>
             </div>
           </article>)}
         </div>}
