@@ -93,6 +93,10 @@
 .fpw-payment-person .fpw-lines>div{min-width:0;flex-wrap:wrap}
 .fpw-payment-person .fpw-lines>div>div{min-width:0}
 .fpw-print-payments{display:none}
+.fpw-audit-toggle{display:flex;justify-content:flex-end;gap:10px}
+.fpw-audit-toggle button{min-height:40px}
+@media(max-width:650px){.fpw-audit-toggle button{width:100%}}
+
 
 
 .fpw-report>.fpw-help{padding:0 18px}
