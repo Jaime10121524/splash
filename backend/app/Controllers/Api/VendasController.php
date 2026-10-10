@@ -37,6 +37,22 @@ class VendasController extends CommercialBaseController
             ->setHeader('Cache-Control','no-store');
     }
 
+    public function resumo(): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $db=db_connect();
+        $row=$db->table('venda_operacoes')->select("
+            COUNT(*) AS total,
+            SUM(CASE WHEN situacao='VENDA' THEN 1 ELSE 0 END) AS vendas,
+            SUM(CASE WHEN situacao='PENDENCIA' THEN 1 ELSE 0 END) AS pendencias
+        ",false)->get()->getRowArray();
+        return $this->response->setJSON([
+            'total'=>(int)($row['total']??0),
+            'vendas'=>(int)($row['vendas']??0),
+            'pendencias'=>(int)($row['pendencias']??0),
+        ])->setHeader('Cache-Control','no-store');
+    }
+
     public function index(): ResponseInterface
     {
         if($denied=$this->guard())return $denied;
