@@ -122,3 +122,46 @@
 .vd-rateios-toggle{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .vd-rateios-toggle small{font-size:11px;line-height:1.5;color:var(--muted-dark)}
 @media(max-width:650px){.vd-rateios-toggle{display:grid}.vd-rateios-toggle button{width:100%}}
+
+
+/* Comissões no extrato: cards com hierarquia visual e quebra mobile first. */
+.vd-commission-panel{display:grid;gap:15px;min-width:0;border:1px solid var(--border);border-radius:15px;padding:16px;background:var(--surface)}
+.vd-commission-heading{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
+.vd-commission-heading>div{display:grid;gap:4px;min-width:0}
+.vd-commission-heading h3,.vd-commission-subhead h4{margin:0;color:var(--text);font-weight:800;font-size:14px}
+.vd-commission-heading p{margin:0;color:var(--muted-dark);font-size:11px;line-height:1.5}
+.vd-commission-state{border-radius:999px;padding:7px 10px;font-size:10px;font-weight:800;white-space:nowrap;background:var(--surface-alt);color:var(--muted-dark);border:1px solid var(--border)}
+.vd-commission-state.is-paid{background:#e4f8f0;color:#13855e;border-color:#c6eddd}
+.vd-commission-state.is-partial{background:#fff5e4;color:#88622d;border-color:#f3e3c4}
+.vd-commission-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.vd-commission-metric{display:flex;flex-direction:column;gap:7px;min-width:0;min-height:86px;padding:12px;border:1px solid var(--border);background:var(--surface-alt);border-radius:12px}
+.vd-commission-metric>span,.vd-commission-person-values span{font-size:10px;color:var(--muted-dark);line-height:1.4;font-weight:600}
+.vd-commission-metric>strong{font-size:clamp(15px,2vw,19px);font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.vd-commission-metric>small{color:var(--muted);font-size:9px;line-height:1.4}
+.vd-commission-metric.vd-commission-due>strong{color:var(--brand)}
+.vd-commission-beneficiaries{display:grid;gap:10px;border-top:1px solid var(--border);padding-top:15px;min-width:0}
+.vd-commission-subhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.vd-commission-subhead h4{font-size:12px}
+.vd-commission-subhead small{font-size:10px;color:var(--muted-dark)}
+.vd-commission-people{display:grid;gap:9px;min-width:0}
+.vd-commission-person{display:grid;grid-template-columns:minmax(115px,1fr) minmax(0,2fr);align-items:center;gap:14px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt);min-width:0}
+.vd-commission-person-head{display:flex;flex-direction:column;gap:5px;min-width:0}
+.vd-commission-person-head strong{font-size:12px;color:var(--text);font-weight:800;overflow-wrap:anywhere}
+.vd-commission-person-head small{font-size:10px;color:var(--muted-dark)}
+.vd-commission-person-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0}
+.vd-commission-person-values>div{display:flex;flex-direction:column;gap:6px;min-width:0}
+.vd-commission-person-values strong{font-size:12px;line-height:1.4;color:var(--text);font-weight:800;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.vd-commission-person-values strong.vd-commission-person-pending{color:var(--brand)}
+@media(max-width:700px){
+  .vd-commission-panel{padding:13px;gap:13px}
+  .vd-commission-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .vd-commission-metric.vd-commission-due{grid-column:1/-1;min-height:auto}
+  .vd-commission-person{grid-template-columns:1fr;gap:12px}
+  .vd-commission-person-head{padding-bottom:9px;border-bottom:1px solid var(--border)}
+}
+@media(max-width:370px){
+  .vd-commission-metrics{grid-template-columns:1fr}
+  .vd-commission-metric.vd-commission-due{grid-column:auto}
+  .vd-commission-person-values{grid-template-columns:1fr 1fr}
+  .vd-commission-person-values>div:last-child{grid-column:1/-1}
+}
