@@ -86,7 +86,11 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const plan=options.planos.find(p=>String(p.id)===String(saleForm.plano_versao_id))
   const rule=options.regras.find(p=>String(p.id)===String(saleForm.regra_comissao_id))
   const planChoices=options.planos.filter(p=>saleForm.historica||p.ativo).map(p=>({
-    value:String(p.id),label:p.codigo+' · '+currency(p.valor)+' · '+(Number(p.duracao_meses)/12)+' anos'+(!p.ativo?' (histórico)':''),
+    value:String(p.id),label:p.codigo+' · '+currency(p.valor)+' · '+(
+      Number(p.duracao_meses)%12===0
+        ? Number(p.duracao_meses)/12+' ano(s)'
+        : Number(p.duracao_meses)+' mês(es)'
+    )+(!p.ativo?' (histórico)':''),
   }))
   const ruleChoices=options.regras.filter(r=>saleForm.historica||r.ativo).map(r=>({
     value:String(r.id),label:r.nome+(r.ativo?'':' (inativa)'),
