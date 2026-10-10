@@ -45,6 +45,7 @@ export default function Fechamentos({role='admin'}){
   const [detail,setDetail]=useState(null)
   const [suggestion,setSuggestion]=useState(5)
   const [policy,setPolicy]=useState(null)
+  const [policyTab,setPolicyTab]=useState('gerais')
   const [holiday,setHoliday]=useState({data:localDateISO(),descricao:''})
   const [holidays,setHolidays]=useState([])
   const [paymentMethods,setPaymentMethods]=useState([])
@@ -230,6 +231,7 @@ export default function Fechamentos({role='admin'}){
       const result=await comercialGet('/api/fechamentos/politica')
       setPolicy(result.politica);setHolidays(result.feriados||[])
       setPlanOverrides(result.excecoes||[]);setPlanCatalog(result.planos||[])
+      setPolicyTab('gerais')
       setDialog({type:'policy'})
     }catch(e){setError(e.message)}
     finally{setBusy(false)}
@@ -516,7 +518,7 @@ export default function Fechamentos({role='admin'}){
               <span>{line.descricao} · {line.titulo||'#'+line.operacao_id}</span>
               <strong>Falta {money(line.pendente)}</strong>
             </div>)}
-        </div>
+        </div>}
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions">
           <button type="button" className="cm-button" disabled={busy} onClick={()=>setDialog(null)}>Cancelar</button>
@@ -572,7 +574,13 @@ export default function Fechamentos({role='admin'}){
         </div>
       </form>}
       {dialog.type==='policy'&&policy&&<div className="cm-form">
-        <form className="cm-form" onSubmit={savePolicy}>
+        <div className="fc-policy-tabs" role="tablist" aria-label="Categorias das regras de comissão">
+          {[['gerais','Regras gerais'],['planos','Exceções por plano'],['feriados','Feriados']].map(([id,label])=>
+            <button key={id} type="button" role="tab" aria-selected={policyTab===id}
+              className={policyTab===id?'active':''}
+              onClick={()=>{setPolicyTab(id);setFormError('')}}>{label}</button>)}
+        </div>
+        {policyTab==='gerais'&&<form className="cm-form" onSubmit={savePolicy}>
           <div className="com-inform">Percentuais sobre o valor de tabela do plano, exceto a divisão entre corretores, que utiliza o saldo da comissão após os participantes. Alterações não recalculam rateios já registrados.</div>
           {[
             ['percentual_atendente_dia_util','Atendente em dia útil (%)'],
@@ -584,8 +592,8 @@ export default function Fechamentos({role='admin'}){
               value={policy[key]??''} onChange={e=>setPolicy(p=>({...p,[key]:e.target.value}))}/></label>)}
           <div className="cm-form-actions"><button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
             <button type="submit" className="cm-button primary" disabled={busy}>Salvar percentuais</button></div>
-        </form>
-        <form className="cm-form" onSubmit={saveHoliday}>
+        </form>}
+        {policyTab==='feriados'&&<form className="cm-form" onSubmit={saveHoliday}>
           <strong>Feriados cadastrados</strong>
           <div className="com-inform">Segunda a sexta tem 10% no modelo inicial, exceto feriados. Cadastre os feriados aplicáveis antes de apurar, para não pagar o percentual errado.</div>
           <label>Data <FormControl type="date" value={holiday.data} onChange={v=>setHoliday(x=>({...x,data:v}))}/></label>
@@ -593,8 +601,8 @@ export default function Fechamentos({role='admin'}){
           <button type="submit" className="cm-button primary" disabled={busy}>Cadastrar feriado</button>
           <div className="fc-holiday-list">{holidays.slice(0,20).map(h=><div key={h.data}>
             <span>{dateBR(h.data)}</span><strong>{h.descricao}</strong></div>)}</div>
-        </form>
-        <form className="cm-form fc-exceptions-form" onSubmit={saveOverride}>
+        </form>}
+        {policyTab==='planos'&&<form className="cm-form fc-exceptions-form" onSubmit={saveOverride}>
           <strong>Exceções por plano e forma de pagamento</strong>
           <div className="com-inform">Exemplo: se 5% do plano de um ano gera R$ 58,80, mas o atendente recebe R$ 60,00, cadastre uma regra de valor fixo de R$ 60,00 para esse plano em Outros dias. Para uma comissão maior em venda 100% à vista, selecione À vista. A regra vale para novas apurações, sem mexer nas já pagas.</div>
           <label>Versão do plano
@@ -645,8 +653,8 @@ export default function Fechamentos({role='admin'}){
             <button type="submit" className="cm-button primary" disabled={busy||!override.plano_versao_id}>
               Salvar exceção do plano</button>
           </div>
-        </form>
-        <div className="fc-exceptions-list">
+        </form>}
+        {policyTab==='planos'&&<div className="fc-exceptions-list">
           <strong>Exceções cadastradas</strong>
           {!planOverrides.length&&<p className="fc-hint">Ainda não há exceções. Serão usados os percentuais gerais.</p>}
           {planOverrides.map(e=><div key={e.id}>
