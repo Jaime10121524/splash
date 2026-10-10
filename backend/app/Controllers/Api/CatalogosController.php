@@ -11,7 +11,7 @@ class CatalogosController extends CommercialBaseController
 {
     public function index(): ResponseInterface
     {
-        if ($denied=$this->authorizeAdmin()) return $denied;
+        if ($denied=$this->authorizeOperations()) return $denied;
 
         $db=db_connect();
         $origens=$db->table('lead_origens')->orderBy('nome','ASC')->get()->getResultArray();
