@@ -31,6 +31,8 @@ class FinanceiroPessoal extends Migration
             'descricao'=>['type'=>'VARCHAR','constraint'=>500],
             'situacao'=>['type'=>'VARCHAR','constraint'=>12,'default'=>'ATIVA'],
             'justificativa_cancelamento'=>['type'=>'VARCHAR','constraint'=>500,'null'=>true],
+            'cancelado_por_usuario_id'=>['type'=>'INT','unsigned'=>true,'null'=>true],
+            'cancelado_em'=>['type'=>'DATETIME','null'=>true],
             'criado_por_usuario_id'=>['type'=>'INT','unsigned'=>true],
             'criado_em'=>['type'=>'DATETIME'],
         ]);
@@ -47,6 +49,9 @@ class FinanceiroPessoal extends Migration
             'valor'=>['type'=>'DECIMAL','constraint'=>'15,2'],
             'descricao'=>['type'=>'VARCHAR','constraint'=>500],
             'situacao'=>['type'=>'VARCHAR','constraint'=>12,'default'=>'ATIVO'],
+            'justificativa_cancelamento'=>['type'=>'VARCHAR','constraint'=>500,'null'=>true],
+            'cancelado_por_usuario_id'=>['type'=>'INT','unsigned'=>true,'null'=>true],
+            'cancelado_em'=>['type'=>'DATETIME','null'=>true],
             'criado_por_usuario_id'=>['type'=>'INT','unsigned'=>true],
             'criado_em'=>['type'=>'DATETIME'],
         ]);
