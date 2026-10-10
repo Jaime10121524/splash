@@ -191,13 +191,14 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
         <div className="com-visit-list">
           {visits.map(v=>{
             const elapsed=v.inicio_em && v.fim_em ? Number(v.duracao_segundos) : null
-            const canResume=['SEM_VENDA','RETORNO','PENDENCIA'].includes(v.status)
+            const visibleStatus=v.operacao_situacao==='VENDA'?'VENDA':v.status
+            const canResume=!v.operacao_id && ['SEM_VENDA','RETORNO','PENDENCIA'].includes(v.status)
               && v.chegada_em?.slice(0,10)===localDateISO()
             return <article className="com-visit" key={v.id}>
               <div className="com-visit-main">
                 <div className="com-visit-name"><strong>{v.cliente_nome}</strong>
-                  <span className={'com-pill '+(v.status==='ATENDENDO'?'violet':v.status==='AGUARDANDO'?'muted':'good')}>
-                    {statusLabels[v.status]||v.status}</span></div>
+                  <span className={'com-pill '+(visibleStatus==='ATENDENDO'?'violet':visibleStatus==='AGUARDANDO'?'muted':'good')}>
+                    {statusLabels[visibleStatus]||visibleStatus}</span></div>
                 <small>{formatPhone(v.cliente_telefone)} · Corrente: {v.dono_corrente_nome||'—'}</small>
                 <div className="com-visit-meta">
                   <span>Chegada: <b>{dateBR(v.chegada_em,true)}</b></span>
