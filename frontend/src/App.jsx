@@ -181,67 +181,143 @@ function DataCard({ label, icon, tone, detail, value = '—' }) {
   return <div className="stat-card"><div className="stat-top"><span>{label}</span><span className={'stat-icon ' + (tone || '')}><Icon name={icon} size={19}/></span></div><strong className="stat-value">{value}</strong><div className="stat-foot"><span className="mini-dot"/> {detail || 'Aguardando dados do módulo'}</div></div>
 }
 function Dashboard({ user, navigate }) {
-  const admin = user.role === 'admin'
-  const [visitSummary, setVisitSummary] = useState(null)
-  const [salesSummary, setSalesSummary] = useState(null)
-  useEffect(() => {
-    if (!admin) return undefined
-    let active = true
-    fetch('/api/atendimentos', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-      .then(response => response.ok ? response.json() : null)
-      .then(data => { if (active && data?.indicadores) setVisitSummary(data.indicadores) })
-      .catch(() => {})
-    return () => { active = false }
-  }, [admin])
-  useEffect(() => {
-    if (!admin) return undefined
-    let active = true
-    fetch('/api/vendas/resumo', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-      .then(response => response.ok ? response.json() : null)
-      .then(data => { if (active && data) setSalesSummary(data) })
-      .catch(() => {})
-    return () => { active = false }
-  }, [admin])
+  const admin=user.role==='admin'
+  const [refresh,setRefresh]=useState(0)
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState('')
+  const [stats,setStats]=useState({})
+  const [activities,setActivities]=useState([])
+  const [period,setPeriod]=useState('')
+  useEffect(()=>{
+    let active=true
+    const now=new Date()
+    const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
+    const start=iso(new Date(now.getFullYear(),now.getMonth(),1))
+    const end=iso(new Date(now.getFullYear(),now.getMonth()+1,0))
+    const query='?'+new URLSearchParams({inicio:start,fim:end})
+    setPeriod(new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(now))
+    setLoading(true);setError('')
+    const requests=[
+      ['contas',getJSON('/api/fechamentos/contas'+query)],
+      ['pessoal',getJSON('/api/financeiro/pessoal'+query)],
+    ]
+    if(admin){
+      requests.push(['vendas',getJSON('/api/vendas/resumo')])
+      requests.push(['visitas',getJSON('/api/atendimentos'+query)])
+    }else if(user.role==='operador'){
+      requests.push(['visitas',getJSON('/api/atendimentos'+query)])
+    }
+    Promise.allSettled(requests.map(([,req])=>req)).then(results=>{
+      if(!active)return
+      const values={}
+      results.forEach((res,i)=>{if(res.status==='fulfilled')values[requests[i][0]]=res.value})
+      const accounts=values.contas?.contas||[]
+      const own=admin?accounts:accounts.slice(0,1)
+      const sum=(items,fn)=>items.reduce((n,x)=>n+Number(fn(x)||0),0)
+      const commission=sum(own,a=>a.resumo.total)
+      const paid=sum(own,a=>a.resumo.recebido)
+      const offsets=sum(own,a=>a.resumo.abatido)
+      const pending=sum(own,a=>a.resumo.pendente)
+      setStats({
+        visits:values.visitas?.indicadores?.total,
+        sales:values.vendas?.vendas,
+        pendingSales:values.vendas?.pendencias,
+        commission:values.contas?commission:undefined,
+        received:values.contas?paid:undefined,
+        offset:values.contas?offsets:undefined,
+        due:values.contas?pending:undefined,
+        expenses:values.pessoal?.resumo?.despesas_periodo,
+        loans:values.pessoal?.resumo?.saldo_emprestimos,
+        acertos:values.contas?.acertos?.length,
+      })
+      const recent=accounts.flatMap(a=>(a.itens||[]).map(item=>({
+        id:a.pessoa_id+'-'+item.operacao_id+'-'+(item.rateio_id||0)+'-'+item.tipo,
+        nome:admin?a.nome:'Minha comissão',
+        descricao:item.descricao,
+        titulo:item.titulo,
+        data:item.data_venda,
+        total:item.total,
+        saldo:item.pendente,
+      }))).sort((x,y)=>(y.data||'').localeCompare(x.data||'')).slice(0,6)
+      setActivities(recent)
+      if(results.every(x=>x.status==='rejected'))setError('Não foi possível carregar os indicadores. Verifique o backend e tente novamente.')
+      else if(results.some(x=>x.status==='rejected'))setError('Alguns indicadores não foram carregados; os demais estão atualizados.')
+    }).finally(()=>{if(active)setLoading(false)})
+    return ()=>{active=false}
+  },[admin,user.role,refresh])
+  const money=v=>v===undefined?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))
+  const number=v=>v===undefined?'—':v
   return <>
-    <div className="welcome-row"><div><span className="eyebrow">VISÃO GERAL</span><h1>Olá, {user.username}! <span className="wave">✳</span></h1><p>Seu espaço de trabalho, organizado em um só lugar.</p></div><div className="today-pill"><Icon name="calendar" size={17}/>{formatToday()}</div></div>
+    <div className="welcome-row"><div><span className="eyebrow">VISÃO GERAL</span><h1>Olá, {user.username}! <span className="wave">✳</span></h1>
+      <p>Indicadores de {period||'sua operação'}, atualizados a partir dos registros reais.</p></div>
+      <div className="today-pill"><Icon name="calendar" size={17}/>{formatToday()}</div></div>
     <div className="hero-panel">
-      <div className="hero-copy"><span className="hero-pill"><Icon name="spark" size={15}/> PAINEL SPLASH</span><h2>{admin ? 'Mais controle em cada etapa da venda.' : 'Suas comissões, com mais clareza.'}</h2><p>{admin ? 'Visitas, negócios e repasses reunidos para você acompanhar tudo com tranquilidade.' : 'Acompanhe seus resultados, recebimentos e movimentações pessoais.'}</p><div className="hero-actions"><button type="button" className="button light" onClick={()=>navigate(admin?'atendimentos':'financeiro')}>{admin?'Ver atendimentos':'Meu financeiro'}<Icon name="arrow" size={18}/></button><span className="hero-state"><span/> Ambiente em implantação</span></div></div>
+      <div className="hero-copy"><span className="hero-pill"><Icon name="spark" size={15}/> PAINEL SPLASH</span>
+        <h2>{admin?'Operação e resultados em um só lugar.':'Acompanhe suas comissões e pagamentos.'}</h2>
+        <p>{admin?'Vendas, visitas, comissões e acertos por pessoa, sem misturar os responsáveis.':
+          'Veja suas comissões, quanto recebeu e o que continua pendente.'}</p>
+        <div className="hero-actions"><button type="button" className="button light"
+          onClick={()=>navigate(admin?'fechamentos':'financeiro')}>{admin?'Ver fechamentos':'Meu financeiro'}<Icon name="arrow" size={18}/></button>
+          <button type="button" className="button light" onClick={()=>setRefresh(v=>v+1)} disabled={loading}>
+            <Icon name="refresh" size={16}/>{loading?'Atualizando':'Atualizar dados'}</button></div>
+      </div>
       <div className="hero-art" aria-hidden="true"><div className="hero-ring ring-one"/><div className="hero-ring ring-two"/><div className="hero-bubble main-bubble"><Icon name="chart" size={43}/></div><div className="hero-bubble small-bubble"><Icon name="check" size={28}/></div></div>
     </div>
-    <div className="section-heading"><div><h2>Resumo {admin ? 'da operação' : 'pessoal'}</h2><p>Indicadores atualizados a partir dos seus lançamentos.</p></div><span className="hint-badge">Sem dados conectados</span></div>
+    <div className="section-heading"><div><h2>Resumo {admin?'da operação':'pessoal'}</h2>
+      <p>Período: {period||'mês atual'}. Pagamentos referem-se às vendas do período, mesmo que feitos depois.</p></div>
+      <span className="hint-badge">{loading?'Atualizando…':error?'Dados parciais':'Dados conectados'}</span></div>
+    {error&&<div className="com-alert error" role="status">{error}</div>}
     <div className="stats-grid">
-      {admin ? <>
-        <DataCard label="Visitas registradas" icon="users" tone="violet" detail="Total registrado no clube" value={visitSummary?.total ?? "—"}/>
-        <DataCard label="Vendas registradas" icon="bag" tone="mint" detail="Títulos concluídos no cadastro" value={salesSummary?.vendas ?? "—"}/>
-        <DataCard label="Pendências financeiras" icon="clock" tone="amber" detail="Negociações ainda sem título" value={salesSummary?.pendencias ?? "—"}/>
-        <DataCard label="Acertos financeiros" icon="wallet" tone="sky" detail="Aguardando fechamentos"/>
-      </> : <>
-        <DataCard label="Minhas vendas" icon="bag" tone="violet"/>
-        <DataCard label="Minhas comissões" icon="wallet" tone="mint"/>
-        <DataCard label="A receber" icon="clock" tone="amber"/>
-        <DataCard label="Recebimentos" icon="arrows" tone="sky"/>
+      {admin&&<>
+        <DataCard label="Visitas no período" icon="users" tone="violet" detail="Chegadas registradas" value={loading?'…':number(stats.visits)}/>
+        <DataCard label="Vendas cadastradas" icon="bag" tone="mint" detail="Total histórico do clube" value={loading?'…':number(stats.sales)}/>
+        <DataCard label="Pendências de negociação" icon="clock" tone="amber" detail="Total histórico em aberto" value={loading?'…':number(stats.pendingSales)}/>
       </>}
+      <DataCard label={admin?'Comissões das contas':'Minhas comissões'} icon="wallet" tone="violet"
+        detail="Direitos apurados no mês" value={loading?'…':money(stats.commission)}/>
+      <DataCard label="Recebido em pagamentos" icon="check" tone="mint"
+        detail="Baixas efetivamente registradas" value={loading?'…':money(stats.received)}/>
+      <DataCard label="Ainda falta receber" icon="clock" tone="amber"
+        detail="Saldo sem baixa no financeiro" value={loading?'…':money(stats.due)}/>
+      <DataCard label="Abatido em empréstimos" icon="arrows" tone="sky"
+        detail="Compensação de dívida, não dinheiro recebido" value={loading?'…':money(stats.offset)}/>
+      <DataCard label="Despesas no mês" icon="receipt" tone="amber"
+        detail="Despesas pessoais registradas" value={loading?'…':money(stats.expenses)}/>
+      <DataCard label="Saldo de empréstimos" icon="wallet" tone="sky"
+        detail="Valor ainda devido ao clube" value={loading?'…':money(stats.loans)}/>
     </div>
     <div className="dashboard-columns">
-      <section className="panel activity-panel"><div className="panel-head"><div><h3>{admin?'Movimentação comercial':'Minhas movimentações'}</h3><p>Histórico de atividades e resultados</p></div><span className="panel-meta">Em breve</span></div><NoData icon="chart" title="Seu histórico começa aqui" description="As movimentações serão exibidas após a ativação dos módulos de vendas e financeiro."/></section>
-      <section className="panel quick-panel"><div className="panel-head"><div><h3>Acesso rápido</h3><p>Continue de onde precisar</p></div></div>
+      <section className="panel activity-panel"><div className="panel-head"><div><h3>Comissões recentes</h3>
+        <p>Últimos direitos apurados nas vendas do período</p></div></div>
+        {activities.length===0?<NoData icon="chart" title="Sem lançamentos no período"
+          description="Cadastre e apure uma venda para visualizar seus resultados."/>:
+          <div className="splash-activity-list">{activities.map(a=><div className="splash-activity-item" key={a.id}>
+            <div><strong>{a.nome} · {a.descricao}</strong>
+              <small>{a.titulo||'Venda #'+a.id} · {a.data?new Date(a.data+'T12:00:00').toLocaleDateString('pt-BR'):''}</small></div>
+            <div><strong>{money(a.total)}</strong><small>Falta {money(a.saldo)}</small></div>
+          </div>)}</div>}
+      </section>
+      <section className="panel quick-panel"><div className="panel-head"><div><h3>Acesso rápido</h3>
+        <p>Abra diretamente a função desejada</p></div></div>
         <div className="quick-links">
-          {(admin ? [
-            { label:'Atendimentos',detail:'Acompanhar visitantes',id:'atendimentos',icon:'clipboard' },
-            { label:'Vendas',detail:'Consultar negociações',id:'vendas',icon:'bag' },
-            { label:'Fechamentos',detail:'Apurar valores',id:'fechamentos',icon:'wallet' }
-          ] : [
-            {label:'Meu financeiro',detail:'Consultar recebimentos',id:'financeiro',icon:'wallet'},
-            {label:'Minhas vendas',detail:'Histórico de resultados',id:'vendas',icon:'bag'},
-            {label:'Relatórios',detail:'Visão do meu resultado',id:'relatorios',icon:'chart'}
-          ]).map(item => <button key={item.id} className="quick-link" onClick={()=>navigate(item.id)}><span className="quick-icon"><Icon name={item.icon} size={21}/></span><span className="quick-label"><strong>{item.label}</strong><small>{item.detail}</small></span><Icon name="chevron" size={17}/></button>)}
+          {(admin?[
+            {label:'Atendimentos',detail:'Acompanhar visitantes',id:'atendimentos',icon:'clipboard'},
+            {label:'Vendas',detail:'Consultar negociações',id:'vendas',icon:'bag'},
+            {label:'Fechamentos',detail:'Acertos por pessoa e empréstimos',id:'fechamentos',icon:'wallet'},
+            {label:'Financeiro',detail:'Despesas e empréstimos',id:'financeiro',icon:'receipt'},
+          ]:[
+            {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
+            {label:'Minhas despesas',detail:'Registrar gastos',id:'despesas',icon:'receipt'},
+            {label:'Empréstimos',detail:'Consultar saldos',id:'emprestimos',icon:'arrows'},
+          ]).map(item=><button key={item.id} type="button" className="quick-link" onClick={()=>navigate(item.id)}>
+            <span className="quick-icon"><Icon name={item.icon} size={21}/></span>
+            <span className="quick-label"><strong>{item.label}</strong><small>{item.detail}</small></span>
+            <Icon name="chevron" size={17}/></button>)}
         </div>
-        <div className="quick-note"><Icon name="info" size={18}/><span>As funcionalidades de cadastro serão liberadas por etapas.</span></div>
       </section>
     </div>
   </>
 }
-
 function ModulePage({ page, user }) {
   const item = nav.find(v => v.id===page)
   const admin = user.role === 'admin'
