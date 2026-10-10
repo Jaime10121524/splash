@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\VendaMoney;
+use App\Libraries\ComissaoAutomatica;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -33,7 +34,8 @@ class VendasController extends CommercialBaseController
         $methods=$db->table('venda_formas_pagamento')->orderBy('id','ASC')->get()->getResultArray();
         foreach($methods as &$m){$m['ativo']=(bool)$m['ativo'];$m['credito']=(bool)$m['credito'];}
         unset($m);
-        return $this->response->setJSON(['planos'=>$plans,'regras'=>$rules,'formas'=>$methods])
+        $application=$db->table('venda_regras_aplicacao')->get()->getResultArray();
+        return $this->response->setJSON(['planos'=>$plans,'regras'=>$rules,'formas'=>$methods,'aplicacoes'=>$application])
             ->setHeader('Cache-Control','no-store');
     }
 
@@ -112,6 +114,24 @@ class VendasController extends CommercialBaseController
             $received+=$m['tipo']==='ENTRADA'?$value:-$value;
         }
         unset($m);
+        $remainingByEntry=[];
+        foreach($movements as $m){
+            if($m['tipo']==='ENTRADA'){
+                $remainingByEntry[(int)$m['id']]=VendaMoney::cents((string)$m['valor'],true);
+            }
+        }
+        foreach($movements as $m){
+            if($m['referencia_entrada_id'] && in_array($m['tipo'],['DEVOLUCAO','ESTORNO'],true)){
+                $key=(int)$m['referencia_entrada_id'];
+                if(isset($remainingByEntry[$key]))$remainingByEntry[$key]-=VendaMoney::cents((string)$m['valor'],true);
+            }
+        }
+        foreach($movements as &$m){
+            $m['saldo_estornavel']=$m['tipo']==='ENTRADA'
+              ?VendaMoney::decimal(max(0,$remainingByEntry[(int)$m['id']]??0))
+              :null;
+        }
+        unset($m);
         $history=$db->table('venda_operacoes_auditoria')->select('id,acao,justificativa,criado_em,usuario_id')
             ->where('operacao_id',(int)$id)->orderBy('id','DESC')->get()->getResultArray();
         $editavel=$op['comissao_ajustada']===null;
@@ -138,11 +158,10 @@ class VendasController extends CommercialBaseController
         try{
             $clientId=$this->optionalId($data['cliente_id']??null);
             $versionId=$this->optionalId($data['plano_versao_id']??null);
-            $ruleId=$this->optionalId($data['regra_comissao_id']??null);
             $visitId=$this->optionalId($data['visita_id']??null);
-            if(!$clientId||!$versionId||!$ruleId||$visitId===false){
+            if(!$clientId||!$versionId||$visitId===false){
                 $db->transRollback();
-                return $this->errorResponse(422,'Informe cliente, plano e regra de comissão válidos.');
+                return $this->errorResponse(422,'Informe cliente e plano válidos.');
             }
             $kind=(string)($data['situacao']??'');
             if(!in_array($kind,['PENDENCIA','VENDA'],true)){
@@ -157,10 +176,11 @@ class VendasController extends CommercialBaseController
             }
             $client=$db->table('clientes')->where('id',$clientId)->get()->getRowArray();
             $plan=$db->table('plano_versoes')->where('id',$versionId)->get()->getRowArray();
-            $rule=$db->table('venda_regras_comissao')->where('id',$ruleId)->get()->getRowArray();
-            if(!$client || !$plan || !$rule || (!$historic && (!(bool)$plan['ativo'] || !(bool)$rule['ativo']))){
+            $automatic=ComissaoAutomatica::configs($db);
+            $rule=$automatic[$historic?'AVISTA_HISTORICA':'AVISTA_ATUAL'];
+            if(!$client || !$plan || (!$historic && !(bool)$plan['ativo'])){
                 $db->transRollback();
-                return $this->errorResponse(422,'Cliente, plano ou regra inexistente/inativa.');
+                return $this->errorResponse(422,'Cliente ou plano inexistente/inativo.');
             }
             $visit=null;
             if($visitId){
@@ -190,11 +210,8 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'O desconto deve ser inferior ao valor do plano.');
             }
-            $estimate=VendaMoney::estimate($rule,$table,0,$discount);
-            if($estimate['valor']===null) {
-                $db->transRollback();
-                return $this->errorResponse(422,$estimate['aviso']);
-            }
+            // Não há modalidade definitiva antes de registrar todos os pagamentos.
+            $estimate=['valor'=>null,'aviso'=>'Aguardando pagamento do cliente para calcular a comissão automaticamente.'];
             $notes=$this->cleanText($data['observacoes']??null,4000);
             if($notes===false){
                 $db->transRollback();
@@ -233,11 +250,9 @@ class VendasController extends CommercialBaseController
                 'valor_tabela'=>VendaMoney::decimal($table),
                 'desconto_corretor'=>VendaMoney::decimal($discount),
                 'valor_cobrado'=>VendaMoney::decimal($table-$discount),
-                'regra_comissao_id'=>$ruleId,'regra_snapshot'=>json_encode([
-                    'nome'=>$rule['nome'],'modalidade'=>$rule['modalidade'],
-                    'numerador'=>(int)$rule['numerador'],'denominador'=>(int)$rule['denominador'],
-                    'desconto_cartao'=>$rule['desconto_cartao'],
-                ],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'regra_comissao_id'=>$rule['id'],
+                'regra_snapshot'=>json_encode($rule,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'regras_automaticas_snapshot'=>json_encode($automatic,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'comissao_prevista'=>$estimate['valor'],
                 'observacao_comissao'=>$estimate['aviso'],
                 ...$brokers,
@@ -294,16 +309,16 @@ class VendasController extends CommercialBaseController
                 return $this->errorResponse(409,'Cadastro protegido: existem pagamentos não estornados, devoluções reais ou comissão já ajustada. Apenas operações sem movimentação financeira válida podem ser corrigidas.');
             }
             $versionId=$this->optionalId($data['plano_versao_id']??null);
-            $ruleId=$this->optionalId($data['regra_comissao_id']??null);
-            if(!$versionId || !$ruleId){
+            if(!$versionId){
                 $db->transRollback();
-                return $this->errorResponse(422,'Informe plano e regra válidos.');
+                return $this->errorResponse(422,'Informe um plano válido.');
             }
             $plan=$db->table('plano_versoes')->where('id',$versionId)->get()->getRowArray();
-            $rule=$db->table('venda_regras_comissao')->where('id',$ruleId)->get()->getRowArray();
-            if(!$plan||!$rule||(!(bool)$op['historica'] && (!(bool)$plan['ativo'] || !(bool)$rule['ativo']))){
+            $automatic=$this->automaticSnapshot($db,$op);
+            $rule=$automatic[(bool)$op['historica']?'AVISTA_HISTORICA':'AVISTA_ATUAL'];
+            if(!$plan||(!(bool)$op['historica'] && !(bool)$plan['ativo'])){
                 $db->transRollback();
-                return $this->errorResponse(422,'Plano ou regra não disponível. Para operações históricas, use versões e regras correspondentes à época.');
+                return $this->errorResponse(422,'Plano não disponível. Para operações históricas, use a versão correspondente à época.');
             }
             $discount=VendaMoney::cents($data['desconto_corretor']??null,true);
             $table=VendaMoney::cents((string)$plan['valor']);
@@ -311,11 +326,7 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Desconto inválido ou superior ao valor de tabela.');
             }
-            $estimate=VendaMoney::estimate($rule,$table,0,$discount);
-            if($estimate['valor']===null){
-                $db->transRollback();
-                return $this->errorResponse(422,$estimate['aviso']);
-            }
+            $estimate=['valor'=>null,'aviso'=>'Aguardando pagamento do cliente para calcular a comissão automaticamente.'];
             $day=(string)($data['data_negociacao']??'');
             if(!$this->validateDate($day,false)){
                 $db->transRollback();
@@ -367,12 +378,9 @@ class VendasController extends CommercialBaseController
                 'valor_tabela'=>VendaMoney::decimal($table),
                 'desconto_corretor'=>VendaMoney::decimal($discount),
                 'valor_cobrado'=>VendaMoney::decimal($table-$discount),
-                'regra_comissao_id'=>$ruleId,
-                'regra_snapshot'=>json_encode([
-                    'nome'=>$rule['nome'],'modalidade'=>$rule['modalidade'],
-                    'numerador'=>(int)$rule['numerador'],'denominador'=>(int)$rule['denominador'],
-                    'desconto_cartao'=>$rule['desconto_cartao'],
-                ],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'regra_comissao_id'=>$rule['id'],
+                'regra_snapshot'=>json_encode($rule,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'regras_automaticas_snapshot'=>json_encode($automatic,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'comissao_prevista'=>$estimate['valor'],
                 'observacao_comissao'=>$estimate['aviso'],
                 ...$brokers,
@@ -462,16 +470,6 @@ class VendasController extends CommercialBaseController
             if(!$op||!$method ||!(bool)$method['ativo']){
                 $db->transRollback();
                 return $this->errorResponse(404,'Operação ou meio de pagamento não encontrado/ativo.');
-            }
-            // Evita registrar uma forma de pagamento que geraria comissão
-            // incoerente com a regra congelada na operação.
-            $ruleSnapshot=json_decode((string)$op['regra_snapshot'],true,512,JSON_THROW_ON_ERROR);
-            $mode=(string)($ruleSnapshot['modalidade']??'');
-            if(($mode==='AVISTA' && (bool)$method['credito'])
-                ||($mode==='CARTAO' && !(bool)$method['credito'])
-                ||($mode==='MISTO' && !(bool)$method['credito'] && $method['codigo']!=='PIX')){
-                $db->transRollback();
-                return $this->errorResponse(422,'Meio de pagamento incompatível com a regra escolhida. Use uma regra à vista, cartão ou mista adequada.');
             }
             if($date<$op['data_negociacao']){
                 $db->transRollback();
@@ -683,29 +681,41 @@ class VendasController extends CommercialBaseController
         return VendaMoney::cents((string)$op['valor_cobrado'])-$total;
     }
 
+    /** Snapshot de todas as regras congelado na abertura, imune a reajustes futuros. */
+    private function automaticSnapshot($db,array $op): array
+    {
+        if(!empty($op['regras_automaticas_snapshot'])){
+            $configs=json_decode((string)$op['regras_automaticas_snapshot'],true,512,JSON_THROW_ON_ERROR);
+            if(is_array($configs) && count($configs)>=4)return $configs;
+        }
+        // Compatibilidade com operações criadas antes desta migração.
+        return ComissaoAutomatica::configs($db);
+    }
+
     private function updateEstimate($db,int $id,array $op): void
     {
-        $rule=json_decode($op['regra_snapshot'],true,512,JSON_THROW_ON_ERROR);
+        $configs=$this->automaticSnapshot($db,$op);
         $rows=$db->table('venda_recebimentos r')
-            ->select('r.tipo,r.valor,f.codigo')
+            ->select('r.tipo,r.valor,f.credito')
             ->join('venda_formas_pagamento f','f.id=r.forma_id')
             ->where('r.operacao_id',$id)->get()->getResultArray();
-        $pix=0;
-        foreach($rows as $row){
-            if($row['codigo']!=='PIX')continue;
-            $v=VendaMoney::cents((string)$row['valor']);
-            $pix+=$row['tipo']==='ENTRADA'?$v:-$v;
-        }
-        $estimate=VendaMoney::estimate($rule,
+        $estimate=ComissaoAutomatica::calculate($configs,$rows,
+            VendaMoney::cents((string)$op['valor_cobrado']),
             VendaMoney::cents((string)$op['valor_tabela']),
-            max(0,$pix),
-            VendaMoney::cents((string)$op['desconto_corretor'],true)
+            VendaMoney::cents((string)$op['desconto_corretor'],true),
+            (bool)$op['historica']
         );
-        $db->table('venda_operacoes')->where('id',$id)->update([
+        $new=[
             'comissao_prevista'=>$estimate['valor'],
             'observacao_comissao'=>$estimate['aviso'],
+            'regras_automaticas_snapshot'=>json_encode($configs,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
             'atualizado_em'=>$this->nowLocal(),
-        ]);
+        ];
+        if($estimate['rule']!==null){
+            $new['regra_comissao_id']=$estimate['rule']['id'];
+            $new['regra_snapshot']=json_encode($estimate['rule'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        }
+        $db->table('venda_operacoes')->where('id',$id)->update($new);
     }
 
     private function number(mixed $raw): ?string
