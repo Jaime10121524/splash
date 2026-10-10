@@ -79,6 +79,7 @@ $routes->group('api', static function ($routes): void {
     $routes->get('fechamentos-periodos','Api\FechamentosPeriodosController::listar');
     $routes->post('fechamentos-periodos','Api\FechamentosPeriodosController::abrir',['filter'=>'csrf']);
     $routes->get('fechamentos-periodos/(:num)','Api\FechamentosPeriodosController::detalhe/$1');
+    $routes->get('fechamentos-periodos/(:num)/auditoria-rateios','Api\\FechamentosPeriodosController::auditoriaRateios/$1');
     $routes->post('fechamentos-periodos/(:num)/receber','Api\FechamentosPeriodosController::receber/$1',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/entradas/(:num)/excluir','Api\FechamentosPeriodosController::excluirEntrada/$1/$2',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/abater','Api\FechamentosPeriodosController::abater/$1',['filter'=>'csrf']);
