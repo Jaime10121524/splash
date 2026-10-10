@@ -7,6 +7,7 @@ namespace App\Controllers\Api;
 use App\Libraries\VendaMoney;
 use App\Libraries\ComissaoAutomatica;
 use App\Libraries\RateioAutomatico;
+use App\Libraries\ProtecaoVendaFechada;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -19,6 +20,13 @@ class VendasController extends CommercialBaseController
     private function guard(): ?ResponseInterface
     {
         return $this->authorizeAdmin();
+    }
+
+    private function impedeVendaFechada($db,int $id): ?ResponseInterface
+    {
+        $periodo=ProtecaoVendaFechada::fechamento($db,$id);
+        return $periodo===null?null:$this->errorResponse(409,
+            ProtecaoVendaFechada::MESSAGE.' Fechamento #'.$periodo['id'].'.');
     }
 
     public function opcoes(): ResponseInterface
@@ -70,12 +78,15 @@ class VendasController extends CommercialBaseController
             ->select("o.*,c.nome AS cliente_nome,c.telefone AS cliente_telefone,
                 cp.nome AS corretor_nome,sp.nome AS segundo_corretor_nome,
                 dc.nome AS dono_corrente_nome,
+                fp.id AS fechamento_id,fp.status AS fechamento_status,
                 (SELECT COALESCE(SUM(CASE WHEN mov.tipo='ENTRADA' THEN mov.valor ELSE -mov.valor END),0)
                  FROM venda_recebimentos mov WHERE mov.operacao_id=o.id) AS recebido",false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas cp','cp.id=o.corretor_pessoa_id','left')
             ->join('pessoas sp','sp.id=o.segundo_corretor_pessoa_id','left')
-            ->join('pessoas dc','dc.id=o.dono_corrente_pessoa_id','left');
+            ->join('pessoas dc','dc.id=o.dono_corrente_pessoa_id','left')
+            ->join('fechamento_periodo_vendas fv','fv.operacao_id=o.id','left')
+            ->join('fechamento_periodos fp','fp.id=fv.fechamento_id','left');
         if($type!=='')$query->where('o.situacao',$type);
         if($q!==''){
             $query->groupStart()->like('c.nome',$q);
@@ -135,7 +146,8 @@ class VendasController extends CommercialBaseController
         unset($m);
         $history=$db->table('venda_operacoes_auditoria')->select('id,acao,justificativa,criado_em,usuario_id')
             ->where('operacao_id',(int)$id)->orderBy('id','DESC')->get()->getResultArray();
-        $editavel=$op['comissao_ajustada']===null;
+        $periodo=ProtecaoVendaFechada::fechamento($db,(int)$id);
+        $editavel=$periodo===null && $op['comissao_ajustada']===null;
         if($this->temRateio($db,(int)$id)||$this->temPagamentoTitular($db,(int)$id))$editavel=false;
         foreach($movements as $mov){
             if($mov['tipo']==='DEVOLUCAO') $editavel=false;
@@ -143,8 +155,19 @@ class VendasController extends CommercialBaseController
         // Só pode alterar condições com todos os lançamentos estornados
         // (ou quando não houve entrada). Devolução real NÃO libera edição.
         if($received!==0) $editavel=false;
+        $comissaoStatus=$this->comissoesNoDetalhe($db,$op);
+        $recClube=null;
+        if($periodo){
+            $recClube=$db->table('fechamento_periodo_entradas')
+                ->select('COALESCE(SUM(valor),0) AS total',false)
+                ->where('fechamento_id',(int)$periodo['id'])
+                ->where('corretor_pessoa_id',(int)$op['corretor_pessoa_id'])
+                ->get()->getRow('total');
+        }
         return $this->response->setJSON([
-            'editavel'=>$editavel,'historico_correcoes'=>$history,
+            'editavel'=>$editavel,'fechamento'=>$periodo,'comissoes'=>$comissaoStatus,
+            'entrada_clube_para_titular_no_periodo'=>$recClube,
+            'historico_correcoes'=>$history,
             'operacao'=>$op,'movimentos'=>$movements,
             'recebido'=>VendaMoney::decimal($received),
             'saldo'=>VendaMoney::decimal(max(0,VendaMoney::cents((string)$op['valor_cobrado'])-$received)),
@@ -307,6 +330,9 @@ class VendasController extends CommercialBaseController
             if(!$op){
                 $db->transRollback();
                 return $this->errorResponse(404,'Operação não encontrada.');
+            }
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
             }
             $movementRows=$db->table('venda_recebimentos')
                 ->select('tipo,valor')->where('operacao_id',(int)$id)->get()->getResultArray();
@@ -507,6 +533,9 @@ class VendasController extends CommercialBaseController
         $db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
             if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
@@ -569,6 +598,9 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
             if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
@@ -624,6 +656,9 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
             if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
@@ -676,6 +711,9 @@ class VendasController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
             if($op && ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
                 $db->transRollback();
                 return $this->errorResponse(409,'Esta venda já tem participações apuradas. Revise os rateios e repasses antes de modificar valores financeiros.');
@@ -768,6 +806,65 @@ class VendasController extends CommercialBaseController
         }
         // Compatibilidade com operações criadas antes desta migração.
         return ComissaoAutomatica::configs($db);
+    }
+
+    /** Mostra os pagamentos aos BENEFICIÁRIOS, sem confundir com dinheiro do cliente/clube. */
+    private function comissoesNoDetalhe($db,array $op): array
+    {
+        $id=(int)$op['id'];
+        $base=$op['comissao_ajustada']??$op['comissao_prevista'];
+        $gross=$base===null?null:VendaMoney::cents((string)$base,true);
+        $alloc=$db->table('comissao_rateios r')
+            ->select('r.id,r.responsavel_pessoa_id,r.beneficiario_pessoa_id,r.papel,r.valor,p.nome AS nome')
+            ->join('pessoas p','p.id=r.beneficiario_pessoa_id')
+            ->where('r.operacao_id',$id)->orderBy('r.id')->get()->getResultArray();
+        $allocationIds=array_map(static fn($x)=>(int)$x['id'],$alloc);
+        $sums=[];
+        if($allocationIds){
+            foreach($db->table('comissao_repasses')
+                ->select('rateio_id,tipo,valor')->whereIn('rateio_id',$allocationIds)
+                ->get()->getResultArray() as $m){
+                $key=(int)$m['rateio_id'];
+                $sums[$key]=($sums[$key]??0)+($m['tipo']==='PAGAMENTO'?1:-1)
+                    *VendaMoney::cents((string)$m['valor'],true);
+            }
+        }
+        $totalOutgoing=0;$details=[];$payments=0;$due=0;
+        foreach($alloc as $a){
+            $value=VendaMoney::cents((string)$a['valor'],true);
+            if((int)$a['responsavel_pessoa_id']===(int)$op['corretor_pessoa_id'])$totalOutgoing+=$value;
+            $p=$sums[(int)$a['id']]??0;
+            $payments+=$p;$due+=max(0,$value-$p);
+            $details[]=[
+                'pessoa_id'=>(int)$a['beneficiario_pessoa_id'],
+                'nome'=>$a['nome'],'papel'=>$a['papel'],
+                'devido'=>VendaMoney::decimal($value),'pago'=>VendaMoney::decimal($p),
+                'pendente'=>VendaMoney::decimal(max(0,$value-$p)),
+            ];
+        }
+        $ownerPaid=0;
+        foreach($db->table('comissao_titular_movimentos')
+            ->select('tipo,valor')->where('operacao_id',$id)->get()->getResultArray() as $m){
+            $ownerPaid+=($m['tipo']==='PAGAMENTO'?1:-1)*VendaMoney::cents((string)$m['valor'],true);
+        }
+        $own=$gross===null?null:$gross-$totalOutgoing;
+        if($own!==null){
+            $payments+=$ownerPaid;
+            $due+=max(0,$own-$ownerPaid);
+            $owner=$db->table('pessoas')->select('nome')->where('id',(int)$op['corretor_pessoa_id'])->get()->getRow('nome');
+            array_unshift($details,[
+                'pessoa_id'=>(int)$op['corretor_pessoa_id'],'nome'=>$owner,'papel'=>'TITULAR',
+                'devido'=>VendaMoney::decimal($own),'pago'=>VendaMoney::decimal($ownerPaid),
+                'pendente'=>VendaMoney::decimal(max(0,$own-$ownerPaid)),
+            ]);
+        }
+        return [
+            'bruta'=>$gross===null?null:VendaMoney::decimal($gross),
+            'direitos_pagos'=>VendaMoney::decimal($payments),
+            'direitos_pendentes'=>$gross===null?null:VendaMoney::decimal($due),
+            'participantes'=>$details,
+            'status'=>$gross===null?'AGUARDANDO_APURACAO':($due===0?'QUITADA':($payments>0?'PARCIAL':'A_RECEBER')),
+        ];
     }
 
     private function updateEstimate($db,int $id,array $op): void
