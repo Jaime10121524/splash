@@ -16,7 +16,7 @@ const moneyInput = value => {
 const states={PENDENCIA:'Pendência',VENDA:'Venda registrada'}
 const blank=()=>({
   situacao:'VENDA',cliente_id:'',visita_id:'',plano_versao_id:'',
-  regra_comissao_id:'',desconto_corretor:'0,00',numero_titulo:'',
+  desconto_corretor:'0,00',numero_titulo:'',
   data_negociacao:localDateISO(),data_venda:localDateISO(),data_inicio:localDateISO(),
   retorno_previsto:'',observacoes:'',historica:false,
   corretor_pessoa_id:'',segundo_corretor_pessoa_id:'',justificativa:'',
@@ -27,7 +27,7 @@ const noop=()=>{}
 
 export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=noop,role='admin'}) {
   const [rows,setRows]=useState([])
-  const [options,setOptions]=useState({planos:[],regras:[],formas:[]})
+  const [options,setOptions]=useState({planos:[],regras:[],formas:[],aplicacoes:[]})
   const [people,setPeople]=useState([])
   const [visits,setVisits]=useState([])
   const [search,setSearch]=useState('')
@@ -44,6 +44,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [formError,setFormError]=useState('')
   const [setting,setSetting]=useState('regras')
   const [settingForm,setSettingForm]=useState(null)
+  const [applying,setApplying]=useState({codigo:'',regra_comissao_id:''})
   const [adjustment,setAdjustment]=useState({valor:'',justificativa:''})
 
   async function loadOptions() {
@@ -84,7 +85,6 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
 
   const setField=(key,value)=>setSaleForm(f=>({...f,[key]:value}))
   const plan=options.planos.find(p=>String(p.id)===String(saleForm.plano_versao_id))
-  const rule=options.regras.find(p=>String(p.id)===String(saleForm.regra_comissao_id))
   const planChoices=options.planos.filter(p=>saleForm.historica||p.ativo).map(p=>({
     value:String(p.id),label:p.codigo+' · '+currency(p.valor)+' · '+(
       Number(p.duracao_meses)%12===0
@@ -92,16 +92,14 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         : Number(p.duracao_meses)+' mês(es)'
     )+(!p.ativo?' (histórico)':''),
   }))
-  const ruleChoices=options.regras.filter(r=>saleForm.historica||r.ativo).map(r=>({
-    value:String(r.id),label:r.nome+(r.ativo?'':' (inativa)'),
-  }))
   const brokerChoices=personOptions(people,['corretor'])
   const clientVisits=[...visits,
     ...(linkedVisit && !visits.some(v=>Number(v.id)===Number(linkedVisit.id))?[linkedVisit]:[])
   ].filter(v=>client && Number(v.cliente_id)===Number(client.id)
     && ['VENDA','PENDENCIA'].includes(v.status))
   const currentMethod=options.formas.find(m=>String(m.id)===String(moveForm.forma_id))
-  const entryRecords=(detail?.movimentos||[]).filter(r=>r.tipo==='ENTRADA')
+  const entryRecords=(detail?.movimentos||[]).filter(r=>
+    r.tipo==='ENTRADA' && Number(r.saldo_estornavel)>0)
   const selectedPlanTotal=plan?Number(plan.valor):0
   const discount=moneyInput(saleForm.desconto_corretor)
   const duePreview=discount!==null?selectedPlanTotal-Number(discount):null
@@ -119,7 +117,6 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       ...blank(),situacao:op.situacao,
       cliente_id:String(op.cliente_id),visita_id:op.visita_id?String(op.visita_id):'',
       plano_versao_id:String(op.plano_versao_id),
-      regra_comissao_id:String(op.regra_comissao_id),
       historica:!!op.historica,numero_titulo:op.numero_titulo||'',
       corretor_pessoa_id:String(op.corretor_pessoa_id),
       segundo_corretor_pessoa_id:op.segundo_corretor_pessoa_id?String(op.segundo_corretor_pessoa_id):'',
@@ -156,7 +153,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     event.preventDefault()
     setFormError('')
     if(!client?.id) return setFormError('Selecione o cliente.')
-    if(!saleForm.plano_versao_id||!saleForm.regra_comissao_id)return setFormError('Escolha o plano e a regra de comissão.')
+    if(!saleForm.plano_versao_id)return setFormError('Escolha o plano vendido.')
     if(!saleForm.corretor_pessoa_id)return setFormError('Informe o corretor responsável.')
     const parsed=moneyInput(saleForm.desconto_corretor)
     if(parsed===null)return setFormError('Informe desconto válido (ex.: 100,00).')
@@ -169,7 +166,6 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       const payload={
         ...saleForm,
         cliente_id:Number(client.id),plano_versao_id:Number(saleForm.plano_versao_id),
-        regra_comissao_id:Number(saleForm.regra_comissao_id),
         visita_id:saleForm.visita_id?Number(saleForm.visita_id):null,
         corretor_pessoa_id:saleForm.corretor_pessoa_id?Number(saleForm.corretor_pessoa_id):null,
         segundo_corretor_pessoa_id:saleForm.segundo_corretor_pessoa_id?Number(saleForm.segundo_corretor_pessoa_id):null,
@@ -261,6 +257,23 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     }catch(e){setFormError(e.message)}
     finally{setBusy(false)}
   }
+  function openApplication(item){
+    setApplying({codigo:item.codigo,regra_comissao_id:String(item.regra_comissao_id)})
+    setDialog({type:'application'});setFormError('')
+  }
+  async function saveApplication(event){
+    event.preventDefault()
+    setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/vendas/aplicacoes/'+applying.codigo,{
+        regra_comissao_id:Number(applying.regra_comissao_id),
+      })
+      setNotice(result.message)
+      await refresh()
+      setDialog({type:'settings'})
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
   function openSetting(item=null) {
     const isRule=setting==='regras'
     setSettingForm(isRule?
@@ -336,7 +349,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         dialog.type==='convert'?'Fechar pendência em venda':
         dialog.type==='receipt'?'Registrar recebimento':dialog.type==='refund'?'Devolver dinheiro':
         dialog.type==='reversal'?'Estornar lançamento':dialog.type==='edit'?'Corrigir cadastro':
-        dialog.type==='details'?'Extrato da operação':dialog.type==='adjust'?'Ajustar comissão':dialog.type==='setting'?'Cadastro financeiro':'Configurações de vendas'}
+        dialog.type==='details'?'Extrato da operação':dialog.type==='adjust'?'Ajustar comissão':dialog.type==='setting'?'Cadastro financeiro':dialog.type==='application'?'Regra automática':'Configurações de vendas'}
       subtitle={['details','receipt','refund','reversal','edit'].includes(dialog.type)?dialog.op?.cliente_nome:''}
       busy={busy} onClose={()=>setDialog(null)}>
 
@@ -367,11 +380,9 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <FormControl type="select" value={saleForm.plano_versao_id}
             onChange={v=>setField('plano_versao_id',v)} options={planChoices}
             placeholder="Selecione o plano vendido"/></label>
-        <label><span className="field-caption">Regra de comissão <em>*</em></span>
-          <FormControl type="select" value={saleForm.regra_comissao_id}
-            onChange={v=>setField('regra_comissao_id',v)} options={ruleChoices}
-            placeholder="Selecione a regra aplicada naquela venda"/></label>
-        {rule&&<div className="com-inform">Modelo selecionado: {rule.nome}. A estimativa da comissão será mantida no histórico, sem gerar repasse agora.</div>}
+        <div className="com-inform">
+          <strong>Comissão calculada automaticamente.</strong> Não é necessário selecionar regra. O sistema identifica à vista, cartão ou misto quando o cliente quitar o título. {saleForm.historica?'Nesta venda histórica, pagamento à vista utiliza o modelo antigo de 1/3.':'À vista atual utiliza o percentual configurado (inicialmente 40%).'}
+        </div>
         <div className="cm-form-grid">
           <label><span className="field-caption">Corretor principal <em>*</em></span>
             <FormControl type="select" value={saleForm.corretor_pessoa_id}
@@ -534,16 +545,36 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       </form>}
 
       {dialog.type==='settings'&&<div className="cm-form">
-        <div className="com-toggle"><button type="button" className={setting==='regras'?'active':''}
+        <div className="com-toggle"><button type="button" className={setting==='aplicacoes'?'active':''}
+          onClick={()=>setSetting('aplicacoes')}>Aplicação</button>
+          <button type="button" className={setting==='regras'?'active':''}
           onClick={()=>setSetting('regras')}>Regras</button>
           <button type="button" className={setting==='formas'?'active':''} onClick={()=>setSetting('formas')}>Pagamentos</button></div>
-        <div className="com-inform">Modelos podem mudar ao longo do tempo. A venda guarda uma cópia da regra utilizada; alterar o cadastro não recalcula vendas antigas.</div>
-        <div className="vd-settings-list">{(setting==='regras'?options.regras:options.formas).map(x=><div key={x.id}>
+        <div className="com-inform">As regras são aplicadas automaticamente conforme os recebimentos do cliente. Cada operação guarda os percentuais vigentes no momento do cadastro, mesmo após futuras alterações.</div>
+        <div className="vd-settings-list">{setting==='aplicacoes'
+          ?(options.aplicacoes||[]).map(a=><div key={a.codigo}>
+            <span><strong>{{AVISTA_ATUAL:'À vista atual',AVISTA_HISTORICA:'À vista histórico',CARTAO:'Cartão de crédito',MISTO:'Pagamento misto'}[a.codigo]||a.codigo}</strong>
+              <small>{options.regras.find(r=>Number(r.id)===Number(a.regra_comissao_id))?.nome||'Regra indisponível'}</small></span>
+            <button className="cm-button" type="button" onClick={()=>openApplication(a)}>Alterar</button>
+          </div>)
+          :(setting==='regras'?options.regras:options.formas).map(x=><div key={x.id}>
           <span><strong>{x.nome}</strong><small>{x.ativo?'Ativo':'Inativo'}</small></span>
           <button className="cm-button" type="button" onClick={()=>openSetting(x)}>Editar</button></div>)}</div>
         <div className="cm-form-actions"><button className="cm-button" type="button" onClick={()=>setDialog(null)}>Fechar</button>
-          <button className="cm-button primary" type="button" onClick={()=>openSetting()}>＋ Novo cadastro</button></div>
+          {setting!=='aplicacoes'&&<button className="cm-button primary" type="button" onClick={()=>openSetting()}>＋ Novo cadastro</button>}</div>
       </div>}
+
+      {dialog.type==='application'&&<form className="cm-form" onSubmit={saveApplication}>
+        <div className="com-inform">Escolha qual modelo será aplicado automaticamente às próximas vendas. Não altera vendas já cadastradas.</div>
+        <label>Regra de comissão
+          <FormControl type="select" value={applying.regra_comissao_id}
+            onChange={v=>setApplying(f=>({...f,regra_comissao_id:v}))}
+            options={options.regras.filter(r=>r.modalidade===(applying.codigo.startsWith('AVISTA')?'AVISTA':applying.codigo))
+              .map(r=>({value:String(r.id),label:r.nome}))}/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="cm-form-actions"><button type="button" className="cm-button" onClick={()=>setDialog({type:'settings'})}>Voltar</button>
+          <button className="cm-button primary" type="submit" disabled={busy}>{busy?'Salvando...':'Salvar aplicação'}</button></div>
+      </form>}
 
       {dialog.type==='setting'&&settingForm&&<form className="cm-form" onSubmit={saveSetting}>
         <label><span className="field-caption">Descrição <em>*</em></span><input required maxLength={100} value={settingForm.nome}
