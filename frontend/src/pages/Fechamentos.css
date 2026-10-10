@@ -212,3 +212,14 @@
 .fc-batch-total{grid-template-columns:minmax(0,1fr) auto}
 .fc-batch-total>span{font-size:11px}
 @media(max-width:660px){.fc-policy-tabs{gap:4px}.fc-policy-tabs>button{padding:10px 5px;font-size:10px}.fc-loan-offsets{padding:10px}}
+
+.fc-person-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+.fc-batch-form .fc-ledger-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+.fc-settlement-amount{display:grid;gap:5px;text-align:right}
+.fc-settlement-amount strong{font-size:13px}
+.fc-settlement-amount small{color:var(--muted-dark);font-size:10px;line-height:1.5}
+@media(max-width:700px){
+  .fc-person-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fc-batch-form .fc-ledger-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fc-settlement-amount{text-align:left}
+}
