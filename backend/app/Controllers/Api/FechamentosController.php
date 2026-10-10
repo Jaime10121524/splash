@@ -881,6 +881,12 @@ class FechamentosController extends CommercialBaseController
                     'pendente_centavos'=>$pending,
                 ];
             }
+            foreach($lines as $line){
+                if(ProtecaoVendaFechada::bloqueada($db,(int)$line['operacao_id'])){
+                    $db->transRollback();
+                    return $this->errorResponse(409,'Há comissões de vendas vinculadas a fechamento neste período. Registre esses pagamentos no fechamento correspondente, não no lote legado.');
+                }
+            }
             try{
                 $distribution=DistribuicaoPagamento::calcular($lines,$forms);
             }catch(\InvalidArgumentException $e){
