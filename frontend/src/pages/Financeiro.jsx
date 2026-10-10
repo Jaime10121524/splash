@@ -43,7 +43,7 @@ function buildLedger(accounts,personal){
       record.items.push({
         key:'R'+line.id,tipo:'repasse',direcao:'saida',
         nome:line.beneficiario_nome||'Participante',
-        detalhe:({ATENDENTE:'Atendente',GERENTE:'Gerente',CORRETOR:'Corretor'}[line.papel]||'Participação'),
+        detalhe:(line.origem_corretor_nome?'Venda de '+line.origem_corretor_nome+' · ':'')+({ATENDENTE:'Atendente',GERENTE:'Gerente',CORRETOR:'Corretor'}[line.papel]||'Participação'),
         data:line.data_venda,origem:line.titulo||'Venda #'+line.operacao_id,
         total:cents(line.total),recebido:cents(line.pago),pendente:cents(line.pendente),
       })
@@ -188,6 +188,7 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
   const visibleLines=allLines.filter(x=>direction==='todos'||x.direcao===direction)
   const totals=sums(allLines)
   const general=totals.ganhos-totals.despesas
+  const allSelected=admin&&!selected
   const tabs=personalAllowed?[['extrato','Extrato geral'],['despesas','Despesas'],['emprestimos','Empréstimos']]:[['extrato','Meu extrato']]
   const options=people.length?people.map(p=>({value:String(p.id),label:p.nome})):
     ledger.map(a=>({value:a.id,label:a.nome}))
@@ -232,7 +233,7 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
       {busy&&<section className="com-panel"><div className="com-empty">Carregando extrato financeiro...</div></section>}
       {!busy&&payload&&<>
         <section className="finx-highlights" aria-label="Resumo de direitos e obrigações">
-          <div className="finx-tile finx-tile-green"><span>Ganhos e comissões</span><strong>{cash(totals.ganhos)}</strong><small>Direitos pessoais apurados</small></div>
+          <div className="finx-tile finx-tile-green"><span>{allSelected?'Créditos de todas as pessoas':'Ganhos e comissões'}</span><strong>{cash(totals.ganhos)}</strong><small>Direitos por titular, sem misturar a propriedade</small></div>
           <div className="finx-tile finx-tile-green"><span>Recebido</span><strong>{cash(totals.recebido)}</strong><small>Dinheiro pago ao beneficiário</small></div>
           <div className="finx-tile finx-tile-green"><span>A receber</span><strong>{cash(totals.aReceber)}</strong><small>Créditos ainda pendentes</small></div>
           {personalAllowed&&<div className="finx-tile finx-tile-red"><span>Despesas registradas</span><strong>{cash(totals.despesas)}</strong><small>Gastos do período</small></div>}
@@ -262,6 +263,7 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
             <div><span>Despesas registradas</span><strong className="finx-text-red">− {cash(totals.despesas)}</strong></div>
             <div><span>Resultado pessoal estimado</span><strong className={general>=0?'finx-text-green':'finx-text-red'}>{cash(general)}</strong></div>
           </div>
+          {allSelected&&<p>O total de créditos consolida direitos de pessoas diferentes. Não significa que todos esses valores pertençam ao administrador. Os repasses das vendas dos corretores vinculados aparecem sob quem centraliza os pagamentos.</p>}
           {personalAllowed&&<p>Repasses a terceiros ({cash(totals.repassesPendentes)} pendentes) e saldo de empréstimos ({cash(totals.emprestimosPendentes)}) são exibidos separadamente: não são descontados novamente dos direitos pessoais já líquidos. Abatimentos de dívida também não representam dinheiro recebido.</p>}
           {!personalAllowed&&<p>Recebido, abatido e a receber são situações diferentes da mesma comissão. Não são somados em duplicidade.</p>}
           <p className="finx-fineprint">Valores para conferência gerencial, não saldo bancário. Despesa registrada não comprova pagamento; somente transferências efetivamente registradas são consideradas recebidas ou repassadas.</p>
