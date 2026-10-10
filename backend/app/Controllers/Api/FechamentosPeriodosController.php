@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\VendaMoney;
+use App\Libraries\FechamentoEscopo;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -48,11 +49,10 @@ class FechamentosPeriodosController extends CommercialBaseController
     /** A vinculação explícita é o único fundamento para incluir outra pessoa. */
     private function members($db,int $root): array
     {
-        $rows=$db->table('fechamento_responsabilidades')->select('corretor_pessoa_id')
+        $rows=$db->table('fechamento_responsabilidades')
+            ->select('corretor_pessoa_id,responsavel_pessoa_id')
             ->where('responsavel_pessoa_id',$root)->get()->getResultArray();
-        $ids=[$root];
-        foreach($rows as $r)$ids[]=(int)$r['corretor_pessoa_id'];
-        return array_values(array_unique($ids));
+        return FechamentoEscopo::membros($root,$rows);
     }
 
     private function isDelegated($db,int $personId): bool
