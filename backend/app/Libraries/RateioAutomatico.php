@@ -26,6 +26,38 @@ final class RateioAutomatico
     }
 
     /**
+     * Regra mais específica (modalidade do recebimento + tipo do dia).
+     * A parametrização pertence à versão do plano; não altera o histórico.
+     */
+    private static function exception(array $op,string $role,string $payment,string $day): ?array
+    {
+        $rules=$op['_regras_especiais']??[];
+        foreach([$payment,$payment,'TODOS','TODOS'] as $i=>$mode){
+            $kind=$i%2===0?$day:'TODOS';
+            foreach($rules as $rule){
+                if($rule['papel']===$role && $rule['modalidade']===$mode && $rule['tipo_dia']===$kind){
+                    return $rule;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static function customAmount(?array $rule,int $price,int $default): int
+    {
+        if(!$rule)return $default;
+        if($rule['tipo_calculo']==='FIXO'){
+            $amount=VendaMoney::cents((string)$rule['valor'],true);
+            if($amount===null)throw new \InvalidArgumentException('Valor fixo inválido.');
+            return $amount;
+        }
+        if($rule['tipo_calculo']==='PERCENTUAL'){
+            return self::fraction($price,self::pct((string)$rule['valor']));
+        }
+        throw new \InvalidArgumentException('Tipo de regra personalizada inválido.');
+    }
+
+    /**
      * Pure function, testable without database.
      * @return array{rateios:array,avisos:array}
      */
@@ -47,9 +79,18 @@ final class RateioAutomatico
             if($id>0 && $id!==$root && !in_array($id,$receivers,true))$receivers[]=$id;
         }
         $out=[];$notes=[];
+        $payment='AVISTA';
+        $snap=json_decode((string)($op['regra_snapshot']??''),true);
+        if(is_array($snap) && in_array(($snap['modalidade']??''),['AVISTA','CARTAO','MISTO'],true)){
+            $payment=$snap['modalidade'];
+        }
+        $day=$businessDay?'UTIL':'OUTROS';
+        $serviceOverride=self::exception($op,'ATENDENTE',$payment,$day);
+        $managerOverride=self::exception($op,'GERENTE',$payment,$day);
         $available=$base;
         if($receivers){
-            $total=self::fraction($table,$serviceRate);
+            $total=self::customAmount($serviceOverride,$table,self::fraction($table,$serviceRate));
+            if($serviceOverride)$notes[]='Atendimento: exceção configurada para esta versão do plano e forma de pagamento.';
             if($total>$available)return ['rateios'=>[],'avisos'=>['Comissão insuficiente para pagar atendimento: revisar manualmente.']];
             foreach($receivers as $index=>$to){
                 $value=$index===count($receivers)-1
@@ -63,7 +104,8 @@ final class RateioAutomatico
         // Sem gerente vinculado, não se inventa pagamento.
         // Dia útil e renovação de outro corretor são exceções informadas.
         if($manager>0 && $manager!==$root && !$businessDay && !$renewalOther){
-            $value=self::fraction($table,$managerRate);
+            $value=self::customAmount($managerOverride,$table,self::fraction($table,$managerRate));
+            if($managerOverride)$notes[]='Gerente: exceção configurada para esta versão do plano e forma de pagamento.';
             if($value>$available)return ['rateios'=>[],'avisos'=>['Comissão insuficiente para pagar gerente: revisar manualmente.']];
             if($value>0)$out[]=['origem'=>$root,'destino'=>$manager,'papel'=>'GERENTE','valor'=>$value];
             $available-=$value;
@@ -106,6 +148,8 @@ final class RateioAutomatico
         $policy=$db->table('comissao_politicas')->where('id',1)->get()->getRowArray();
         if(!$policy)throw new \RuntimeException('Configuração de comissões não encontrada.');
         $holiday=$db->table('comissao_feriados')->where('data',$op['data_venda'])->countAllResults()>0;
+        $op['_regras_especiais']=$db->table('comissao_excecoes_plano')
+            ->where('plano_versao_id',(int)$op['plano_versao_id'])->get()->getResultArray();
         $renewalOther=false;
         if($op['segundo_corretor_pessoa_id']){
             $cliente=$db->table('clientes c')->select('o.nome AS origem_nome')
