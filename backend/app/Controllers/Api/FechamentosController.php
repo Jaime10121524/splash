@@ -49,7 +49,7 @@ class FechamentosController extends CommercialBaseController
     private function rows($db,string $start,string $end): array
     {
         $operations=$db->table('venda_operacoes o')
-            ->select('o.id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_tabela,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
+            ->select('o.id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_cobrado,o.valor_tabela,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas p','p.id=o.corretor_pessoa_id','left')
             ->where('o.situacao','VENDA')
@@ -58,6 +58,14 @@ class FechamentosController extends CommercialBaseController
             ->limit(500)->get()->getResultArray();
         if(!$operations)return [];
         $ids=array_map(static fn($r)=>(int)$r['id'],$operations);
+        $received=[];
+        $salesMovements=$db->table('venda_recebimentos')->select('operacao_id,tipo,valor')
+            ->whereIn('operacao_id',$ids)->get()->getResultArray();
+        foreach($salesMovements as $move){
+            $oid=(int)$move['operacao_id'];
+            $received[$oid]=($received[$oid]??0)+
+                ($move['tipo']==='ENTRADA'?1:-1)*VendaMoney::cents((string)$move['valor'],true);
+        }
         $allocations=$db->table('comissao_rateios r')
             ->select('r.*,b.nome AS beneficiario_nome,o.nome AS origem_nome')
             ->join('pessoas b','b.id=r.beneficiario_pessoa_id')
@@ -92,7 +100,8 @@ class FechamentosController extends CommercialBaseController
                 $operation[$key]=$operation[$key]===null?null:(int)$operation[$key];
             }
             $operation['rateios']=$byOperation[$operation['id']]??[];
-            $commission=$this->commission($operation);
+            $fullyPaid=($received[$operation['id']]??0)===VendaMoney::cents((string)$operation['valor_cobrado']);
+            $commission=$fullyPaid?$this->commission($operation):null;
             $operation['comissao_base']=$commission===null?null:VendaMoney::decimal($commission);
             $operation['pendente_apuracao']=$commission===null;
             $out=$in=0;
@@ -199,7 +208,8 @@ class FechamentosController extends CommercialBaseController
         $db=db_connect();$db->transBegin();
         try{
             $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
-            if(!$op||$op['situacao']!=='VENDA'||$this->commission($op)===null){
+            if(!$op||$op['situacao']!=='VENDA'||$this->commission($op)===null
+                ||!$this->salePaid($db,$op)){
                 $db->transRollback();
                 return $this->errorResponse(409,'Só é possível ratear uma venda com comissão calculada ou ajustada.');
             }
@@ -337,6 +347,18 @@ class FechamentosController extends CommercialBaseController
         }catch(Throwable $e){
             $db->transRollback();return $this->unexpected($e,'estornar repasse');
         }
+    }
+
+    private function salePaid($db,array $operation): bool
+    {
+        $movements=$db->table('venda_recebimentos')->select('tipo,valor')
+            ->where('operacao_id',(int)$operation['id'])->get()->getResultArray();
+        $net=0;
+        foreach($movements as $move){
+            $value=VendaMoney::cents((string)$move['valor'],true);
+            $net+=$move['tipo']==='ENTRADA'?$value:-$value;
+        }
+        return $net===VendaMoney::cents((string)$operation['valor_cobrado']);
     }
 
     private function sumPaid($db,int $id): int
