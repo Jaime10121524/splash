@@ -77,4 +77,36 @@ class VendasCatalogosController extends CommercialBaseController
             return $this->responseOK('Forma de pagamento salva.', $id===null?201:200);
         }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'cadastrar forma');}
     }
+
+    public function aplicacao(string $codigo): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $types=['AVISTA_ATUAL'=>'AVISTA','AVISTA_HISTORICA'=>'AVISTA','CARTAO'=>'CARTAO','MISTO'=>'MISTO'];
+        if(!isset($types[$codigo]))return $this->errorResponse(422,'Aplicação desconhecida.');
+        $ruleId=$this->optionalId($this->jsonPayload()['regra_comissao_id']??null);
+        if(!$ruleId)return $this->errorResponse(422,'Selecione uma regra válida.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $rule=$db->table('venda_regras_comissao')->where('id',$ruleId)->get()->getRowArray();
+            if(!$rule || $rule['modalidade']!==$types[$codigo]){
+                $db->transRollback();
+                return $this->errorResponse(422,'A modalidade da regra não corresponde à aplicação.');
+            }
+            if(!(bool)$rule['ativo']){
+                $db->transRollback();
+                return $this->errorResponse(422,'Ative a regra antes de utilizá-la.');
+            }
+            $current=$db->table('venda_regras_aplicacao')->where('codigo',$codigo)->get()->getRowArray();
+            if(!$current){
+                $db->transRollback();
+                return $this->errorResponse(404,'Configuração automática não encontrada.');
+            }
+            $db->table('venda_regras_aplicacao')->where('codigo',$codigo)->update(['regra_comissao_id'=>$ruleId]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Regra aplicada automaticamente às próximas vendas. Vendas anteriores mantêm suas taxas.');
+        }catch(Throwable $e){
+            $db->transRollback();
+            return $this->unexpected($e,'atualizar aplicação automática de comissão');
+        }
+    }
 }
