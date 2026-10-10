@@ -60,6 +60,15 @@ $routes->group('api', static function ($routes): void {
     $routes->post('vendas/formas', 'Api\VendasCatalogosController::forma', ['filter'=>'csrf']);
     $routes->post('vendas/formas/(:num)/editar', 'Api\VendasCatalogosController::forma/$1', ['filter'=>'csrf']);
     $routes->post('vendas/aplicacoes/(:segment)', 'Api\VendasCatalogosController::aplicacao/$1', ['filter'=>'csrf']);
+
+    // Apuração individual: rateios, pagamentos manuais e extrato próprio.
+    $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
+    $routes->get('fechamentos/meu', 'Api\FechamentosController::meu');
+    $routes->post('fechamentos/operacoes/(:num)/rateios', 'Api\FechamentosController::ratear/$1', ['filter'=>'csrf']);
+    $routes->get('fechamentos/rateios/(:num)', 'Api\FechamentosController::extrato/$1');
+    $routes->post('fechamentos/rateios/(:num)/pagar', 'Api\FechamentosController::pagar/$1', ['filter'=>'csrf']);
+    $routes->post('fechamentos/repasses/(:num)/estornar', 'Api\FechamentosController::estornar/$1', ['filter'=>'csrf']);
+
 });
 
 // Rotas internas do Shield: recuperação de acesso e gestão de sessão tradicional.
