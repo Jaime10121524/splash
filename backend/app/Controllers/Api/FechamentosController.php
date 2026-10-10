@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\RateioRules;
+use App\Libraries\RateioAutomatico;
 use App\Libraries\VendaMoney;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
@@ -196,6 +197,102 @@ class FechamentosController extends CommercialBaseController
         ])->setHeader('Cache-Control','no-store');
     }
 
+    public function sincronizar(): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $body=$this->jsonPayload();
+        $start=(string)($body['inicio']??'');
+        $end=(string)($body['fim']??'');
+        if(!$this->validateDate($start)||!$this->validateDate($end)||$start>$end
+            ||(new \DateTimeImmutable($start))->diff(new \DateTimeImmutable($end))->days>366){
+            return $this->errorResponse(422,'Informe um período válido de no máximo 366 dias.');
+        }
+        $db=db_connect();
+        $ids=$db->table('venda_operacoes')
+            ->select('id')->where('situacao','VENDA')
+            ->where('data_venda >=',$start)->where('data_venda <=',$end)
+            ->orderBy('id','ASC')->limit(500)->get()->getResultArray();
+        $counts=['geradas'=>0,'revisar'=>0,'existentes'=>0,'aguardando'=>0];
+        foreach($ids as $item){
+            $id=(int)$item['id'];
+            $db->transBegin();
+            try{
+                $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[$id])->getRowArray();
+                $result=RateioAutomatico::sync($db,$id,(int)auth('session')->user()->id);
+                $status=$result['status'];
+                $key=match($status){
+                    'GERADO'=>'geradas','REVISAR'=>'revisar',
+                    'JA_APURADA','RATEIO_MANUAL'=>'existentes',
+                    default=>'aguardando',
+                };
+                $counts[$key]++;
+                $this->commitOrFail($db);
+            }catch(Throwable $e){
+                $db->transRollback();
+                return $this->unexpected($e,'sincronizar rateios automáticos');
+            }
+        }
+        return $this->responseOK('Apuração automática concluída.',200,
+            ['resultado'=>$counts,'total_consultado'=>count($ids),'limite'=>500]);
+    }
+
+    public function politica(): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $db=db_connect();
+        return $this->response->setJSON([
+            'politica'=>$db->table('comissao_politicas')->where('id',1)->get()->getRowArray(),
+            'feriados'=>$db->table('comissao_feriados')->orderBy('data','DESC')->limit(100)->get()->getResultArray(),
+        ])->setHeader('Cache-Control','no-store');
+    }
+
+    public function salvarPolitica(): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $payload=$this->jsonPayload();
+        $keys=['percentual_atendente_dia_util','percentual_atendente_outros_dias','percentual_gerente','divisao_segundo_corretor'];
+        $values=[];
+        foreach($keys as $key){
+            $raw=(string)($payload[$key]??'');
+            if(!preg_match('/^(?:\d{1,2}|100)(?:\.\d{1,2})?$/D',$raw)|| (float)$raw>100){
+                return $this->errorResponse(422,'Percentual inválido em '.$key.'. Informe 0 a 100, com até duas casas.');
+            }
+            $values[$key]=$raw;
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $db->table('comissao_politicas')->where('id',1)->update([
+                ...$values,
+                'alterado_em'=>\CodeIgniter\I18n\Time::now(config('App')->appTimezone)->toDateTimeString(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Parâmetros salvos. Somente próximas apurações os utilizarão.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'atualizar políticas de comissão');
+        }
+    }
+
+    public function salvarFeriado(): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $payload=$this->jsonPayload();
+        $date=(string)($payload['data']??'');
+        $desc=$this->cleanText($payload['descricao']??null,120,true);
+        if(!$this->validateDate($date) || $desc===false){
+            return $this->errorResponse(422,'Informe a data e o motivo do feriado.');
+        }
+        $db=db_connect();$db->transBegin();
+        try{
+            $row=$db->table('comissao_feriados')->where('data',$date)->get()->getRowArray();
+            if($row)$db->table('comissao_feriados')->where('data',$date)->update(['descricao'=>$desc]);
+            else $db->table('comissao_feriados')->insert(['data'=>$date,'descricao'=>$desc]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Feriado cadastrado para próximas apurações.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'salvar feriado');
+        }
+    }
+
     public function ratear(int|string $id): ResponseInterface
     {
         if($denied=$this->authorizeAdmin())return $denied;
@@ -283,6 +380,8 @@ class FechamentosController extends CommercialBaseController
                     'criado_em'=>$now,
                 ]);
             }
+            $db->table('comissao_auto_apuracoes')->where('operacao_id',(int)$id)
+                ->update(['status'=>'MANUAL','observacoes'=>'Rateio conferido e personalizado pelo administrador.']);
             $db->table('comissao_rateios_auditoria')->insert([
                 'operacao_id'=>(int)$id,
                 'dados_antes'=>json_encode($old,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
