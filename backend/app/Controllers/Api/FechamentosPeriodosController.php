@@ -435,7 +435,8 @@ class FechamentosPeriodosController extends CommercialBaseController
                 'rateios_pendentes'=>VendaMoney::decimal(max(0,$sumRates-$sumPaid)),
                 'despesas'=>VendaMoney::decimal($costs),
                 'saldo_caixa_registrado'=>VendaMoney::decimal($cash-$paidInClosing),
-                'resultado_gerencial_estimado'=>VendaMoney::decimal($gross-$sumRates-$costs),
+                'participacoes_internas'=>VendaMoney::decimal($participacoesDoGrupo),
+                'resultado_gerencial_estimado'=>VendaMoney::decimal($gross-$sumRates-$costs+$participacoesDoGrupo),
             ],
             'observacao'=>'Entradas do clube são dinheiro recebido neste fechamento; repasses indicam pagamentos registrados. Resultado gerencial não é lucro bancário definitivo e não inclui custódia anterior de Pix do clube.',
         ];
