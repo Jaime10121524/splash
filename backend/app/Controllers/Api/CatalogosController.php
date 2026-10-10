@@ -30,7 +30,10 @@ class CatalogosController extends CommercialBaseController
             ];
             $pessoas[$id]['papeis'][]=$row['papel'];
         }
-        foreach($origens as &$row) $row['ativo']=(bool)$row['ativo'];
+        foreach($origens as &$row) {
+            $row['ativo']=(bool)$row['ativo'];
+            $row['permite_indicador']=(bool)$row['permite_indicador'];
+        }
         unset($row);
         foreach($motivos as &$row) $row['ativo']=(bool)$row['ativo'];
         unset($row);
@@ -69,6 +72,10 @@ class CatalogosController extends CommercialBaseController
         if (!isset($data['ativo']) || !is_bool($data['ativo'])) {
             return $this->errorResponse(422,'Informe se o cadastro está ativo.');
         }
+        if($table==='lead_origens' && (!isset($data['permite_indicador']) || !is_bool($data['permite_indicador']))){
+            return $this->errorResponse(422,'Informe se esta origem permite indicação de cliente.');
+        }
+        $indicador=$table==='lead_origens' ? ['permite_indicador'=>$data['permite_indicador']?1:0] : [];
         $db=db_connect();
         $already=$db->table($table)->where($field,$name)->get()->getRowArray();
         if ($already && ($id===null || (int)$already['id']!==$id)) {
@@ -78,7 +85,7 @@ class CatalogosController extends CommercialBaseController
         try {
             if ($id === null) {
                 $db->table($table)->insert([
-                    $field=>$name,'ativo'=>$data['ativo']?1:0,'criado_em'=>date('Y-m-d H:i:s'),
+                    $field=>$name,'ativo'=>$data['ativo']?1:0,...$indicador,'criado_em'=>date('Y-m-d H:i:s'),
                 ]);
             } else {
                 if (!$db->table($table)->where('id',$id)->countAllResults()) {
@@ -86,7 +93,7 @@ class CatalogosController extends CommercialBaseController
                     return $this->errorResponse(404,'Cadastro não encontrado.');
                 }
                 $db->table($table)->where('id',$id)->update([
-                    $field=>$name,'ativo'=>$data['ativo']?1:0,
+                    $field=>$name,'ativo'=>$data['ativo']?1:0,...$indicador,
                 ]);
             }
             $this->commitOrFail($db);
