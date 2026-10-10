@@ -46,15 +46,15 @@ final class AuditoriaRateios
         }
         // Reproduz exatamente a composição de créditos do Financeiro:
         // parte própria + TODAS as participações ligadas à venda.
-        $créditos=$proprio+$todos;
-        if($créditos!==$bruta)$problemas[]='Distribuição dos direitos difere da comissão bruta.';
+        $creditos=$proprio+$todos;
+        if($creditos!==$bruta)$problemas[]='Distribuição dos direitos difere da comissão bruta.';
         return [
             'bruta_cent'=>$bruta,
             'parte_propria_cent'=>$proprio,
             'titular_pago_cent'=>$titularPago,
             'rateios_cent'=>$todos,
-            'creditos_financeiro_cent'=>$créditos,
-            'diferenca_cent'=>$créditos-$bruta,
+            'creditos_financeiro_cent'=>$creditos,
+            'diferenca_cent'=>$creditos-$bruta,
             'pessoas'=>$pessoas,
             'problemas'=>array_values(array_unique($problemas)),
         ];
