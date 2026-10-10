@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react'
 import {comercialGet,dateBR} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
+import FinanceiroPessoal from './FinanceiroPessoal.jsx'
 import './ComercialPages.css'
 import './Fechamentos.css'
 import './Financeiro.css'
@@ -15,8 +16,9 @@ const period=()=>{
 }
 
 /** Consulta individual protegida na API, sem cadastro de pagamento no perfil comum. */
-export default function Financeiro({role='admin'}){
+export default function Financeiro({role='admin',initialTab='comissoes'}){
   const admin=role==='admin'
+  const [tab,setTab]=useState(initialTab)
   const [initialStart,initialEnd]=useMemo(period,[])
   const [start,setStart]=useState(initialStart)
   const [end,setEnd]=useState(initialEnd)
@@ -51,22 +53,28 @@ export default function Financeiro({role='admin'}){
   const setOpen=id=>setExpanded(p=>({...p,[id]:!p[id]}))
   return <div className="com-page fin-page">
     <header className="com-heading"><div><span className="com-eyebrow">SPLASH / FINANCEIRO</span>
-      <h1>{admin?'Contas e comissões':'Minhas comissões'}</h1>
+      <h1>{admin?'Financeiro':'Meu financeiro'}</h1>
       <p>{admin?'Quanto cada pessoa ganhou, recebeu e ainda tem para receber.':
         'Confira cada atendimento ou venda e veja os pagamentos registrados para você.'}</p>
     </div></header>
+    <div className="fin-tabs" role="tablist" aria-label="Módulos financeiros">
+      {[['comissoes','Comissões'],['despesas','Despesas'],['emprestimos','Empréstimos']].map(([value,label])=>
+        <button type="button" key={value} role="tab" aria-selected={tab===value}
+          className={tab===value?'active':''} onClick={()=>setTab(value)}>{label}</button>)}
+    </div>
     <section className="com-panel fin-filters">
       <div className="fc-period">
         <label>De <FormControl type="date" value={start} onChange={setStart}/></label>
         <label>Até <FormControl type="date" value={end} onChange={setEnd}/></label>
       </div>
-      {admin&&<div className="fc-selection"><label>Conta de
+      {admin&&tab==='comissoes'&&<div className="fc-selection"><label>Conta de
         <FormControl type="select" value={selected} onChange={setSelected}
           options={[{value:'',label:'Todas as pessoas'},...accounts.map(a=>({
             value:String(a.pessoa_id),label:a.nome,
           }))]}/></label></div>}
       <small>O período considera a data da venda. Pagamentos dessas vendas podem ter ocorrido posteriormente.</small>
     </section>
+    {tab==='comissoes'&&<>
     {error&&<div className="com-alert error" role="alert">{error}</div>}
     {busy&&<section className="com-panel"><div className="com-empty">Carregando seu extrato...</div></section>}
     {!busy&&payload&&<>
@@ -131,5 +139,8 @@ export default function Financeiro({role='admin'}){
       </section>}
       <p className="com-disclaimer">{payload.aviso} Os valores “recebidos” são pagamentos efetivamente registrados pelo administrador, não transferências realizadas por esta tela.</p>
     </>}
+    </>}
+    {tab!=='comissoes'&&<FinanceiroPessoal role={role} tab={tab}
+      start={start} end={end} initialPerson={selected}/>}
   </div>
 }
