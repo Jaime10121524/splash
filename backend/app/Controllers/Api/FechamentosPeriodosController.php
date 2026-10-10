@@ -203,6 +203,9 @@ class FechamentosPeriodosController extends CommercialBaseController
             if(count($sales)>500){
                 $db->transRollback();return $this->errorResponse(409,'Mais de 500 vendas. Reduza o período.');
             }
+            if(!$sales){
+                $db->transRollback();return $this->errorResponse(409,'Não existem vendas no período para fechar.');
+            }
             // O fechamento só pode congelar comissões apuradas de títulos
             // quitados. Caso contrário, a venda apareceria no fechamento mas
             // ainda não poderia aparecer no Financeiro do beneficiário.
