@@ -34,6 +34,7 @@ export default function Financeiro({role='admin'}){
       .then(data=>{
         if(!active)return
         setPayload(data);setError('')
+        setSelected(current=>current && !(data.contas||[]).some(a=>String(a.pessoa_id)===current)?'':current)
       })
       .catch(e=>{if(active)setError(e.message)})
       .finally(()=>{if(active)setBusy(false)})
