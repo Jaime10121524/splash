@@ -72,6 +72,10 @@ $routes->group('api', static function ($routes): void {
     $routes->post('financeiro/emprestimos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarEmprestimo/$1', ['filter'=>'csrf']);
     $routes->post('financeiro/emprestimos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarEmprestimo/$1', ['filter'=>'csrf']);
 
+    // Relatório semanal: somente CONCLUÍDO, consulta pessoal filtrada no servidor.
+    $routes->get('relatorios/fechamentos', 'Api\\RelatoriosController::periodos');
+    $routes->get('relatorios/fechamentos/(:num)/acerto', 'Api\\RelatoriosController::acertoSemanal/$1');
+
     // Fechamento do período tem escopo próprio e NÃO agrega corretores independentes.
     // Todas as rotas revalidam o responsável associado à sessão Shield.
     $routes->get('fechamentos-periodos/escopos','Api\FechamentosPeriodosController::escopos');
