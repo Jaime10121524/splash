@@ -280,6 +280,8 @@ export default function FechamentosPeriodos({role='admin'}){
             {(current.abatimentos||[]).length>0&&<div className="fpw-lines">{current.abatimentos.map(a=><div key={a.id}>
               <div><strong>{a.pessoa_nome}</strong><small>Empréstimo #{a.emprestimo_id}</small></div>
               <strong>{money(a.valor)} abatido</strong>
+              <button type="button" className="vd-outline" disabled={busy}
+                onClick={()=>action('/api/fechamentos-periodos/'+current.id+'/abates/'+a.id+'/desfazer',{})}>Desfazer rascunho</button>
             </div>)}</div>}
           </section>
           <div className="fpw-next"><p className="fpw-help">Após avançar, os recebimentos e abatimentos desta etapa ficam registrados. Confira os valores antes de seguir.</p>
@@ -288,6 +290,11 @@ export default function FechamentosPeriodos({role='admin'}){
               Conferir e ir para os pagamentos →</button></div>
         </>}
         {current.status==='REPASSES'&&<>
+          <div className="fpw-next">
+            <p className="fpw-help">Precisa corrigir entradas ou abatimentos? Volte antes de registrar pagamentos.</p>
+            <button type="button" className="vd-outline" disabled={busy}
+              onClick={()=>action('/api/fechamentos-periodos/'+current.id+'/voltar',{})}>← Voltar aos recebimentos</button>
+          </div>
           <section className="com-panel fpw-stage">
             <div className="com-panel-head"><div><h2>3. Pagar corretores, atendentes e gerentes</h2>
               <p>Você informa como pagou cada pessoa. Os valores são baixados nas participações das vendas deste fechamento.</p></div></div>
