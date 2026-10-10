@@ -8,6 +8,7 @@ use App\Libraries\RateioRules;
 use App\Libraries\RateioAutomatico;
 use App\Libraries\VendaMoney;
 use App\Libraries\SaldoComissao;
+use App\Libraries\DistribuicaoPagamento;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -339,7 +340,8 @@ class FechamentosController extends CommercialBaseController
         $value=$this->money($input['valor']??null);
         $date=$input['data_pagamento']??null;
         $reason=$this->cleanText($input['observacoes']??null,500,true);
-        if(!$value||!$this->validateDate($date,false)||$reason===false){
+        $formId=$this->optionalId($input['forma_id']??null);
+        if(!$value||!$this->validateDate($date,false)||$reason===false||!$formId){
             return $this->errorResponse(422,'Valor, data e descrição do pagamento são obrigatórios.');
         }
         $db=db_connect();$db->transBegin();
@@ -356,6 +358,9 @@ class FechamentosController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(409,'Confira primeiro o rateio da venda. A parcela própria não pode ser paga antes da apuração.');
             }
+            if(!$db->table('venda_formas_pagamento')->where('id',$formId)->where('ativo',1)->countAllResults()){
+                $db->transRollback();return $this->errorResponse(422,'Meio de pagamento inválido ou inativo.');
+            }
             $due=$this->ownerDue($db,$op);
             $paid=$this->ownerPaid($db,(int)$id);
             if($value>$due-$paid || $due<=0){
@@ -366,6 +371,7 @@ class FechamentosController extends CommercialBaseController
                 'operacao_id'=>(int)$id,'corretor_pessoa_id'=>(int)$op['corretor_pessoa_id'],
                 'tipo'=>'PAGAMENTO','referencia_pagamento_id'=>null,
                 'valor'=>VendaMoney::decimal($value),'data_pagamento'=>$date,
+                'forma_id'=>$formId,
                 'observacoes'=>$reason,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
                 'criado_em'=>$this->now(),
             ]);
@@ -545,6 +551,133 @@ class FechamentosController extends CommercialBaseController
         }
     }
 
+
+    public function formasPagamento(): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        return $this->response->setJSON([
+            'formas'=>db_connect()->table('venda_formas_pagamento')
+                ->select('id,nome,codigo')->where('ativo',1)
+                ->orderBy('nome','ASC')->get()->getResultArray(),
+        ])->setHeader('Cache-Control','no-store');
+    }
+
+    public function pagarEmLote(): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $data=$this->jsonPayload();
+        $personId=$this->optionalId($data['pessoa_id']??null);
+        $start=(string)($data['inicio']??'');
+        $end=(string)($data['fim']??'');
+        $paymentDate=(string)($data['data_pagamento']??'');
+        $key=(string)($data['chave_requisicao']??'');
+        $note=$this->cleanText($data['observacoes']??null,500);
+        $items=$data['formas']??null;
+        if(!$personId||!$this->validateDate($start)||!$this->validateDate($end)
+            ||$start>$end ||(new \DateTimeImmutable($start))->diff(new \DateTimeImmutable($end))->days>366
+            ||!$this->validateDate($paymentDate,false)
+            ||!preg_match('/^[a-zA-Z0-9_-]{16,64}$/D',$key)
+            ||$note===false||!is_array($items)||count($items)<1||count($items)>10){
+            return $this->errorResponse(422,'Revise período, beneficiário, data e meios de pagamento.');
+        }
+        $forms=[];$formIds=[];$sum=0;
+        foreach($items as $item){
+            if(!is_array($item))return $this->errorResponse(422,'Item de pagamento inválido.');
+            $id=$this->optionalId($item['forma_id']??null);
+            $value=$this->money($item['valor']??null);
+            if(!$id || $value===null)return $this->errorResponse(422,'Informe valores positivos e meios válidos.');
+            $formIds[$id]=true;
+            $forms[]=['forma_id'=>$id,'valor_centavos'=>$value];
+            $sum+=$value;
+        }
+        if($sum<=0)return $this->errorResponse(422,'Valor do pagamento inválido.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $previous=$db->table('comissao_lotes_pagamento')->where('chave_requisicao',$key)->get()->getRowArray();
+            if($previous){
+                $db->transRollback();
+                return $this->responseOK('Acerto já registrado anteriormente, sem duplicação.',200,
+                    ['lote_id'=>(int)$previous['id'],'duplicado'=>true]);
+            }
+            $valid=$db->table('venda_formas_pagamento')->select('id')
+                ->whereIn('id',array_keys($formIds))->where('ativo',1)->get()->getResultArray();
+            if(count($valid)!==count($formIds)){
+                $db->transRollback();
+                return $this->errorResponse(422,'Selecione meios de pagamento cadastrados e ativos.');
+            }
+            $person=$db->table('pessoas')->select('id')->where('id',$personId)->get()->getRowArray();
+            if(!$person){
+                $db->transRollback();return $this->errorResponse(404,'Pessoa não encontrada.');
+            }
+            // A mesma ordem de locks usada pelos pagamentos individuais (operação).
+            $rows=$db->table('venda_operacoes')->select('id')->where('situacao','VENDA')
+                ->where('data_venda >=',$start)->where('data_venda <=',$end)
+                ->orderBy('id','ASC')->limit(501)->get()->getResultArray();
+            if(count($rows)>500){
+                $db->transRollback();
+                return $this->errorResponse(409,'Mais de 500 vendas no período. Reduza as datas para um acerto seguro.');
+            }
+            foreach($rows as $row){
+                $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$row['id']])->getRowArray();
+            }
+            $operations=$this->rows($db,$start,$end);
+            $accounts=$this->contasPorPessoa($db,$operations,true,(int)$personId);
+            if(!$accounts){
+                $db->transRollback();return $this->errorResponse(409,'Nenhum valor disponível para esta pessoa no período.');
+            }
+            $lines=[];
+            foreach($accounts[0]['itens'] as $item){
+                $pending=VendaMoney::cents((string)$item['pendente'],true);
+                if($pending>0)$lines[]=[
+                    'operacao_id'=>(int)$item['operacao_id'],
+                    'rateio_id'=>$item['rateio_id']===null?null:(int)$item['rateio_id'],
+                    'tipo'=>$item['tipo'],'data_venda'=>$item['data_venda'],
+                    'pendente_centavos'=>$pending,
+                ];
+            }
+            try{
+                $distribution=DistribuicaoPagamento::calcular($lines,$forms);
+            }catch(\InvalidArgumentException $e){
+                $db->transRollback();return $this->errorResponse(422,$e->getMessage());
+            }
+            $now=$this->now();
+            $db->table('comissao_lotes_pagamento')->insert([
+                'pessoa_id'=>$personId,'periodo_inicio'=>$start,'periodo_fim'=>$end,
+                'data_pagamento'=>$paymentDate,'valor_total'=>VendaMoney::decimal($sum),
+                'observacoes'=>$note,'chave_requisicao'=>$key,
+                'criado_por_usuario_id'=>(int)auth('session')->user()->id,'criado_em'=>$now,
+            ]);
+            $lotId=(int)$db->insertID();
+            foreach($distribution as $piece){
+                $base=[
+                    'tipo'=>'PAGAMENTO','referencia_pagamento_id'=>null,
+                    'valor'=>VendaMoney::decimal($piece['valor_centavos']),
+                    'data_pagamento'=>$paymentDate,'observacoes'=>$note,
+                    'lote_id'=>$lotId,'forma_id'=>$piece['forma_id'],
+                    'criado_por_usuario_id'=>(int)auth('session')->user()->id,'criado_em'=>$now,
+                ];
+                if($piece['tipo']==='TITULAR'){
+                    $db->table('comissao_titular_movimentos')->insert([
+                        ...$base,'operacao_id'=>$piece['operacao_id'],
+                        'corretor_pessoa_id'=>$personId,
+                    ]);
+                }else{
+                    $db->table('comissao_repasses')->insert([
+                        ...$base,'rateio_id'=>$piece['rateio_id'],
+                    ]);
+                }
+            }
+            $this->commitOrFail($db);
+            return $this->responseOK('Acerto por pessoa registrado, separado por venda e forma de pagamento.',200,[
+                'lote_id'=>$lotId,'valor_total'=>VendaMoney::decimal($sum),
+                'distribuicoes'=>count($distribution),
+            ]);
+        }catch(Throwable $e){
+            $db->transRollback();
+            return $this->unexpected($e,'registrar acerto semanal multi-forma');
+        }
+    }
+
     public function ratear(int|string $id): ResponseInterface
     {
         if($denied=$this->authorizeAdmin())return $denied;
@@ -659,7 +792,8 @@ class FechamentosController extends CommercialBaseController
         $value=$this->money($input['valor']??null);
         $date=$input['data_pagamento']??null;
         $note=$this->cleanText($input['observacoes']??null,500);
-        if($value===null||!$this->validateDate($date,false)||$note===false){
+        $formId=$this->optionalId($input['forma_id']??null);
+        if($value===null||!$this->validateDate($date,false)||$note===false||!$formId){
             return $this->errorResponse(422,'Informe valor, data e observações válidos.');
         }
         $db=db_connect();$db->transBegin();
@@ -669,6 +803,9 @@ class FechamentosController extends CommercialBaseController
             if(!$allocation){
                 $db->transRollback();return $this->errorResponse(404,'Participação não encontrada.');
             }
+            if(!$db->table('venda_formas_pagamento')->where('id',$formId)->where('ativo',1)->countAllResults()){
+                $db->transRollback();return $this->errorResponse(422,'Meio de pagamento inválido ou inativo.');
+            }
             $paid=$this->sumPaid($db,(int)$id);
             $total=VendaMoney::cents((string)$allocation['valor']);
             if($value>$total-$paid){
@@ -677,7 +814,7 @@ class FechamentosController extends CommercialBaseController
             $db->table('comissao_repasses')->insert([
                 'rateio_id'=>(int)$id,'tipo'=>'PAGAMENTO','referencia_pagamento_id'=>null,
                 'valor'=>VendaMoney::decimal($value),'data_pagamento'=>$date,
-                'observacoes'=>$note,
+                'forma_id'=>$formId,'observacoes'=>$note,
                 'criado_por_usuario_id'=>(int)auth('session')->user()->id,'criado_em'=>$this->now(),
             ]);
             $this->commitOrFail($db);
