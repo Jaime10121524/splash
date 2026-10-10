@@ -177,6 +177,16 @@ class FechamentosController extends CommercialBaseController
                 $personName[(int)$p['id']]=$p['nome'];
             }
         }
+        // O responsável pelo grupo recebe o dinheiro do clube e realiza os
+        // pagamentos, inclusive os das vendas de corretores vinculados.
+        // A obrigação original permanece associada à venda do corretor.
+        $responsaveis=[];
+        if($includeOutgoing){
+            foreach($db->table('fechamento_responsabilidades')
+                ->select('corretor_pessoa_id,responsavel_pessoa_id')->get()->getResultArray() as $rel){
+                $responsaveis[(int)$rel['corretor_pessoa_id']]=(int)$rel['responsavel_pessoa_id'];
+            }
+        }
         $add=function(int $personId,string $name,array $line) use(&$accounts,$onlyPersonId,$admin,$personName){
             if($onlyPersonId!==null && $personId!==$onlyPersonId)return;
             $accounts[$personId]??=[
@@ -260,11 +270,23 @@ class FechamentosController extends CommercialBaseController
                     ];
                     $accounts[$payer]['obrigações_centavos']+=$outstanding;
                     $accounts[$payer]['obrigações_pagas_centavos']+=$paid;
-                    if($includeOutgoing){
-                        $accounts[$payer]['saidas'][]=[
+                }
+                if($includeOutgoing){
+                    $titularOperacao=(int)$a['responsavel_pessoa_id'];
+                    $pagadorOperacional=$responsaveis[$titularOperacao]??$titularOperacao;
+                    if($onlyPersonId===null || $pagadorOperacional===$onlyPersonId){
+                        $accounts[$pagadorOperacional]??=[
+                            'pessoa_id'=>$pagadorOperacional,
+                            'nome'=>$admin?($personName[$pagadorOperacional]??'Responsável'):'Minha conta',
+                            'total_centavos'=>0,'pago_centavos'=>0,'abatido_centavos'=>0,
+                            'obrigações_centavos'=>0,'obrigações_pagas_centavos'=>0,
+                            'itens'=>[],'saidas'=>[],
+                        ];
+                        $accounts[$pagadorOperacional]['saidas'][]=[
                             'id'=>(int)$a['id'],'beneficiario_pessoa_id'=>$payee,
                             'beneficiario_nome'=>$a['beneficiario_nome'],
                             'papel'=>$a['papel'],'data_venda'=>$op['data_venda'],
+                            'origem_corretor_nome'=>$op['corretor_nome']??'Corretor',
                             'titulo'=>$meta['titulo'],'operacao_id'=>$key,
                             'total'=>$a['valor'],'pago'=>$a['pago'],
                             'pendente'=>$a['pendente'],
