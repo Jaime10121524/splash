@@ -71,6 +71,7 @@ class SessionController extends BaseController
         $user = auth('session')->user();
         if ($user === null || $user->isBanned()) {
             auth('session')->logout();
+            service('security')->generateHash();
             return $this->response->setStatusCode(403)->setJSON([
                 'message' => 'Acesso bloqueado ou sessão inválida.',
                 'csrf' => $this->csrf(),
