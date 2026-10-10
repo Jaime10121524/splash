@@ -43,6 +43,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [formError,setFormError]=useState('')
   const [setting,setSetting]=useState('regras')
   const [settingForm,setSettingForm]=useState(null)
+  const [adjustment,setAdjustment]=useState({valor:'',justificativa:''})
 
   async function loadOptions() {
     const [opt,catalogs,visitsResponse]=await Promise.all([
@@ -166,6 +167,32 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     setSaleForm({...blank(),data_venda:localDateISO(),data_inicio:localDateISO()})
     setFormError('');setDialog({type:'convert',op})
   }
+  function openAdjustment(){
+    const op=detail?.operacao
+    const current=op?.comissao_ajustada??op?.comissao_prevista??''
+    setAdjustment({valor:current===''?'':Number(current).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),
+      justificativa:''})
+    setFormError('')
+    setDialog({type:'adjust',op:dialog.op})
+  }
+  async function saveAdjustment(e){
+    e.preventDefault()
+    const parsed=moneyInput(adjustment.valor)
+    if(parsed===null||!adjustment.justificativa.trim())return setFormError('Informe a comissão e a justificativa.')
+    setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/vendas/'+dialog.op.id+'/ajustar-comissao',{
+        valor:parsed,justificativa:adjustment.justificativa.trim(),
+      })
+      setNotice(result.message)
+      await refresh()
+      const data=await comercialGet('/api/vendas/'+dialog.op.id)
+      setDetail(data)
+      setDialog({type:'details',op:dialog.op})
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+
   async function saveMovement(e) {
     e.preventDefault()
     const parsed=moneyInput(moveForm.valor)
@@ -253,7 +280,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         </div>
         <div className="vd-values"><span>Plano {currency(op.valor_cobrado)}</span>
           <strong>Recebido {currency(op.recebido)}</strong><small>Saldo {currency(op.saldo)}</small>
-          <small>Comissão estimada: {op.comissao_prevista===null?'A conferir':currency(op.comissao_prevista)}</small></div>
+          <small>{op.comissao_ajustada!==null?'Comissão ajustada: '+currency(op.comissao_ajustada):'Comissão estimada: '+(op.comissao_prevista===null?'A conferir':currency(op.comissao_prevista))}</small></div>
         <div className="com-actions"><button type="button" onClick={()=>openDetail(op)}>Extrato</button>
           {op.situacao==='PENDENCIA'&&<button type="button" className="primary" onClick={()=>openConvert(op)}>Fechar venda</button>}
         </div>
@@ -265,7 +292,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       title={dialog.type==='new'?(saleForm.situacao==='PENDENCIA'?'Nova pendência':'Nova venda'):
         dialog.type==='convert'?'Fechar pendência em venda':
         dialog.type==='receipt'?'Registrar recebimento':dialog.type==='refund'?'Registrar devolução':
-        dialog.type==='details'?'Extrato da operação':dialog.type==='setting'?'Cadastro financeiro':'Configurações de vendas'}
+        dialog.type==='details'?'Extrato da operação':dialog.type==='adjust'?'Ajustar comissão':dialog.type==='setting'?'Cadastro financeiro':'Configurações de vendas'}
       subtitle={dialog.type==='details'||dialog.type==='receipt'||dialog.type==='refund'?dialog.op?.cliente_nome:''}
       busy={busy} onClose={()=>setDialog(null)}>
 
@@ -368,13 +395,29 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <strong className={m.tipo==='DEVOLUCAO'?'vd-negative':'vd-positive'}>{m.tipo==='DEVOLUCAO'?'-':'+'}{currency(m.valor)}</strong>
         </div>)}</div>:<div className="com-empty vd-empty">Nenhum recebimento lançado.</div>}
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
-        <div className="vd-detail-title"><span>Comissão estimada: <strong>{detail.operacao.comissao_prevista===null?'A conferir':currency(detail.operacao.comissao_prevista)}</strong></span></div>
+        <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada':'Comissão estimada'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'A conferir':currency(detail.operacao.comissao_prevista)}</strong></span></div>
+        {detail.operacao.ajuste_motivo&&<div className="com-inform">Justificativa do ajuste: {detail.operacao.ajuste_motivo}</div>}
         <div className="cm-form-actions vd-wrap">
           <button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
+          <button type="button" className="cm-button" onClick={openAdjustment}>Ajustar comissão</button>
           <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver</button>
           <button type="button" className="cm-button primary" disabled={Number(detail.saldo)<=0} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
         </div>
       </div>}
+
+      {dialog.type==='adjust'&&<form className="cm-form" onSubmit={saveAdjustment}>
+        <div className="com-inform">O clube pode arredondar a comissão. O ajuste será registrado com justificativa e não realiza repasse financeiro.</div>
+        <label>Valor final da comissão (R$) <em>*</em>
+          <input type="text" inputMode="decimal" value={adjustment.valor}
+            onChange={e=>setAdjustment(f=>({...f,valor:e.target.value}))} placeholder="Ex.: 306,65"/></label>
+        <label>Justificativa <em>*</em>
+          <textarea rows={3} maxLength={500} value={adjustment.justificativa}
+            onChange={e=>setAdjustment(f=>({...f,justificativa:e.target.value}))}
+            placeholder="Ex.: Arredondamento confirmado pelo clube"/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="cm-form-actions"><button type="button" className="cm-button" onClick={()=>setDialog({type:'details',op:dialog.op})}>Voltar</button>
+          <button type="submit" className="cm-button primary" disabled={busy}>{busy?'Salvando...':'Salvar ajuste'}</button></div>
+      </form>}
 
       {(dialog.type==='receipt'||dialog.type==='refund')&&<form className="cm-form" onSubmit={saveMovement}>
         <div className="com-inform">{dialog.type==='refund'
