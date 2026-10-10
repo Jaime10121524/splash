@@ -152,8 +152,16 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
   useEffect(()=>{
     if(!admin)return undefined
     let active=true
-    comercialGet('/api/pessoas').then(data=>{
-      if(active)setPeople((data.pessoas||[]).filter(p=>p.ativo))
+    Promise.all([
+      comercialGet('/api/pessoas'),
+      comercialGet('/api/fechamentos-periodos/escopos').catch(()=>null),
+    ]).then(([data,escopo])=>{
+      if(!active)return
+      setPeople((data.pessoas||[]).filter(p=>p.ativo))
+      const mine=escopo?.pessoa_logada
+      // Por padrão, mostre a conta do próprio administrador, nunca a
+      // soma dos créditos de todos os corretores como se fossem dele.
+      if(mine)setSelected(old=>old||String(mine))
     }).catch(()=>{})
     return ()=>{active=false}
   },[admin])
@@ -217,14 +225,14 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
       </div>
       {admin&&<div className="fc-selection"><label>Pessoa
         <FormControl type="select" value={selected} onChange={setSelected}
-          options={[{value:'',label:'Todas as pessoas'},...options]}/></label></div>}
+          options={[{value:'',label:'Todas as pessoas (visão administrativa)'},...options]}/></label></div>}
       {tab==='extrato'&&<div className="finx-filters">
         <label>Agrupar por <FormControl type="select" value={groupBy} onChange={setGroupBy}
           options={[{value:'pessoa',label:'Pessoa'},{value:'tipo',label:'Tipo de entrada / saída'}]}/></label>
         <label>Exibir <FormControl type="select" value={direction} onChange={setDirection}
           options={[{value:'todos',label:'Entradas e saídas'},{value:'entrada',label:'Só entradas'},{value:'saida',label:'Só saídas'}]}/></label>
       </div>}
-      <small>Os créditos consideram a data da venda. Os pagamentos podem ter ocorrido depois. Despesas usam a data lançada; empréstimos exibem o saldo atual.</small>
+      <small>Extrato: somente comissões apuradas de vendas integralmente quitadas pela data da venda. O Fechamento mostra comissões brutas das vendas selecionadas e entradas do clube; seus totais não são diretamente comparáveis. Empréstimos mostram saldo atual.</small>
     </section>
     {tab==='extrato'&&<>
       {error&&<div className="com-alert error" role="alert">{error}</div>}
@@ -248,10 +256,12 @@ export default function Financeiro({role='admin',initialTab='comissoes'}){
               return <div key={g.key} className="finx-block">
                 <header className="finx-block-header"><h2>{g.title}</h2>
                   <small>{g.items.length} lançamento(s)</small></header>
-                {positives.length>0&&<Group title="Entradas e valores a receber"
-                  subheading="Comissões, atendimentos e participações" kind="entrada" items={positives}/>}
-                {negatives.length>0&&<Group title="Saídas e obrigações"
-                  subheading="Repasses, despesas e empréstimos" kind="saida" items={negatives}/>}
+                {positives.length>0&&<Group title="Créditos da pessoa"
+                  subheading="Comissões líquidas, atendimentos e participações" kind="entrada"
+                  items={positives.map(x=>({...x,mostrarPessoa:allSelected&&groupBy==='tipo'}))}/>}
+                {negatives.length>0&&<Group title="Contas a pagar e dívidas"
+                  subheading="Repasses operacionais, despesas lançadas e saldos de empréstimos (sem dupla dedução)"
+                  kind="saida" items={negatives.map(x=>({...x,mostrarPessoa:allSelected&&groupBy==='tipo'}))}/>}
               </div>
             })}
           </div>}
