@@ -105,3 +105,10 @@
   font-weight:500;
   line-height:1.55;
 }
+
+/* Auditoria de correções: visível sem confundir com pagamentos do cliente. */
+.vd-corrections{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:11px;background:var(--surface-alt)}
+.vd-corrections>strong{font-size:11px;color:var(--text)}
+.vd-corrections>div{display:grid;gap:4px;padding-top:8px;border-top:1px solid var(--border)}
+.vd-corrections small{font-size:10px;color:var(--muted)}
+.vd-corrections span{font-size:11px;line-height:1.5;color:var(--text)}
