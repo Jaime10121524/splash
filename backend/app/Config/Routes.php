@@ -94,6 +94,10 @@ $routes->group('api', static function ($routes): void {
     $routes->get('fechamentos-periodos/(:num)/conciliacao','Api\\ConciliacaoCustodiaController::index/$1');
     $routes->post('fechamentos-periodos/(:num)/conciliacao/movimentos','Api\\ConciliacaoCustodiaController::registrar/$1',['filter'=>'csrf']);
     $routes->post('fechamentos-periodos/(:num)/conciliacao/movimentos/(:num)/estornar','Api\\ConciliacaoCustodiaController::estornar/$1/$2',['filter'=>'csrf']);
+    // Sugestões de Pix reais, vinculadas somente com confirmação e sem baixas automáticas.
+    $routes->get('fechamentos-periodos/(:num)/conciliacao/pix','Api\\PixCustodiaController::listar/$1');
+    $routes->post('fechamentos-periodos/(:num)/conciliacao/pix/vincular','Api\\PixCustodiaController::vincular/$1',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/conciliacao/pix/(:num)/desvincular','Api\\PixCustodiaController::desvincular/$1/$2',['filter'=>'csrf']);
 
     $routes->get('fechamentos/resumo', 'Api\FechamentosController::resumo');
     $routes->get('fechamentos/meu', 'Api\FechamentosController::meu');
