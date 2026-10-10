@@ -238,8 +238,13 @@ export default function Fechamentos({role='admin'}){
             <div className="fc-sale-total"><span>Comissão {op.comissao_ajustada!==null?'ajustada':'apurada'}</span>
               <strong>{op.comissao_base===null?'A calcular':money(op.comissao_base)}</strong></div>
           </div>
+          {op.apuracao_automatica?.status==='REVISAR'&&
+            <p className="fc-hint fc-review">Rateio automático precisa de revisão: {op.apuracao_automatica.observacoes}</p>}
+          {op.apuracao_automatica?.status==='GERADO'&&
+            <p className="fc-hint">Participações geradas automaticamente. Confira os valores antes de registrar pagamentos.</p>}
           {op.comissao_base===null?<p className="fc-hint">Pagamento do título incompleto ou regra sem apuração. Não é possível distribuir ainda.</p>:
           <>
+            <p className="fc-hint">Parte prevista do corretor {op.corretor_nome}: <strong>{money(op.saldo_corretor_base)}</strong>, após participações registradas. Não representa pagamento recebido.</p>
             <div className="fc-allocations">
               {op.rateios.length?op.rateios.map(r=><div key={r.id} className="fc-allocation">
                 <div><strong>{r.beneficiario_nome}</strong>
