@@ -26,7 +26,7 @@ final class ClienteRules
         $occupation=$cleanString($input['profissao']??null,100);
         $notes=$cleanString($input['observacoes']??null,3000);
         if ($name===false) return ['error'=>'Informe o nome do cliente (até 160 caracteres).'];
-        if (strlen($phoneDigits)<8 || strlen($phoneDigits)>15) {
+        if (!in_array(strlen($phoneDigits),[10,11],true)) {
             return ['error'=>'Informe um telefone válido com DDD.'];
         }
         if ($cpfDigits!=='' && !self::cpfValid($cpfDigits)) {
@@ -57,8 +57,12 @@ final class ClienteRules
         if ($existing===null && $originId===null) {
             return ['error'=>'Informe a origem do lead. Quando não souber, escolha Outro.'];
         }
-        if ($originId!==null && !$db->table('lead_origens')->where('id',$originId)->countAllResults()) {
+        $origin=$originId!==null ? $db->table('lead_origens')->where('id',$originId)->get()->getRowArray() : null;
+        if($originId!==null && !$origin) {
             return ['error'=>'Origem do lead não encontrada.'];
+        }
+        if($referrerId!==null && (!$origin || !(bool)$origin['permite_indicador'])) {
+            return ['error'=>'Só é possível informar quem indicou em origens marcadas como Indicação.'];
         }
 
         $changedReferral = $existing===null
