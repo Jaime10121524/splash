@@ -46,17 +46,29 @@ export default function Fechamentos({role='admin'}){
   const [policy,setPolicy]=useState(null)
   const [holiday,setHoliday]=useState({data:localDateISO(),descricao:''})
   const [holidays,setHolidays]=useState([])
+  const [paymentMethods,setPaymentMethods]=useState([])
+  const [methodId,setMethodId]=useState('')
+  const [batchEntries,setBatchEntries]=useState([])
+  const [batchKey,setBatchKey]=useState('')
+  const [planOverrides,setPlanOverrides]=useState([])
+  const [planCatalog,setPlanCatalog]=useState([])
+  const [override,setOverride]=useState({
+    plano_versao_id:'',modalidade:'TODOS',tipo_dia:'OUTROS',
+    papel:'ATENDENTE',tipo_calculo:'FIXO',valor:'',observacoes:'',
+  })
 
   async function reload(){
     if(!start||!end||start>end)throw new Error('Selecione início e fim válidos.')
     const endpoint=admin?'resumo':'meu'
     const query='?'+new URLSearchParams({inicio:start,fim:end})
     if(admin){
-      const [data,accountData]=await Promise.all([
+      const [data,accountData,forms]=await Promise.all([
         comercialGet('/api/fechamentos/'+endpoint+query),
         comercialGet('/api/fechamentos/contas'+query),
+        comercialGet('/api/fechamentos/formas'),
       ])
       setReport(data);setAccounts(accountData.contas||[])
+      setPaymentMethods(forms.formas||[])
     } else {
       const [data,accountData]=await Promise.all([
         comercialGet('/api/fechamentos/'+endpoint+query),
@@ -212,6 +224,7 @@ export default function Fechamentos({role='admin'}){
     try{
       const result=await comercialGet('/api/fechamentos/politica')
       setPolicy(result.politica);setHolidays(result.feriados||[])
+      setPlanOverrides(result.excecoes||[]);setPlanCatalog(result.planos||[])
       setDialog({type:'policy'})
     }catch(e){setError(e.message)}
     finally{setBusy(false)}
@@ -230,11 +243,75 @@ export default function Fechamentos({role='admin'}){
       const result=await comercialPost('/api/fechamentos/feriados',holiday)
       setNotice(result.message)
       const refreshed=await comercialGet('/api/fechamentos/politica')
-      setHolidays(refreshed.feriados||[]);setHoliday({data:localDateISO(),descricao:''})
+      setHolidays(refreshed.feriados||[])
+      setPlanOverrides(refreshed.excecoes||[]);setPlanCatalog(refreshed.planos||[])
+      setHoliday({data:localDateISO(),descricao:''})
     }catch(e){setFormError(e.message)}
     finally{setBusy(false)}
   }
 
+  async function saveOverride(event){
+    event.preventDefault();setBusy(true);setFormError('')
+    const value=numeric(override.valor)
+    if(!value || Number(value)<=0){setBusy(false);setFormError('Informe valor fixo ou percentual maior que zero.');return}
+    try{
+      const result=await comercialPost('/api/fechamentos/excecoes',{...override,valor:value,
+        plano_versao_id:Number(override.plano_versao_id)})
+      setNotice(result.message)
+      const refreshed=await comercialGet('/api/fechamentos/politica')
+      setPlanOverrides(refreshed.excecoes||[])
+      setOverride(x=>({...x,valor:'',observacoes:''}))
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+  async function removeOverride(id){
+    if(!window.confirm('Excluir esta exceção somente para novas apurações?'))return
+    setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/fechamentos/excecoes/'+id+'/excluir',{})
+      setNotice(result.message)
+      const refreshed=await comercialGet('/api/fechamentos/politica')
+      setPlanOverrides(refreshed.excecoes||[])
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+  const newKey=()=> (typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():
+    String(Date.now())+'_'+Math.random().toString(36).slice(2,12))
+  function openBatch(person){
+    setFormError('');setDate(localDateISO());setReason('')
+    const initial=paymentMethods.find(f=>f.codigo==='PIX')||paymentMethods[0]
+    setBatchEntries([{forma_id:String(initial?.id||''),valor:''}])
+    setBatchKey(newKey())
+    setDialog({type:'batch',person})
+  }
+  function updateBatch(index,field,value){
+    setBatchEntries(old=>old.map((item,i)=>i===index?{...item,[field]:value}:item))
+  }
+  const batchSum=batchEntries.reduce((sum,item)=>sum+(Number(numeric(item.valor))||0),0)
+  async function saveBatch(event){
+    event.preventDefault()
+    const person=dialog.person
+    if(!batchEntries.length||batchEntries.some(x=>!x.forma_id||!numeric(x.valor)||Number(numeric(x.valor))<=0)){
+      return setFormError('Informe a forma e o valor de cada parte do pagamento.')
+    }
+    if(batchSum>Number(person.resumo.pendente)+0.00001)return setFormError('O acerto supera o saldo pendente da pessoa.')
+    setBusy(true);setFormError('')
+    try{
+      const payload={
+        chave_requisicao:batchKey,pessoa_id:Number(person.pessoa_id),inicio:start,fim:end,
+        data_pagamento:date,observacoes:reason,
+        formas:batchEntries.map(x=>({forma_id:Number(x.forma_id),valor:numeric(x.valor)})),
+      }
+      const result=await comercialPost('/api/fechamentos/pagamentos-lote',payload)
+      setNotice(result.message+' '+money(result.valor_total||batchSum)+' distribuídos nas vendas desta pessoa.')
+      setDialog(null);await reload()
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+  const nameOfPlan=id=>{
+    const p=planCatalog.find(x=>String(x.id)===String(id))
+    return p? p.codigo+' · '+money(p.valor)+' · '+(Number(p.duracao_meses)/12)+' ano(s)':'Plano #'+id
+  }
   const title=admin?'Fechamentos':'Meu financeiro'
   if(!admin)return <Financeiro role={role}/>
   return <div className="com-page fc-page">
