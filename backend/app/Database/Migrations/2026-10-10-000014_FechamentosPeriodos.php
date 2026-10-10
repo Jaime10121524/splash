@@ -95,6 +95,7 @@ class FechamentosPeriodos extends Migration
             'rateio_id'=>['type'=>'INT','unsigned'=>true],
             'movimento_id'=>['type'=>'INT','unsigned'=>true],
             'forma_id'=>['type'=>'INT','unsigned'=>true],
+            'situacao'=>['type'=>'VARCHAR','constraint'=>12,'default'=>'ATIVO'],
             'valor'=>['type'=>'DECIMAL','constraint'=>'15,2'],
         ]);
         $this->forge->addKey('id',true);
