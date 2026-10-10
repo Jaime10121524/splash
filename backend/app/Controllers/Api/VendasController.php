@@ -444,6 +444,21 @@ class VendasController extends CommercialBaseController
                 'data_inicio'=>$start,'data_vencimento'=>$expiry,'retorno_previsto'=>null,
                 'atualizado_em'=>$this->nowLocal(),
             ]);
+            if($op['visita_id']){
+                $visit=$db->query('SELECT id,status FROM visitas WHERE id=? FOR UPDATE',[(int)$op['visita_id']])->getRowArray();
+                if($visit && $visit['status']==='PENDENCIA'){
+                    $db->table('visitas')->where('id',$visit['id'])->update([
+                        'status'=>'VENDA','atualizado_em'=>$this->nowLocal(),
+                    ]);
+                    $db->table('visita_status_historico')->insert([
+                        'visita_id'=>(int)$visit['id'],
+                        'status_anterior'=>'PENDENCIA',
+                        'status_novo'=>'VENDA',
+                        'usuario_id'=>(int)auth('session')->user()->id,
+                        'criado_em'=>$this->nowLocal(),
+                    ]);
+                }
+            }
             $this->commitOrFail($db);
             return $this->responseOK('Pendência convertida em venda; todos os pagamentos foram preservados.');
         }catch(Throwable $e){
