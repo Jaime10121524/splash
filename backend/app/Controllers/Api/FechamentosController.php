@@ -311,9 +311,42 @@ class FechamentosController extends CommercialBaseController
         }
         $operations=$this->rows($db,$start,$end);
         $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId);
+        $lots=[];
+        if($admin){
+            $query=$db->table('comissao_lotes_pagamento l')
+                ->select('l.id,l.pessoa_id,l.periodo_inicio,l.periodo_fim,l.data_pagamento,l.valor_total,l.observacoes,p.nome AS pessoa_nome')
+                ->join('pessoas p','p.id=l.pessoa_id')
+                ->where('l.periodo_inicio >=',$start)->where('l.periodo_fim <=',$end)
+                ->orderBy('l.id','DESC')->limit(150);
+            if($personId!==null)$query->where('l.pessoa_id',$personId);
+            $lots=$query->get()->getResultArray();
+            if($lots){
+                $lotIds=array_map(static fn($x)=>(int)$x['id'],$lots);
+                $forms=$db->table('venda_formas_pagamento')->select('id,nome')->get()->getResultArray();
+                $byForm=[];
+                foreach($forms as $fm)$byForm[(int)$fm['id']]=$fm['nome'];
+                $pieces=[];
+                foreach(['comissao_repasses','comissao_titular_movimentos'] as $table){
+                    foreach($db->table($table)->select('lote_id,forma_id,valor')
+                        ->whereIn('lote_id',$lotIds)->where('tipo','PAGAMENTO')->get()->getResultArray() as $m){
+                        $id=(int)$m['lote_id'];
+                        $name=$byForm[(int)$m['forma_id']]??'Forma não informada';
+                        $pieces[$id][$name]=($pieces[$id][$name]??0)+VendaMoney::cents((string)$m['valor']);
+                    }
+                }
+                foreach($lots as &$lot){
+                    $details=[];
+                    foreach($pieces[(int)$lot['id']]??[] as $name=>$cent){
+                        $details[]=['forma'=>$name,'valor'=>VendaMoney::decimal($cent)];
+                    }
+                    $lot['formas']=$details;
+                }
+                unset($lot);
+            }
+        }
         return $this->response->setJSON([
             'inicio'=>$start,'fim'=>$end,
-            'contas'=>$accounts,
+            'contas'=>$accounts,'acertos'=>$lots,
             'limite_operacoes'=>500,'possivel_truncamento'=>count($operations)===500,
             'aviso'=>'Somente comissões de vendas quitadas, rateios e pagamentos confirmados. Não inclui adiantamentos não conciliados, despesas, dívidas ou saldo do clube.',
         ])->setHeader('Cache-Control','no-store');
