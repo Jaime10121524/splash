@@ -443,7 +443,7 @@ export default function FechamentosPeriodos({role='admin'}){
         </button></div>}
         {currentStage===4&&showAudit&&<AuditoriaRateios fechamentoId={current.id}/>}
       </>}
-    </>}
+    </>
     {modal&&<SurfaceModal eyebrow="SPLASH / FECHAMENTOS"
       title={modal==='entrada'?'Recebimento do clube':modal==='abate'?'Abater empréstimo':
         modal==='pagamento'?'Pagamento ao participante':modal==='estorno'?'Estornar pagamento':
