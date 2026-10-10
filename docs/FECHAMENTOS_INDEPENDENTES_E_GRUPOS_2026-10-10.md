@@ -11,7 +11,7 @@ Somente administrador cadastra vínculos e não são permitidos grupos em cascat
 
 1. **Novo fechamento:** escolha período inicial/final e responsável (admin); corretor comum usa automaticamente sua pessoa vinculada ao login.
 2. **Recebimentos:** confira vendas do grupo e registre quanto entrou efetivamente do clube, forma (ex.: R$ 200 dinheiro e R$ 3.000 Pix) e beneficiário correto. Inclua abatimentos negociados de empréstimos do titular, sem contá-los como dinheiro recebido.
-3. **Repasses:** sistema totaliza comissões de atendentes, gerentes e corretores participantes. Registre pagamentos reais, parciais e com múltiplas formas; são distribuídos nas participações das vendas. É permitido estornar pagamento incorreto com justificativa antes da conclusão.
+3. **Repasses:** primeiro registre a parte própria da comissão de cada corretor (inclusive Marta e Helena), depois as participações de atendentes, gerentes e segundos corretores. É possível pagar parcialmente ou com múltiplas formas. Cada baixa afeta a venda original e o extrato da pessoa; estornos antes da conclusão exigem justificativa.
 4. **Conclusão e histórico:** confira por pessoa o total, já recebido, recebido neste fechamento, repasses, despesas, abatimentos e resultado gerencial estimado. Concluir congela o relatório, disponível no histórico. Para obter PDF use **Imprimir → Salvar como PDF** no navegador.
 
 Atenção: dinheiro antigo retido pelo corretor que pertence ao clube não é conciliado automaticamente nesta versão. Portanto o valor a receber e o resultado líquido ainda são **estimativas** até conciliar a custódia anterior. Despesas não são consideradas saída do caixa do fechamento sem pagamento registrado.
@@ -23,7 +23,8 @@ Atenção: dinheiro antigo retido pelo corretor que pertence ao clube não é co
 - Leitura de históricos de outros corretores independentes retorna 403 para usuários comuns.
 - Chave de requisição evita entradas, abatimentos e repasses duplicados.
 - Rascunhos podem ter recebimentos retirados ou abatimentos desfeitos antes de avançar.
-- Pagamentos reais usam comissao_repasses e registram meio de pagamento. Sem baixas fictícias.
+- Pagamentos a atendentes e demais participantes usam comissao_repasses; pagamentos da parte própria dos corretores usam comissao_titular_movimentos. Todas as formas de pagamento e estornos ficam auditáveis. Sem baixas fictícias.
+- Abatimento de empréstimo lança tanto a amortização da dívida quanto a quitação equivalente na comissão própria da pessoa, marcada com forma interna, sem saída financeira.
 - Finalizado tem resumo congelado, com histórico acessível.
 
 ## Implantação
