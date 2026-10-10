@@ -436,7 +436,17 @@ export default function FechamentosPeriodos({role='admin'}){
             </div>
             <b>Resultado estimado: {money(p.resultado_estimado)}</b>
           </div>)}</div>
-          <p className="fpw-help">{current.observacao} A comissão ainda a receber é uma estimativa calculada com lançamentos registrados; se o mesmo dinheiro já foi lançado como comissão do titular e como recebimento do clube, é necessária conciliação antes de tratar o saldo como definitivo.</p>
+          {paymentsByPerson.length>0&&<div className="fpw-print-payments">
+            <h3>Pagamentos confirmados por pessoa</h3>
+            {paymentsByPerson.map(p=><div key={p.id}>
+              <strong>{p.nome} — {money(p.totalCent/100)}</strong>
+              {p.entries.map(m=><p key={m.key}>
+                {m.kind==='titular'?'Comissão própria':'Participação'} · {m.forma_nome} ·
+                {m.situacao==='ATIVO'?' Confirmado':' Estornado'} · {money(m.valor)}
+              </p>)}
+            </div>)}
+          </div>}
+          <p className="fpw-help">{current.observacao} Valores pagos a um titular só devem ser baixados depois da transferência efetiva; o recebimento pelo responsável do grupo não equivale a esse pagamento.</p>
         </section>}
       </>}
     </>}
