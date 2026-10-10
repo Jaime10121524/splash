@@ -339,9 +339,16 @@ class FechamentosPeriodosController extends CommercialBaseController
         $costs=0;
         foreach($costRows as $cost){$c=VendaMoney::cents((string)$cost['valor'],true);$costs+=$c;$byPerson[(int)$cost['pessoa_id']]['despesas_cent']+=$c;}
         $periodPayments=$db->table('fechamento_periodo_repasses')->select('valor')
-            ->where('fechamento_id',$id)->get()->getResultArray();
+            ->where('fechamento_id',$id)->where('situacao','ATIVO')->get()->getResultArray();
         $paidInClosing=0;
         foreach($periodPayments as $m)$paidInClosing+=VendaMoney::cents((string)$m['valor'],true);
+        $paymentHistory=$db->table('fechamento_periodo_repasses f')
+            ->select('f.id,f.rateio_id,f.valor,f.situacao,b.nome AS beneficiario_nome,m.nome AS forma_nome,r.beneficiario_pessoa_id')
+            ->join('comissao_rateios r','r.id=f.rateio_id')
+            ->join('pessoas b','b.id=r.beneficiario_pessoa_id')
+            ->join('venda_formas_pagamento m','m.id=f.forma_id')
+            ->where('f.fechamento_id',$id)->orderBy('f.id','DESC')->get()->getResultArray();
+
         $sumRates=0;$sumPaid=0;
         foreach($participant as &$p){
             $sumRates+=$p['total_cent'];$sumPaid+=$p['pago_cent'];
@@ -372,6 +379,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             'status'=>$period['status'],'concluido_em'=>$period['concluido_em'],
             'corretores'=>array_values($byPerson),'participantes'=>array_values($participant),
             'entradas'=>$entries,'abatimentos'=>$offsetRows,'emprestimos'=>$loans,
+            'historico_repasses'=>$paymentHistory,
             'quantidade_vendas'=>count($sales),
             'resumo'=>[
                 'comissoes'=>VendaMoney::decimal($gross),
@@ -562,7 +570,8 @@ class FechamentosPeriodosController extends CommercialBaseController
         try{
             $p=$this->editable($db,(int)$id,$actor,'REPASSES');
             if($p instanceof ResponseInterface){$db->transRollback();return $p;}
-            if($db->table('fechamento_periodo_repasses')->where('fechamento_id',(int)$id)->countAllResults()){
+            if($db->table('fechamento_periodo_repasses')->where('fechamento_id',(int)$id)
+                ->where('situacao','ATIVO')->countAllResults()){
                 $db->transRollback();return $this->errorResponse(409,'Já foram registrados repasses. Conclua ou estorne os pagamentos antes de voltar.');
             }
             $db->table('fechamento_periodos')->where('id',(int)$id)->update(['status'=>'RECEBIMENTOS']);
@@ -681,6 +690,45 @@ class FechamentosPeriodosController extends CommercialBaseController
             $this->commitOrFail($db);
             return $this->responseOK('Repasse confirmado e distribuído nas vendas desta pessoa.');
         }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'repasse do fechamento');}
+    }
+
+    /** Um pagamento errado vira ESTORNO: não apaga o lançamento nem mexe no outro corretor. */
+    public function estornarRepasse(int|string $id,int|string $entryId): ResponseInterface
+    {
+        $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
+        $body=$this->jsonPayload();
+        $reason=$this->cleanText($body['justificativa']??null,500,true);
+        if($reason===false||mb_strlen((string)$reason)<5)
+            return $this->errorResponse(422,'Justifique o estorno em ao menos cinco caracteres.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $p=$this->editable($db,(int)$id,$actor,'REPASSES');
+            if($p instanceof ResponseInterface){$db->transRollback();return $p;}
+            $entry=$db->table('fechamento_periodo_repasses f')
+                ->select('f.*,r.operacao_id')
+                ->join('comissao_rateios r','r.id=f.rateio_id')
+                ->where('f.fechamento_id',(int)$id)->where('f.id',(int)$entryId)
+                ->get()->getRowArray();
+            if(!$entry){$db->transRollback();return $this->errorResponse(404,'Repasse não encontrado.');}
+            $db->query('SELECT id FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$entry['operacao_id']])->get()->getRowArray();
+            $entry=$db->table('fechamento_periodo_repasses')->where('id',(int)$entryId)->get()->getRowArray();
+            if($entry['situacao']!=='ATIVO'){
+                $db->transRollback();return $this->errorResponse(409,'Repasse já estornado.');
+            }
+            $db->table('comissao_repasses')->insert([
+                'rateio_id'=>(int)$entry['rateio_id'],'tipo'=>'ESTORNO',
+                'referencia_pagamento_id'=>(int)$entry['movimento_id'],
+                'valor'=>$entry['valor'],
+                'data_pagamento'=>substr($this->now(),0,10),
+                'observacoes'=>$reason,'forma_id'=>(int)$entry['forma_id'],
+                'lote_id'=>null,'criado_por_usuario_id'=>$actor['usuario_id'],
+                'criado_em'=>$this->now(),
+            ]);
+            $db->table('fechamento_periodo_repasses')->where('id',(int)$entryId)
+                ->update(['situacao'=>'ESTORNADO']);
+            $this->commitOrFail($db);
+            return $this->responseOK('Pagamento estornado com histórico; voltou a ficar pendente.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'estornar repasse do fechamento');}
     }
 
     public function concluir(int|string $id): ResponseInterface
