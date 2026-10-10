@@ -99,7 +99,7 @@ class PessoasController extends BaseController
                 $user = auth()->getProvider()->findById($old['user_id']);
                 if ($user && ! $user->inGroup('admin')) {
                     foreach ($user->getGroups() as $group) {
-                        if (in_array($group, ['corretor','vendedor','gerente'], true)
+                        if (in_array($group, ['corretor','vendedor','gerente','operador'], true)
                             && ! in_array($group, $roles, true)) {
                             $db->transRollback();
                             return $this->error(409, 'O papel vinculado ao acesso precisa permanecer marcado ou ser alterado antes no cadastro de usuários.');
@@ -140,11 +140,11 @@ class PessoasController extends BaseController
         if (mb_strlen($phone)>25 || mb_strlen($note)>3000) {
             return ['error'=>'Telefone ou observações ultrapassam o limite permitido.'];
         }
-        if (!is_array($roles) || count($roles)<1 || count($roles)>3
+        if (!is_array($roles) || count($roles)<1 || count($roles)>4
             || count(array_filter($roles,'is_string'))!==count($roles)
             || count($roles)!==count(array_unique($roles))
             || array_diff($roles, ['corretor','vendedor','gerente'])!==[]) {
-            return ['error'=>'Marque pelo menos um papel válido: corretor, vendedor ou gerente.'];
+            return ['error'=>'Marque pelo menos um papel válido: corretor, vendedor, gerente ou operador.'];
         }
         if (!array_key_exists('ativo',$data) || !is_bool($data['ativo'])) {
             return ['error'=>'Informe a situação da pessoa.'];
