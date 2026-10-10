@@ -6,6 +6,37 @@ import FechamentosLegado from './Fechamentos.jsx'
 import './FechamentosPeriodos.css'
 
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0))
+const cents=n=>Math.round(Number(n||0)*100)
+/**
+ * Os relatórios concluídos mais antigos possuem um snapshot sem as participações
+ * recebidas por corretores do grupo. Recalcula somente a exibição, sem mexer
+ * no histórico de vendas ou nos pagamentos.
+ */
+const summaryByPerson=current=>{
+  const benefits=new Map((current?.participantes||[]).map(p=>[String(p.pessoa_id),p]))
+  return (current?.corretores||[]).map(p=>{
+    const part=benefits.get(String(p.pessoa_id))
+    const received=cents(part?.total)
+    const result=cents(p.comissao)+received-cents(p.repasse_total)-cents(p.despesas)
+    return {...p,participacoes_total:received/100,
+      participacoes_recebidas:cents(part?.pago)/100,
+      participacoes_pendentes:cents(part?.pendente)/100,
+      resultado_estimado:result/100}
+  })
+}
+const groupedPayments=current=>{
+  const groups=new Map()
+  const append=(id,name,entry)=>{
+    const key=String(id)
+    if(!groups.has(key))groups.set(key,{id:key,nome:name||'Participante',entries:[],totalCent:0})
+    const person=groups.get(key)
+    person.entries.push(entry)
+    if(entry.situacao==='ATIVO')person.totalCent+=cents(entry.valor)
+  }
+  for(const m of current?.historico_titulares||[])append(m.corretor_pessoa_id,m.beneficiario_nome,{...m,kind:'titular',key:'T'+m.id})
+  for(const m of current?.historico_repasses||[])append(m.beneficiario_pessoa_id,m.beneficiario_nome,{...m,kind:'repasse',key:'R'+m.id})
+  return [...groups.values()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
+}
 const suggestedAmount=n=>Number(n)>0?Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):''
 const cleanMoney=v=>{
   const s=String(v||'').trim()
