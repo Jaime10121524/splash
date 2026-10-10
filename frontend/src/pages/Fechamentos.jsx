@@ -29,6 +29,7 @@ export default function Fechamentos({role='admin'}){
   const [end,setEnd]=useState(defaultEnd)
   const [report,setReport]=useState(null)
   const [accounts,setAccounts]=useState([])
+  const [settlements,setSettlements]=useState([])
   const [showSales,setShowSales]=useState(false)
   const [openPersons,setOpenPersons]=useState({})
   const [busy,setBusy]=useState(false)
@@ -69,6 +70,7 @@ export default function Fechamentos({role='admin'}){
         comercialGet('/api/fechamentos/formas'),
       ])
       setReport(data);setAccounts(accountData.contas||[])
+      setSettlements(accountData.acertos||[])
       setPaymentMethods(forms.formas||[])
     } else {
       const [data,accountData]=await Promise.all([
@@ -413,6 +415,19 @@ export default function Fechamentos({role='admin'}){
             </div>}
           </article>
         })}</div>}
+      </section>
+      <section className="com-panel fc-settlements">
+        <div className="com-panel-head"><div><h2>Acertos registrados</h2>
+          <p>Pagamentos consolidados por pessoa, com as formas utilizadas. Estornos posteriores aparecem no extrato das participações.</p></div></div>
+        {!settlements.length?<div className="com-empty">Nenhum acerto consolidado registrado neste período.</div>:
+        <div className="fc-settlements-list">{settlements.map(item=><article key={item.id}>
+          <div><strong>{item.pessoa_nome}</strong>
+            <small>Acerto #{item.id} · {dateBR(item.data_pagamento)} · Vendas de {dateBR(item.periodo_inicio)} a {dateBR(item.periodo_fim)}</small>
+            {item.observacoes&&<small>{item.observacoes}</small>}
+            <div className="fc-settlement-methods">{item.formas.map((f,i)=><span key={i}>{f.forma}: {money(f.valor)}</span>)}</div>
+          </div>
+          <strong>{money(item.valor_total)}</strong>
+        </article>)}</div>}
       </section>
       <div className="fc-sales-toggle">
         <button type="button" className="vd-outline" onClick={()=>setShowSales(v=>!v)}
