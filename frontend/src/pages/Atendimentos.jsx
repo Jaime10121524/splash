@@ -192,7 +192,7 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
           {visits.map(v=>{
             const elapsed=v.inicio_em && v.fim_em ? Number(v.duracao_segundos) : null
             const visibleStatus=v.operacao_situacao==='VENDA'?'VENDA':v.status
-            const canResume=!v.operacao_id && ['SEM_VENDA','RETORNO','PENDENCIA'].includes(v.status)
+            const canResume=v.operacao_situacao!=='VENDA' && ['SEM_VENDA','RETORNO','PENDENCIA'].includes(v.status)
               && v.chegada_em?.slice(0,10)===localDateISO()
             return <article className="com-visit" key={v.id}>
               <div className="com-visit-main">
