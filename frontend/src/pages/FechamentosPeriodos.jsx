@@ -115,9 +115,9 @@ export default function FechamentosPeriodos({role='admin'}){
     setRecord({emprestimo_id:'',valor:'',data:localDateISO()})
     setModal('abate')
   }
-  function openPay(person){
+  function openPay(person,type='participacao'){
     setNonce(requestKey())
-    setPayee(person)
+    setPayee({...person,type})
     setRecord({data:localDateISO()})
     setPayMethods([{forma_id:String(methods[0]?.id||''),valor:''}])
     setModal('pagamento')
@@ -145,8 +145,10 @@ export default function FechamentosPeriodos({role='admin'}){
     if(forms.some(x=>!x.forma_id||!x.valor))return setError('Informe forma e valor positivo em cada linha.')
     const sum=forms.reduce((n,x)=>n+Number(x.valor),0)
     if(sum>Number(payee.pendente)+.00001)return setError('Total maior que o saldo pendente.')
-    action('/api/fechamentos-periodos/'+current.id+'/pagar',{
-      beneficiario_pessoa_id:Number(payee.pessoa_id),
+    action('/api/fechamentos-periodos/'+current.id+
+      (payee.type==='titular'?'/titular/pagar':'/pagar'),{
+      ...(payee.type==='titular'?{corretor_pessoa_id:Number(payee.pessoa_id)}:
+        {beneficiario_pessoa_id:Number(payee.pessoa_id)}),
       data_pagamento:record.data,formas:forms,chave_requisicao:nonce,
     })
   }
@@ -155,7 +157,8 @@ export default function FechamentosPeriodos({role='admin'}){
     if(!record.justificativa||record.justificativa.trim().length<5){
       return setError('Informe o motivo do estorno em pelo menos cinco caracteres.')
     }
-    action('/api/fechamentos-periodos/'+current.id+'/repasses/'+record.id+'/estornar',{
+    action('/api/fechamentos-periodos/'+current.id+
+      (record.isTitular?'/titulares/':'/repasses/')+record.id+'/estornar',{
       justificativa:record.justificativa.trim(),
     })
   }
@@ -259,6 +262,7 @@ export default function FechamentosPeriodos({role='admin'}){
                 <span>Parte própria recebida anteriormente: <b>{money(p.titular_ja_recebido)}</b></span>
                 <span>Recebido do clube neste fechamento: <b>{money(p.recebido_clube)}</b></span>
                 <span>Comissão ainda a receber (estimativa): <b>{money(p.a_receber_estimado)}</b></span>
+                <span>Comissão própria pendente: <b>{money(p.titular_pendente)}</b></span>
                 <span>Rateios devidos: <b>{money(p.repasse_total)}</b></span>
                 <span>Rateios já pagos: <b>{money(p.repasse_ja_pago)}</b></span>
                 <span>Despesas próprias: <b>{money(p.despesas)}</b></span>
@@ -307,6 +311,21 @@ export default function FechamentosPeriodos({role='admin'}){
               onClick={()=>action('/api/fechamentos-periodos/'+current.id+'/voltar',{})}>← Voltar aos recebimentos</button>
           </div>
           <section className="com-panel fpw-stage">
+            <div className="com-panel-head"><div><h2>3.1 Comissões próprias de James, Marta, Helena e demais corretores</h2>
+              <p>Valores devidos diretamente a cada corretor titular. O abatimento negociado de sua dívida já liquida a parcela correspondente, sem saída de dinheiro.</p></div></div>
+            <div className="fpw-payees">
+              {current.corretores.map(p=><article key={p.pessoa_id}>
+                <div><strong>{p.nome}</strong><small>Parte própria {money(p.titular_total)} · Já liquidado {money(p.titular_ja_recebido)}</small></div>
+                <div><strong>{money(p.titular_pendente)} pendente</strong>
+                  <button type="button" className="cm-button primary" disabled={busy||Number(p.titular_pendente)<=0}
+                    onClick={()=>openPay({
+                      pessoa_id:p.pessoa_id,nome:p.nome,total:p.titular_total,
+                      pago:p.titular_ja_recebido,pendente:p.titular_pendente,
+                    },'titular')}>Registrar pagamento da comissão</button></div>
+              </article>)}
+            </div>
+          </section>
+          <section className="com-panel fpw-stage">
             <div className="com-panel-head"><div><h2>3. Pagar corretores, atendentes e gerentes</h2>
               <p>Você informa como pagou cada pessoa. Os valores são baixados nas participações das vendas deste fechamento.</p></div></div>
             <div className="fpw-payees">
@@ -322,10 +341,20 @@ export default function FechamentosPeriodos({role='admin'}){
             <button type="button" className="cm-button primary" disabled={busy}
               onClick={()=>{setModal('confirmar')}}>Concluir fechamento e guardar relatório →</button></div>
         </>}
-        {(current.historico_repasses||[]).length>0&&<section className="com-panel fpw-stage fpw-payment-history">
+        {((current.historico_repasses||[]).length>0 || (current.historico_titulares||[]).length>0)&&
+          <section className="com-panel fpw-stage fpw-payment-history">
           <div className="com-panel-head"><div><h2>Pagamentos registrados neste fechamento</h2>
             <p>Histórico por pessoa e forma de pagamento. Correções exigem estorno justificado antes da conclusão.</p></div></div>
-          <div className="fpw-lines">{current.historico_repasses.map(m=><div key={m.id}>
+          <div className="fpw-lines">{(current.historico_titulares||[]).map(m=><div key={'T'+m.id}>
+            <div><strong>{m.beneficiario_nome} · Comissão própria · {m.forma_nome}</strong>
+              <small>{m.situacao==='ATIVO'?'Pagamento confirmado':'Estornado'} · Venda # {m.operacao_id}</small></div>
+            <strong>{money(m.valor)}</strong>
+            {current.status==='REPASSES'&&m.situacao==='ATIVO'&&m.forma_nome!=='Abatimento de empréstimo'&&
+              <button type="button" className="vd-outline" onClick={()=>{
+                setRecord({id:m.id,justificativa:'',isTitular:true});setModal('estorno')
+              }}>Estornar</button>}
+          </div>)}
+          {current.historico_repasses.map(m=><div key={'R'+m.id}>
             <div><strong>{m.beneficiario_nome} · {m.forma_nome}</strong>
               <small>{m.situacao==='ATIVO'?'Pagamento confirmado':'Estornado'} · Rateio # {m.rateio_id}</small></div>
             <strong>{money(m.valor)}</strong>
