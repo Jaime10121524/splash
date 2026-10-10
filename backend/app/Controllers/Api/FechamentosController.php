@@ -509,7 +509,7 @@ class FechamentosController extends CommercialBaseController
         return $this->response->setJSON([
             'inicio'=>$start,'fim'=>$end,'operacoes'=>$operations,'pessoas'=>$people,
             'saldos'=>array_values($rates),'limite_operacoes'=>500,
-            'aviso'=>'Apuração de comissões. Recebimentos do clube, gastos, empréstimos e pagamentos do corretor principal ainda serão conciliados no fechamento definitivo.',
+            'aviso'=>'Resumo de comissões e participações registradas. Dinheiro em poder do corretor e valores que pertencem ao clube ainda requerem conciliação de caixa separada.',
         ])->setHeader('Cache-Control','no-store');
     }
 
