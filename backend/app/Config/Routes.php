@@ -42,6 +42,19 @@ $routes->group('api', static function ($routes): void {
     $routes->post('atendimentos/(:num)/finalizar', 'Api\VisitasController::finalizar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/retomar', 'Api\VisitasController::retomar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/corretores', 'Api\VisitasController::corretores/$1', ['filter'=>'csrf']);
+
+    // Operações de vendas: títulos e negociações compartilham o mesmo extrato.
+    $routes->get('vendas/opcoes', 'Api\VendasController::opcoes');
+    $routes->get('vendas', 'Api\VendasController::index');
+    $routes->get('vendas/(:num)', 'Api\VendasController::detalhe/$1');
+    $routes->post('vendas', 'Api\VendasController::create', ['filter'=>'csrf']);
+    $routes->post('vendas/(:num)/converter', 'Api\VendasController::converter/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/(:num)/receber', 'Api\VendasController::receber/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/(:num)/devolver', 'Api\VendasController::devolver/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/regras', 'Api\VendasCatalogosController::regra', ['filter'=>'csrf']);
+    $routes->post('vendas/regras/(:num)/editar', 'Api\VendasCatalogosController::regra/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/formas', 'Api\VendasCatalogosController::forma', ['filter'=>'csrf']);
+    $routes->post('vendas/formas/(:num)/editar', 'Api\VendasCatalogosController::forma/$1', ['filter'=>'csrf']);
 });
 
 // Rotas internas do Shield: recuperação de acesso e gestão de sessão tradicional.
