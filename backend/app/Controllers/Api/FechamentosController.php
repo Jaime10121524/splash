@@ -443,46 +443,10 @@ class FechamentosController extends CommercialBaseController
         ])->setHeader('Cache-Control','no-store');
     }
 
+    /** Compatibilidade: responde somente com o extrato individual seguro. */
     public function meu(): ResponseInterface
     {
-        $user=auth('session')->user();
-        if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
-        $range=$this->period();
-        if($range instanceof ResponseInterface)return $range;
-        [$start,$end]=$range;
-        $db=db_connect();
-        $self=$db->table('pessoas')->select('id,nome')
-            ->where('user_id',(int)$user->id)->where('ativo',1)->get()->getRowArray();
-        if(!$self)return $this->errorResponse(403,'Nenhuma pessoa ativa está vinculada ao seu usuário.');
-        $id=(int)$self['id'];
-        $operations=$this->rows($db,$start,$end);
-        $mine=0;$fromOthers=0;$outgoing=0;$paidToMe=0;$openToMe=0;
-        foreach($operations as $op){
-            if($op['comissao_base']===null)continue;
-            if($op['corretor_pessoa_id']===$id)$mine+=VendaMoney::cents($op['comissao_base'],true);
-            foreach($op['rateios'] as $allocation){
-                $amount=VendaMoney::cents((string)$allocation['valor']);
-                if($allocation['responsavel_pessoa_id']===$id)$outgoing+=$amount;
-                if($allocation['beneficiario_pessoa_id']===$id){
-                    $fromOthers+=$amount;
-                    $paidToMe+=VendaMoney::cents((string)$allocation['pago'],true);
-                    $openToMe+=VendaMoney::cents((string)$allocation['pendente'],true);
-                }
-            }
-        }
-        return $this->response->setJSON([
-            'inicio'=>$start,'fim'=>$end,
-            'pessoa'=>['id'=>$id,'nome'=>$self['nome']],
-            'resumo'=>[
-                'comissoes_proprias'=>VendaMoney::decimal($mine),
-                'obrigacoes_de_rateio'=>VendaMoney::decimal($outgoing),
-                'direitos_de_terceiros'=>VendaMoney::decimal($fromOthers),
-                'rateios_ja_pagos_a_mim'=>VendaMoney::decimal($paidToMe),
-                'rateios_pendentes_para_mim'=>VendaMoney::decimal($openToMe),
-                'participacao_liquida_prevista'=>VendaMoney::decimal($mine-$outgoing+$fromOthers),
-            ],
-            'aviso'=>'Valores apurados individualmente. Não incluem despesas, empréstimos, acertos com a empresa nem fechamento liquidado.',
-        ])->setHeader('Cache-Control','no-store');
+        return $this->contas();
     }
 
     public function sincronizar(): ResponseInterface
