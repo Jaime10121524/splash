@@ -1,10 +1,10 @@
-# SPLASH — Etapa 5: conciliação de dinheiro sob custódia
+# SPLASH — Conferência opcional de caixa e dinheiro sob custódia
 
 ## Objetivo
 
 Fechar o ciclo físico de dinheiro do grupo sem confundir comissão pessoal e caixa sob posse do responsável. O clube envia o dinheiro de todas as comissões a James, mesmo quando a venda é da Marta ou da Helena. James paga os beneficiários. O pagamento do clube a James **não** dá baixa no direito da Marta, da Helena ou de vendedores/gerentes.
 
-A tela aparece após a conclusão do fechamento em **Fechamentos → Fechamento concluído → 5. Conciliação do dinheiro recebido**. A reconciliação é independente do relatório congelado e pode ser ajustada depois, com estorno histórico.
+A ferramenta aparece somente ao clicar em **Fechamentos → Fechamento concluído → Abrir conferência de caixa**. Não constitui uma quinta etapa obrigatória. O fechamento termina no **Resultado do período** e a conferência de caixa é independente do relatório congelado.
 
 ## Fontes automáticas (não lançar outra vez)
 
