@@ -314,7 +314,7 @@ class FechamentosController extends CommercialBaseController
         $lots=[];
         if($admin){
             $query=$db->table('comissao_lotes_pagamento l')
-                ->select('l.id,l.pessoa_id,l.periodo_inicio,l.periodo_fim,l.data_pagamento,l.valor_total,l.observacoes,p.nome AS pessoa_nome')
+                ->select('l.id,l.pessoa_id,l.periodo_inicio,l.periodo_fim,l.data_pagamento,l.valor_total,l.valor_transferido,l.valor_abate,l.observacoes,p.nome AS pessoa_nome')
                 ->join('pessoas p','p.id=l.pessoa_id')
                 ->where('l.periodo_inicio >=',$start)->where('l.periodo_fim <=',$end)
                 ->orderBy('l.id','DESC')->limit(150);
@@ -397,7 +397,8 @@ class FechamentosController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(409,'Confira primeiro o rateio da venda. A parcela própria não pode ser paga antes da apuração.');
             }
-            if(!$db->table('venda_formas_pagamento')->where('id',$formId)->where('ativo',1)->countAllResults()){
+            if(!$db->table('venda_formas_pagamento')->where('id',$formId)
+                ->where('ativo',1)->where('codigo !=','ABATIMENTO_EMP')->countAllResults()){
                 $db->transRollback();return $this->errorResponse(422,'Meio de pagamento inválido ou inativo.');
             }
             $due=$this->ownerDue($db,$op);
@@ -663,7 +664,7 @@ class FechamentosController extends CommercialBaseController
         if($denied=$this->authorizeAdmin())return $denied;
         return $this->response->setJSON([
             'formas'=>db_connect()->table('venda_formas_pagamento')
-                ->select('id,nome,codigo')->where('ativo',1)
+                ->select('id,nome,codigo')->where('ativo',1)->where('codigo !=','ABATIMENTO_EMP')
                 ->orderBy('nome','ASC')->get()->getResultArray(),
         ])->setHeader('Cache-Control','no-store');
     }
@@ -679,11 +680,14 @@ class FechamentosController extends CommercialBaseController
         $key=(string)($data['chave_requisicao']??'');
         $note=$this->cleanText($data['observacoes']??null,500);
         $items=$data['formas']??null;
+        $deductions=$data['abatimentos']??[];
         if(!$personId||!$this->validateDate($start)||!$this->validateDate($end)
             ||$start>$end ||(new \DateTimeImmutable($start))->diff(new \DateTimeImmutable($end))->days>366
             ||!$this->validateDate($paymentDate,false)
             ||!preg_match('/^[a-zA-Z0-9_-]{16,64}$/D',$key)
-            ||$note===false||!is_array($items)||count($items)<1||count($items)>10){
+            ||$note===false||!is_array($items)||count($items)>10
+            ||!is_array($deductions)||count($deductions)>20
+            ||(count($items)===0 && count($deductions)===0)){
             return $this->errorResponse(422,'Revise período, beneficiário, data e meios de pagamento.');
         }
         $forms=[];$formIds=[];$sum=0;
@@ -696,7 +700,19 @@ class FechamentosController extends CommercialBaseController
             $forms[]=['forma_id'=>$id,'valor_centavos'=>$value];
             $sum+=$value;
         }
-        if($sum<=0)return $this->errorResponse(422,'Valor do pagamento inválido.');
+        $abatimentos=[];$abatTotal=0;$loanIds=[];
+        foreach($deductions as $abat){
+            if(!is_array($abat))return $this->errorResponse(422,'Abatimento inválido.');
+            $loanId=$this->optionalId($abat['emprestimo_id']??null);
+            $cents=$this->money($abat['valor']??null);
+            if(!$loanId||!$cents||isset($loanIds[$loanId])){
+                return $this->errorResponse(422,'Informe um empréstimo distinto e valor de abatimento positivo.');
+            }
+            $loanIds[$loanId]=true;
+            $abatimentos[]=['emprestimo_id'=>$loanId,'valor_centavos'=>$cents];
+            $abatTotal+=$cents;
+        }
+        if($sum+$abatTotal<=0)return $this->errorResponse(422,'Valor do acerto inválido.');
         $db=db_connect();$db->transBegin();
         try{
             $previous=$db->table('comissao_lotes_pagamento')->where('chave_requisicao',$key)->get()->getRowArray();
@@ -705,11 +721,39 @@ class FechamentosController extends CommercialBaseController
                 return $this->responseOK('Acerto já registrado anteriormente, sem duplicação.',200,
                     ['lote_id'=>(int)$previous['id'],'duplicado'=>true]);
             }
-            $valid=$db->table('venda_formas_pagamento')->select('id')
-                ->whereIn('id',array_keys($formIds))->where('ativo',1)->get()->getResultArray();
-            if(count($valid)!==count($formIds)){
+            $valid=$formIds?$db->table('venda_formas_pagamento')->select('id,codigo')
+                ->whereIn('id',array_keys($formIds))->where('ativo',1)->get()->getResultArray():[];
+            if(count($valid)!==count($formIds)
+                ||count(array_filter($valid,static fn($m)=>$m['codigo']==='ABATIMENTO_EMP'))>0){
                 $db->transRollback();
                 return $this->errorResponse(422,'Selecione meios de pagamento cadastrados e ativos.');
+            }
+            if($abatTotal>0){
+                $internal=$db->table('venda_formas_pagamento')
+                    ->where('codigo','ABATIMENTO_EMP')->get()->getRowArray();
+                if(!$internal){
+                    $db->transRollback();return $this->errorResponse(409,'Forma interna de abatimento não configurada.');
+                }
+                // Empréstimos são bloqueados em ordem determinística para impedir abatimento concorrente.
+                sort($loanIds);
+                $locked=[];
+                foreach(array_keys($loanIds) as $loanId){
+                    $loan=$db->query('SELECT * FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[$loanId])->getRowArray();
+                    if(!$loan||(int)$loan['pessoa_id']!==(int)$personId||$loan['situacao']!=='ATIVO'){
+                        $db->transRollback();return $this->errorResponse(422,'Empréstimo não pertence à pessoa ou está inativo.');
+                    }
+                    $paidRows=$db->table('financeiro_emprestimo_abates')->select('valor')
+                        ->where('emprestimo_id',$loanId)->get()->getResultArray();
+                    $paid=0;
+                    foreach($paidRows as $r)$paid+=VendaMoney::cents((string)$r['valor'],true);
+                    $locked[$loanId]=VendaMoney::cents((string)$loan['valor'],true)-$paid;
+                }
+                foreach($abatimentos as $abat){
+                    if($abat['valor_centavos']>$locked[$abat['emprestimo_id']]){
+                        $db->transRollback();return $this->errorResponse(422,'Abatimento maior que o saldo do empréstimo.');
+                    }
+                }
+                $forms[]=['forma_id'=>(int)$internal['id'],'valor_centavos'=>$abatTotal];
             }
             $person=$db->table('pessoas')->select('id')->where('id',$personId)->get()->getRowArray();
             if(!$person){
@@ -760,11 +804,23 @@ class FechamentosController extends CommercialBaseController
             $now=$this->now();
             $db->table('comissao_lotes_pagamento')->insert([
                 'pessoa_id'=>$personId,'periodo_inicio'=>$start,'periodo_fim'=>$end,
-                'data_pagamento'=>$paymentDate,'valor_total'=>VendaMoney::decimal($sum),
+                'data_pagamento'=>$paymentDate,'valor_total'=>VendaMoney::decimal($sum+$abatTotal),
+                'valor_transferido'=>VendaMoney::decimal($sum),
+                'valor_abate'=>VendaMoney::decimal($abatTotal),
                 'observacoes'=>$note,'chave_requisicao'=>$key,
                 'criado_por_usuario_id'=>(int)auth('session')->user()->id,'criado_em'=>$now,
             ]);
             $lotId=(int)$db->insertID();
+            foreach($abatimentos as $abat){
+                $db->table('financeiro_emprestimo_abates')->insert([
+                    'emprestimo_id'=>$abat['emprestimo_id'],
+                    'lote_id'=>$lotId,
+                    'valor'=>VendaMoney::decimal($abat['valor_centavos']),
+                    'data_abate'=>$paymentDate,
+                    'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                    'criado_em'=>$now,
+                ]);
+            }
             foreach($distribution as $piece){
                 $base=[
                     'tipo'=>'PAGAMENTO','referencia_pagamento_id'=>null,
@@ -786,7 +842,9 @@ class FechamentosController extends CommercialBaseController
             }
             $this->commitOrFail($db);
             return $this->responseOK('Acerto por pessoa registrado, separado por venda e forma de pagamento.',200,[
-                'lote_id'=>$lotId,'valor_total'=>VendaMoney::decimal($sum),
+                'lote_id'=>$lotId,'valor_total'=>VendaMoney::decimal($sum+$abatTotal),
+                'valor_transferido'=>VendaMoney::decimal($sum),
+                'valor_abate'=>VendaMoney::decimal($abatTotal),
                 'distribuicoes'=>count($distribution),
             ]);
         }catch(Throwable $e){
