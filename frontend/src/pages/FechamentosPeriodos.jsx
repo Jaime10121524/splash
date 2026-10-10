@@ -3,6 +3,7 @@ import {comercialGet,comercialPost,dateBR,localDateISO} from '../lib/comercialAp
 import {FormControl} from '../components/UiFields.jsx'
 import {SurfaceModal} from '../components/ComercialForms.jsx'
 import FechamentosLegado from './Fechamentos.jsx'
+import ConciliacaoCustodia from './ConciliacaoCustodia.jsx'
 import './FechamentosPeriodos.css'
 
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0))
@@ -448,6 +449,7 @@ export default function FechamentosPeriodos({role='admin'}){
           </div>}
           <p className="fpw-help">{current.observacao} Valores pagos a um titular só devem ser baixados depois da transferência efetiva; o recebimento pelo responsável do grupo não equivale a esse pagamento.</p>
         </section>}
+        {currentStage===4&&<ConciliacaoCustodia fechamentoId={current.id}/>}
       </>}
     </>}
     {modal&&<SurfaceModal eyebrow="SPLASH / FECHAMENTOS"
