@@ -39,6 +39,9 @@ export default function Fechamentos({role='admin'}){
   const [date,setDate]=useState(localDateISO())
   const [detail,setDetail]=useState(null)
   const [suggestion,setSuggestion]=useState(5)
+  const [policy,setPolicy]=useState(null)
+  const [holiday,setHoliday]=useState({data:localDateISO(),descricao:''})
+  const [holidays,setHolidays]=useState([])
 
   async function reload(){
     if(!start||!end||start>end)throw new Error('Selecione início e fim válidos.')
@@ -138,11 +141,54 @@ export default function Fechamentos({role='admin'}){
     }catch(e){setFormError(e.message)}
     finally{setBusy(false)}
   }
+  async function syncSales(){
+    if(!admin)return
+    setBusy(true);setError('');setNotice('')
+    try{
+      const result=await comercialPost('/api/fechamentos/sincronizar',{inicio:start,fim:end})
+      const r=result.resultado||{}
+      setNotice('Participações automáticas: '+(r.geradas||0)+' novas, '+(r.existentes||0)+' existentes, '+(r.revisar||0)+' para revisão, '+(r.aguardando||0)+' aguardando quitação.')
+      await reload()
+    }catch(e){setError(e.message)}
+    finally{setBusy(false)}
+  }
+  async function openPolicies(){
+    setBusy(true);setFormError('')
+    try{
+      const result=await comercialGet('/api/fechamentos/politica')
+      setPolicy(result.politica);setHolidays(result.feriados||[])
+      setDialog({type:'policy'})
+    }catch(e){setError(e.message)}
+    finally{setBusy(false)}
+  }
+  async function savePolicy(e){
+    e.preventDefault();setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/fechamentos/politica',policy)
+      setNotice(result.message);setDialog(null)
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+  async function saveHoliday(e){
+    e.preventDefault();setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/fechamentos/feriados',holiday)
+      setNotice(result.message)
+      const refreshed=await comercialGet('/api/fechamentos/politica')
+      setHolidays(refreshed.feriados||[]);setHoliday({data:localDateISO(),descricao:''})
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+
   const title=admin?'Apuração e repasses':'Meu financeiro'
   return <div className="com-page fc-page">
     <header className="com-heading">
       <div><span className="com-eyebrow">SPLASH / FINANCEIRO</span><h1>{title}</h1>
         <p>{admin?'Distribuição da comissão de cada venda, pagamentos e saldos por pessoa.':'Suas comissões apuradas, sem acesso ao financeiro dos demais.'}</p></div>
+      {admin&&<div className="fc-header-buttons">
+        <button className="vd-outline" type="button" disabled={busy} onClick={openPolicies}>Regras e feriados</button>
+        <button className="com-main-button" type="button" disabled={busy} onClick={syncSales}>{busy?'Apurando...':'Apurar vendas anteriores'}</button>
+      </div>}
     </header>
     {notice&&<div className="com-alert success" role="status">{notice}
       <button type="button" onClick={()=>setNotice('')}>Fechar</button></div>}
@@ -210,10 +256,35 @@ export default function Fechamentos({role='admin'}){
       <p className="com-disclaimer">{report.aviso} O rateio não transfere dinheiro por si só; ao registrar um pagamento, confirme que ele realmente foi feito.</p>
     </>:null}
     {dialog&&<SurfaceModal
-      title={dialog.type==='rateios'?'Distribuir comissão':dialog.type==='pay'?'Registrar repasse':
+      title={dialog.type==='policy'?'Regras automáticas e feriados':dialog.type==='rateios'?'Distribuir comissão':dialog.type==='pay'?'Registrar repasse':
         dialog.type==='reverse'?'Estornar repasse':'Extrato do participante'}
       subtitle={dialog.type==='rateios'?dialog.op.cliente_nome:dialog.rateio?.beneficiario_nome}
       busy={busy} onClose={()=>setDialog(null)}>
+      {dialog.type==='policy'&&policy&&<div className="cm-form">
+        <form className="cm-form" onSubmit={savePolicy}>
+          <div className="com-inform">Percentuais sobre o valor de tabela do plano, exceto a divisão entre corretores, que utiliza o saldo da comissão após os participantes. Alterações não recalculam rateios já registrados.</div>
+          {[
+            ['percentual_atendente_dia_util','Atendente em dia útil (%)'],
+            ['percentual_atendente_outros_dias','Atendente em outros dias (%)'],
+            ['percentual_gerente','Gerente quando aplicável (%)'],
+            ['divisao_segundo_corretor','Percentual do segundo corretor sobre o saldo (%)'],
+          ].map(([key,label])=><label key={key}>{label}
+            <input type="number" min="0" max="100" step="0.01"
+              value={policy[key]??''} onChange={e=>setPolicy(p=>({...p,[key]:e.target.value}))}/></label>)}
+          <div className="cm-form-actions"><button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
+            <button type="submit" className="cm-button primary" disabled={busy}>Salvar percentuais</button></div>
+        </form>
+        <form className="cm-form" onSubmit={saveHoliday}>
+          <strong>Feriados cadastrados</strong>
+          <div className="com-inform">Segunda a sexta tem 10% no modelo inicial, exceto feriados. Cadastre os feriados aplicáveis antes de apurar, para não pagar o percentual errado.</div>
+          <label>Data <FormControl type="date" value={holiday.data} onChange={v=>setHoliday(x=>({...x,data:v}))}/></label>
+          <label>Descrição <input type="text" maxLength={120} value={holiday.descricao} onChange={e=>setHoliday(x=>({...x,descricao:e.target.value}))} placeholder="Ex.: Feriado municipal"/></label>
+          <button type="submit" className="cm-button primary" disabled={busy}>Cadastrar feriado</button>
+          <div className="fc-holiday-list">{holidays.slice(0,20).map(h=><div key={h.data}>
+            <span>{dateBR(h.data)}</span><strong>{h.descricao}</strong></div>)}</div>
+        </form>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+      </div>}
       {dialog.type==='rateios'&&<form className="cm-form fc-rateio-form" onSubmit={saveRateios}>
         <div className="com-inform">Comissão disponível: {money(dialog.op.comissao_base)}. A comissão pertence primeiro a {dialog.op.corretor_nome}. Cada pessoa só pode repartir o que recebeu. Não haverá pagamento automático.</div>
         <div className="fc-suggest">
