@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\VendaMoney;
+use App\Libraries\ExtratoPermissoes;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -15,7 +16,7 @@ class FinanceiroPessoalController extends CommercialBaseController
         $user=auth('session')->user();
         if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
         $admin=$user->inGroup('admin')&&$user->can('visits.manage');
-        $allowed=$admin || ($user->inGroup('corretor') && $user->can('finance.own'));
+        $allowed=ExtratoPermissoes::financeiroPessoal($admin,$user->inGroup('corretor') && $user->can('finance.own'));
         if(!$allowed)return $this->errorResponse(403,'Acesso ao financeiro pessoal não autorizado.');
         $own=null;
         if(!$admin){
