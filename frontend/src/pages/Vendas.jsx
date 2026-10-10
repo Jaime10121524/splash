@@ -7,6 +7,7 @@ import './ComercialPages.css'
 import './Vendas.css'
 
 const currency = n => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0))
+const suggestedAmount = n => Number(n)>0?Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):''
 const moneyInput = value => {
   const s=String(value??'').trim()
   if(!s) return null
@@ -533,7 +534,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <button type="button" className="cm-button" onClick={openAdjustment}>Ajustar comissão</button>
           <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
           <button type="button" className="cm-button" disabled={!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
-          <button type="button" className="cm-button primary" disabled={Number(detail.saldo)<=0} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
+          <button type="button" className="cm-button primary" disabled={Number(detail.saldo)<=0} onClick={()=>{setMoveForm({...blankMovement(),valor:suggestedAmount(detail.saldo)});setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
         </div>
       </div>}
 
