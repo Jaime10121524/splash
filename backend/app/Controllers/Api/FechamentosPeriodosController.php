@@ -223,6 +223,31 @@ class FechamentosPeriodosController extends CommercialBaseController
         }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'abrir fechamento de período');}
     }
 
+    /** Ajusta apenas a apresentação de relatórios concluídos antigos, sem gravar no banco. */
+    private function resultadoHistorico(array $report): array
+    {
+        $income=[];
+        foreach(($report['participantes']??[]) as $item){
+            $income[(int)$item['pessoa_id']]=$item;
+        }
+        $total=0;
+        foreach(($report['corretores']??[]) as &$person){
+            $bonus=$income[(int)$person['pessoa_id']]??null;
+            $part=VendaMoney::cents((string)($bonus['total']??'0'),true);
+            $base=VendaMoney::cents((string)($person['comissao']??'0'),true);
+            $repasses=VendaMoney::cents((string)($person['repasse_total']??'0'),true);
+            $despesas=VendaMoney::cents((string)($person['despesas']??'0'),true);
+            $person['participacoes_total']=VendaMoney::decimal($part);
+            $person['participacoes_recebidas']=$bonus['pago']??'0.00';
+            $person['participacoes_pendentes']=$bonus['pendente']??'0.00';
+            $person['resultado_estimado']=VendaMoney::decimal($base+$part-$repasses-$despesas);
+            $total+=$base+$part-$repasses-$despesas;
+        }
+        unset($person);
+        $report['resumo']['resultado_gerencial_estimado']=VendaMoney::decimal($total);
+        return $report;
+    }
+
     private function resumo($db,array $period): array
     {
         if($period['status']==='CONCLUIDO' && $period['resumo_concluido']){
