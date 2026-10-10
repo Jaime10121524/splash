@@ -112,6 +112,8 @@ class VendasController extends CommercialBaseController
             $received+=$m['tipo']==='ENTRADA'?$value:-$value;
         }
         unset($m);
+        $history=$db->table('venda_operacoes_auditoria')->select('id,acao,justificativa,criado_em,usuario_id')
+            ->where('operacao_id',(int)$id)->orderBy('id','DESC')->get()->getResultArray();
         $editavel=$op['comissao_ajustada']===null;
         foreach($movements as $mov){
             if($mov['tipo']==='DEVOLUCAO') $editavel=false;
@@ -120,7 +122,7 @@ class VendasController extends CommercialBaseController
         // (ou quando não houve entrada). Devolução real NÃO libera edição.
         if($received!==0) $editavel=false;
         return $this->response->setJSON([
-            'editavel'=>$editavel,
+            'editavel'=>$editavel,'historico_correcoes'=>$history,
             'operacao'=>$op,'movimentos'=>$movements,
             'recebido'=>VendaMoney::decimal($received),
             'saldo'=>VendaMoney::decimal(max(0,VendaMoney::cents((string)$op['valor_cobrado'])-$received)),
