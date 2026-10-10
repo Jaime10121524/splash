@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from 'react'
 import {comercialGet,comercialPost,dateBR,localDateISO} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
 import {SurfaceModal} from '../components/ComercialForms.jsx'
+import Financeiro from './Financeiro.jsx'
 import './ComercialPages.css'
 import './Fechamentos.css'
 
@@ -65,6 +66,7 @@ export default function Fechamentos({role='admin'}){
     }
   }
   useEffect(()=>{
+    if(!admin)return
     let active=true
     setLoading(true)
     reload().then(()=>{if(active)setError('')})
@@ -234,6 +236,7 @@ export default function Fechamentos({role='admin'}){
   }
 
   const title=admin?'Fechamentos':'Meu financeiro'
+  if(!admin)return <Financeiro role={role}/>
   return <div className="com-page fc-page">
     <header className="com-heading">
       <div><span className="com-eyebrow">SPLASH / FECHAMENTOS</span><h1>{title}</h1>
