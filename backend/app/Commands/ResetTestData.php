@@ -44,7 +44,14 @@ final class ResetTestData extends BaseCommand
         try{
             $success=service('migrations')->force($path,'App');
             if(!$success)throw new \RuntimeException('Migration extraordinária não pôde ser concluída.');
-            CLI::write('RESET EXECUTADO. Confira a quantidade de vendas e os saldos.', 'green');
+            foreach(['venda_operacoes','venda_recebimentos','comissao_rateios',
+                'comissao_repasses','fechamento_periodos','financeiro_despesas',
+                'financeiro_emprestimos'] as $table){
+                $total=$db->table($table)->countAllResults();
+                CLI::write($table.': '.$total.' registro(s)');
+                if($total!==0)throw new \RuntimeException('Verificação final falhou em '.$table.'.');
+            }
+            CLI::write('RESET EXECUTADO E CONTAGENS ZERADAS.', 'green');
         }catch(Throwable $error){
             CLI::error('RESET NÃO CONCLUÍDO: '.$error->getMessage());
             CLI::write('Não execute o reset novamente sem verificar os logs e fazer backup.');
