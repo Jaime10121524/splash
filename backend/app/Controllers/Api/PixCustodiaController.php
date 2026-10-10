@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\VendaMoney;
+use App\Libraries\PixConferencia;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -44,12 +45,10 @@ final class PixCustodiaController extends CommercialBaseController
 
     private function saldoRecebimento($db,int $id,string $original): int
     {
-        $devolvido=0;
-        $rows=$db->table('venda_recebimentos')->select('valor')
+        $rows=$db->table('venda_recebimentos')->select('tipo,valor')
             ->where('referencia_entrada_id',$id)->whereIn('tipo',['ESTORNO','DEVOLUCAO'])
             ->get()->getResultArray();
-        foreach($rows as $row)$devolvido+=VendaMoney::cents((string)$row['valor'],true);
-        return max(0,(int)VendaMoney::cents($original,true)-$devolvido);
+        return PixConferencia::saldo($original,$rows);
     }
 
     private function origem($db,int $receiptId,array $period): ?array
@@ -189,7 +188,7 @@ final class PixCustodiaController extends CommercialBaseController
                 $manual=$db->table('fechamento_custodia_movimentos')
                     ->where('id',$mid)->where('fechamento_id',(int)$id)->where('tipo','PIX_RETIDO')
                     ->where('situacao','ATIVO')->get()->getRowArray();
-                if(!$manual || VendaMoney::cents((string)$manual['valor'],true)!==$valor){
+                if(!$manual || !PixConferencia::mesmoValor($valor,(int)VendaMoney::cents((string)$manual['valor'],true))){
                     $db->transRollback();return $this->errorResponse(422,'O lançamento manual precisa estar ativo, neste fechamento, e ter o mesmo valor disponível do Pix.');
                 }
                 if($db->table('fechamento_custodia_pix_vinculos')
