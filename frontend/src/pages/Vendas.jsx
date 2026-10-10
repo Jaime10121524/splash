@@ -111,7 +111,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     if(!detail?.operacao) return
     const op=detail.operacao
     if(!detail.editavel) {
-      setFormError('Não é permitido alterar as condições da venda depois de lançar recebimentos ou ajustar a comissão.')
+      setFormError('Para alterar condições da venda, primeiro estorne integralmente lançamentos incorretos. Devoluções reais e comissões ajustadas bloqueiam esta edição.')
       return
     }
     setClient({id:Number(op.cliente_id),nome:dialog.op?.cliente_nome||client?.nome||'Cliente vinculado',telefone:dialog.op?.cliente_telefone||''})
@@ -342,7 +342,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
 
       {['new','edit'].includes(dialog.type)&&<form className="cm-form vd-form" onSubmit={saveSale}>
         {dialog.type==='edit'&&<div className="com-inform">
-          Corrija um erro cadastral antes do primeiro recebimento. A versão anterior ficará na auditoria. Após movimentar dinheiro, use Estornar lançamento e registre corretamente; Devolver é apenas para dinheiro realmente devolvido.
+          É possível corrigir os dados antes de movimentar dinheiro ou após estornar integralmente um lançamento errado. A alteração ficará na auditoria. Devolução é só para dinheiro realmente devolvido.
         </div>}
         {dialog.type==='new'&&<label>Situação inicial
           <FormControl type="select" value={saleForm.situacao} onChange={v=>setField('situacao',v)}
@@ -461,6 +461,13 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         {detail.operacao.observacao_comissao&&<div className="com-inform">{detail.operacao.observacao_comissao}</div>}
         <div className="vd-detail-title"><span>{detail.operacao.comissao_ajustada!==null?'Comissão ajustada (a apurar)':'Comissão prevista (não paga)'}: <strong>{detail.operacao.comissao_ajustada!==null?currency(detail.operacao.comissao_ajustada):detail.operacao.comissao_prevista===null?'A conferir':currency(detail.operacao.comissao_prevista)}</strong></span></div>
         {detail.operacao.ajuste_motivo&&<div className="com-inform">Justificativa do ajuste: {detail.operacao.ajuste_motivo}</div>}
+        {!!detail.historico_correcoes?.length&&<div className="vd-corrections">
+          <strong>Histórico de correções</strong>
+          {detail.historico_correcoes.map(h=><div key={h.id}>
+            <small>{dateBR(h.criado_em,true)} · Correção de dados</small>
+            <span>{h.justificativa}</span>
+          </div>)}
+        </div>}
         <div className="com-inform">Pagamento de comissão, valores a repassar ao clube e despesas serão controlados separadamente no fechamento. O lançamento de Pix acima não significa que a comissão já foi paga.</div>
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions vd-wrap">
