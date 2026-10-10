@@ -289,7 +289,7 @@ function Dashboard({ user, navigate }) {
       <DataCard label="Saldo de empréstimos" icon="wallet" tone="sky"
         detail="Valor ainda devido ao clube" value={loading?'…':money(stats.loans)}/></>}
     </div>
-    <div className="dashboard-columns">
+    <div className={'dashboard-columns'+(operator?' dashboard-operator':'')}>
       {!operator&&<section className="panel activity-panel"><div className="panel-head"><div><h3>Comissões recentes</h3>
         <p>Últimos direitos apurados nas vendas do período</p></div></div>
         {activities.length===0?<NoData icon="chart" title="Sem lançamentos no período"
