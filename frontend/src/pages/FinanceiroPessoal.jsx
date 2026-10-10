@@ -119,6 +119,8 @@ export default function FinanceiroPessoal({role='admin',tab='despesas',start,end
       <button type="button" onClick={()=>setNotice('')}>Fechar</button></div>}
     {error&&<div className="com-alert error" role="alert">{error}
       <button type="button" onClick={()=>setError('')}>Fechar</button></div>}
+    {(data?.despesas?.length===500||data?.emprestimos?.length===500)&&
+      <div className="com-alert" role="status">O limite de 500 lançamentos foi atingido. Reduza o período ou a pessoa selecionada antes de considerar os totais completos.</div>}
     {busy?<div className="com-panel"><div className="com-empty">Carregando o financeiro pessoal...</div></div>:<>
       {tab==='despesas'?<>
         <div className="fp-stats">
