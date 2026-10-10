@@ -1,11 +1,15 @@
 <?php
 declare(strict_types=1);
 
-require_once dirname(__DIR__).'/app/Database/ResetScripts/2026-10-11-000001_ResetCompletoDadosTestes.php';
-
-use App\Database\ResetScripts\ResetCompletoDadosTestes;
-
-$tables=ResetCompletoDadosTestes::TABLES;
+// CI smoke tests do not install CodeIgniter dependencies: read only the
+// declared inventory, without running, loading or connecting to a database.
+$path=dirname(__DIR__).'/app/Database/ResetScripts/2026-10-11-000001_ResetCompletoDadosTestes.php';
+$source=file_get_contents($path);
+if($source===false || !preg_match('/public const TABLES = \[(.*?)\];/s',$source,$inventory)){
+    throw new RuntimeException('Inventário declarado do reset não encontrado.');
+}
+preg_match_all("/'([a-z_]+)'/",$inventory[1],$names);
+$tables=$names[1];
 $required=[
     'fechamento_custodia_pix_vinculos','fechamento_custodia_movimentos',
     'fechamento_periodo_eventos','fechamento_periodo_abates',
@@ -63,8 +67,6 @@ foreach ([
     ['visitas','clientes'],
 ] as [$child,$parent]) $before($child,$parent);
 
-$path=dirname(__DIR__).'/app/Database/ResetScripts/2026-10-11-000001_ResetCompletoDadosTestes.php';
-$source=file_get_contents($path);
 $command=file_get_contents(dirname(__DIR__).'/app/Commands/ResetCompletoTestes.php');
 
 if ($source===false || $command===false
