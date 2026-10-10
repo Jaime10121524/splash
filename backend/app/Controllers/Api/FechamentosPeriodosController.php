@@ -5,6 +5,7 @@ namespace App\Controllers\Api;
 
 use App\Libraries\VendaMoney;
 use App\Libraries\FechamentoEscopo;
+use App\Libraries\FechamentoConferencia;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -244,7 +245,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             $person['participacoes_pendentes']=$bonus['pendente']??'0.00';
             $person['resultado_estimado']=VendaMoney::decimal($base+$part-$repasses-$despesas);
             $doClube=VendaMoney::cents((string)($person['recebido_clube']??'0'),true);
-            $dif=$base-$doClube;
+            $dif=FechamentoConferencia::diferencaSemEntradaDoClube($base,$doClube);
             $person['a_receber_estimado']=VendaMoney::decimal(max(0,$dif));
             $person['excesso_a_conciliar']=VendaMoney::decimal(max(0,-$dif));
             $semEntradaClube+=max(0,$dif);
@@ -422,7 +423,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             // Recebimento do clube, pagamento ao titular e abatimento de dívida
             // são eventos independentes. Somente entradas do clube reduzem a
             // diferença bruta não conciliada (que não é uma cobrança exigível).
-            $falta=$person['comissao_cent']-$person['recebido_clube_cent'];
+            $falta=FechamentoConferencia::diferencaSemEntradaDoClube($person['comissao_cent'],$person['recebido_clube_cent']);
             $person['a_receber_estimado']=VendaMoney::decimal(max(0,$falta));
             $person['excesso_a_conciliar']=VendaMoney::decimal(max(0,-$falta));
             $estAReceber+=max(0,$falta);
