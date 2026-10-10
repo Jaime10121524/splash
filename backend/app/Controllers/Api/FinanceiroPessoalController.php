@@ -161,6 +161,41 @@ class FinanceiroPessoalController extends CommercialBaseController
         }
     }
 
+    public function editarDespesa(int|string $id): ResponseInterface
+    {
+        $actor=$this->actor();
+        if($actor instanceof ResponseInterface)return $actor;
+        $input=$this->jsonPayload();
+        $category=$this->optionalId($input['categoria_id']??null);
+        $date=(string)($input['data_despesa']??'');
+        $amount=$this->amount($input['valor']??null);
+        $description=$this->cleanText($input['descricao']??null,500,true);
+        if(!$category||!$this->validateDate($date)||!$amount||$description===false)
+            return $this->errorResponse(422,'Informe categoria, data, valor e descrição válidos.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $expense=$db->query('SELECT * FROM financeiro_despesas WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$expense || (!$actor['admin'] && (int)$expense['pessoa_id']!==$actor['own'])){
+                $db->transRollback();return $this->errorResponse(404,'Despesa não encontrada.');
+            }
+            if($expense['situacao']!=='ATIVA'){
+                $db->transRollback();return $this->errorResponse(409,'Uma despesa cancelada não pode ser editada.');
+            }
+            $cat=$db->table('financeiro_categorias_despesa')->where('id',$category)->where('ativo',1)->get()->getRowArray();
+            if(!$cat || ($cat['pessoa_id']!==null && (int)$cat['pessoa_id']!==(int)$expense['pessoa_id'])){
+                $db->transRollback();return $this->errorResponse(422,'Categoria não pertence à conta da despesa.');
+            }
+            $db->table('financeiro_despesas')->where('id',(int)$id)->update([
+                'categoria_id'=>$category,'data_despesa'=>$date,
+                'valor'=>VendaMoney::decimal($amount),'descricao'=>$description,
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Despesa atualizada.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'editar despesa');
+        }
+    }
+
     public function cancelarDespesa(int|string $id): ResponseInterface
     {
         $actor=$this->actor();
@@ -187,6 +222,34 @@ class FinanceiroPessoalController extends CommercialBaseController
             return $this->responseOK('Despesa cancelada com histórico preservado.');
         }catch(Throwable $e){
             $db->transRollback();return $this->unexpected($e,'cancelar despesa');
+        }
+    }
+
+    public function editarEmprestimo(int|string $id): ResponseInterface
+    {
+        if($denied=$this->authorizeAdmin())return $denied;
+        $data=$this->jsonPayload();
+        $date=(string)($data['data_emprestimo']??'');
+        $amount=$this->amount($data['valor']??null);
+        $description=$this->cleanText($data['descricao']??null,500,true);
+        if(!$this->validateDate($date)||!$amount||$description===false)
+            return $this->errorResponse(422,'Informe data, valor e descrição válidos.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $loan=$db->query('SELECT * FROM financeiro_emprestimos WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$loan){$db->transRollback();return $this->errorResponse(404,'Empréstimo não encontrado.');}
+            if($loan['situacao']!=='ATIVO'||$db->table('financeiro_emprestimo_abates')
+                ->where('emprestimo_id',(int)$id)->countAllResults()>0){
+                $db->transRollback();return $this->errorResponse(409,'Empréstimo cancelado ou com abatimentos não pode ser alterado.');
+            }
+            $db->table('financeiro_emprestimos')->where('id',(int)$id)->update([
+                'data_emprestimo'=>$date,'valor'=>VendaMoney::decimal($amount),
+                'descricao'=>$description,
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Empréstimo atualizado.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'editar empréstimo');
         }
     }
 
