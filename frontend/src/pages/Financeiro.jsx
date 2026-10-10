@@ -119,6 +119,7 @@ export default function Financeiro({role='admin'}){
                   <strong>Histórico de pagamentos desta participação</strong>
                   {item.movimentos.length?item.movimentos.map(m=><div key={m.id}>
                     <span>{m.tipo==='ESTORNO'?'Estorno do registro':'Pagamento confirmado'} · {dateBR(m.data)}
+                      {' · '+(m.forma_nome||'Forma não informada')}
                       {m.observacoes?' · '+m.observacoes:''}</span>
                     <b>{m.tipo==='ESTORNO'?'-':'+'}{money(m.valor)}</b>
                   </div>):<p>Nenhum pagamento confirmado até agora.</p>}
