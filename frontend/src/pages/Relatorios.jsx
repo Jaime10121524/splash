@@ -167,6 +167,21 @@ export default function Relatorios({role='admin'}){
         {people.length===0?<div className="rel-empty">Nenhuma participação individual neste fechamento.</div>
           :<div className="rel-person-list">{people.map(p=><PersonBlock person={p} key={p.pessoa_id}/>)}</div>}
       </section>
+      {!reportAdmin&&<section className="rel-section">
+        <div className="rel-section-heading"><h3>Minhas despesas e empréstimos</h3><small>Informações pessoais do período</small></div>
+        <div className="rel-kpis">
+          <SummaryCard title="Minhas despesas no período" value={data.despesas_proprias}/>
+          <SummaryCard title="Abatimento das minhas comissões" value={total(people,'abatido')}/>
+        </div>
+        {!!data.emprestimos_proprios?.length&&<div className="rel-table-scroll">
+          <table className="rel-table">
+            <thead><tr><th>Empréstimo</th><th>Descrição</th><th>Valor original</th><th>Saldo restante</th></tr></thead>
+            <tbody>{data.emprestimos_proprios.map(l=><tr key={l.id}>
+              <td>#{l.id}</td><td>{l.descricao}</td><td>{reais(l.valor)}</td><td>{reais(l.saldo)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
+      </section>}
       {reportAdmin&&<>
         <SalesBlock sales={data.vendas||[]}/>
         <section className="rel-section">
