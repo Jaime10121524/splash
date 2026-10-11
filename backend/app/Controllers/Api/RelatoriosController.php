@@ -136,19 +136,37 @@ final class RelatoriosController extends CommercialBaseController
                 'concluido_em'=>$period['concluido_em'],
                 'status'=>'CONCLUIDO',
             ];
+            $snapshot=json_decode((string)($period['resumo_concluido']??''),true);
+            if(!is_array($snapshot))$snapshot=[];
             if(!$actor['admin']){
                 $individual=RelatorioAcertoSemanal::individual($result,$actor['pessoa_id']);
-                // Este usuário recebe exclusivamente suas parcelas, sem nome de
-                // cliente, total do clube, outras pessoas ou saldos de terceiros.
+                $ownExpenses='0.00';
+                foreach(($snapshot['corretores']??[]) as $person){
+                    if((int)($person['pessoa_id']??0)===$actor['pessoa_id']){
+                        $ownExpenses=(string)($person['despesas']??'0.00');
+                        break;
+                    }
+                }
+                $ownLoans=[];
+                foreach(($snapshot['emprestimos']??[]) as $loan){
+                    if((int)($loan['pessoa_id']??0)!==$actor['pessoa_id'])continue;
+                    $ownLoans[]=[
+                        'id'=>(int)$loan['id'],
+                        'descricao'=>$loan['descricao'],
+                        'valor'=>$loan['valor'],
+                        'saldo'=>$loan['saldo'],
+                    ];
+                }
+                // Este usuário recebe exclusivamente suas parcelas, suas despesas e
+                // seus empréstimos, sem nomes de clientes, outras pessoas ou caixa do clube.
                 return $this->response->setJSON([
                     'administrador'=>false,'fechamento'=>$header,
                     'pessoas'=>$individual['pessoas'],
                     'vendas'=>[],
+                    'despesas_proprias'=>$ownExpenses,'emprestimos_proprios'=>$ownLoans,
                     'aviso'=>'Demonstrativo individual liberado somente após a conclusão do fechamento pelo responsável. A entrada do clube não é um pagamento à sua pessoa.',
                 ])->setHeader('Cache-Control','no-store');
             }
-            $snapshot=json_decode((string)($period['resumo_concluido']??''),true);
-            if(!is_array($snapshot))$snapshot=[];
             return $this->response->setJSON([
                 'administrador'=>true,
                 'fechamento'=>[...$header,'responsavel_nome'=>$period['responsavel_nome']],
