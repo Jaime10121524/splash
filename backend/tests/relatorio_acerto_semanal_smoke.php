@@ -52,10 +52,9 @@ if(RelatorioAcertoSemanal::individual($report,999)!==['pessoas'=>[],'vendas'=>[]
 
 $controller=file_get_contents(dirname(__DIR__).'/app/Controllers/Api/RelatoriosController.php');
 if($controller===false||!str_contains($controller,"where('f.status','CONCLUIDO')")
-    ||!str_contains($controller,"where('f.status','CONCLUIDO')") 
     ||!str_contains($controller,"'administrador'=>false")
     ||!str_contains($controller,"RelatorioAcertoSemanal::individual")
-    ||!str_contains($controller,"where('user_id',(int)$user->id)")) {
+    ||!str_contains($controller,"where('user_id',(int)\$user->id)")) {
     throw new RuntimeException('Proteção de relatórios por fechamento/usuário ausente.');
 }
 echo "Relatório semanal: comissões, estorno, abatimento, sigilo e status final OK\n";
