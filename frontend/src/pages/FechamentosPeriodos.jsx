@@ -3,6 +3,7 @@ import {comercialGet,comercialPost,dateBR,localDateISO} from '../lib/comercialAp
 import {FormControl} from '../components/UiFields.jsx'
 import {SurfaceModal} from '../components/ComercialForms.jsx'
 import AuditoriaRateios from './AuditoriaRateios.jsx'
+import Relatorios from './Relatorios.jsx'
 import './FechamentosPeriodos.css'
 
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0))
@@ -216,6 +217,11 @@ export default function FechamentosPeriodos({role='admin'}){
   const peopleReport=summaryByPerson(current)
   const paymentsByPerson=groupedPayments(current)
   const groupResult=peopleReport.reduce((total,p)=>total+cents(p.resultado_estimado),0)/100
+  // O corretor subordinado não abre fechamento: acessa somente o seu
+  // demonstrativo quando o administrador tiver CONCLUÍDO o período.
+  if(!admin && !loading && scope && selectable.length===0){
+    return <Relatorios role={role}/>
+  }
   return <div className="com-page fpw-page">
     <header className="com-heading fpw-heading">
       <div><span className="com-eyebrow">SPLASH / FECHAMENTOS</span>
