@@ -40,6 +40,8 @@ jobs:
         run: php backend/tests/fechamento_conferencia_smoke.php
       - name: Audit person-by-person commission distribution
         run: php backend/tests/auditoria_rateios_smoke.php
+      - name: Weekly report and subordinate isolation
+        run: php backend/tests/relatorio_acerto_semanal_smoke.php
       - name: Financial ledger permission and role isolation
         run: php backend/tests/extrato_permissoes_smoke.php
       - name: Central custody and reconciliation tests
