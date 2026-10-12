@@ -27,6 +27,16 @@ if(!is_dir(FCPATH)){
     exit('Backend indisponível.');
 }
 chdir(FCPATH);
+
+// O front controller publico esta em /api/index.php, mas as rotas do
+// CodeIgniter incluem o prefixo /api. Ao processar REQUEST_URI, o CI4
+// remove automaticamente a parte do caminho que coincide com SCRIPT_NAME.
+// Corrige apenas esse caminho virtual para preservar /api/session etc.
+$scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+if (preg_match('~^(.*)/api/index\\.php$~', $scriptName, $matches) === 1) {
+    $_SERVER['SCRIPT_NAME'] = ($matches[1] ?: '') . '/index.php';
+}
+
 require $entry;
 $paths=new Paths();
 require $paths->systemDirectory.'/Boot.php';
