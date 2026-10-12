@@ -85,6 +85,14 @@ final class TitulosController extends CommercialBaseController
         }
         $all=$query->orderBy('v.data_vencimento','ASC')->orderBy('v.id','DESC')->limit(300)
             ->get()->getResultArray();
+        $paidBySale=[];
+        if($all){
+            $rows=$db->table('venda_recebimentos')
+                ->select("operacao_id,COALESCE(SUM(CASE WHEN tipo='ENTRADA' THEN valor ELSE -valor END),0) AS recebido",false)
+                ->whereIn('operacao_id',array_column($all,'id'))->groupBy('operacao_id')
+                ->get()->getResultArray();
+            foreach($rows as $row)$paidBySale[(int)$row['operacao_id']]=(string)$row['recebido'];
+        }
         $now=\CodeIgniter\I18n\Time::now(config('App')->appTimezone)->toDateString();
         $limit=(new \DateTimeImmutable($now))->modify('+60 days')->format('Y-m-d');
         $items=[];$summary=['total'=>0,'ativos'=>0,'a_vencer'=>0,'vencidos'=>0,'a_quitar'=>0];
@@ -92,12 +100,27 @@ final class TitulosController extends CommercialBaseController
             $due=(string)$sale['data_vencimento'];
             $status=$due<$now?'VENCIDO':($due<=$limit?'A_VENCER':'ATIVO');
             $summary['total']++;
-            $summary[$status==='VENCIDO'?'vencidos':($status==='A_VENCER'?'a_vencer':'ativos')]++;
+            $pending=!empty($sale['movimento_origem']) && 
+                VendaMoney::cents((string)($paidBySale[(int)$sale['id']]??'0'),true)
+                < VendaMoney::cents((string)$sale['valor_cobrado'],true);
+            if($pending){
+                $summary['a_quitar']++;
+                $sale['status_titulo']='A_QUITAR';
+                $sale['data_vencimento_vigente']=$sale['vencimento_anterior'];
+                $sale['saldo_cobranca']=VendaMoney::decimal(max(0,
+                    VendaMoney::cents((string)$sale['valor_cobrado'],true)
+                    -VendaMoney::cents((string)($paidBySale[(int)$sale['id']]??'0'),true)));
+            }else{
+                $summary[$status==='VENCIDO'?'vencidos':($status==='A_VENCER'?'a_vencer':'ativos')]++;
+                $sale['status_titulo']=$status;
+                $sale['data_vencimento_vigente']=$due;
+                $sale['saldo_cobranca']='0.00';
+            }
             $sale['id']=(int)$sale['id'];
-            $sale['status_titulo']=$status;
             if(!$actor['admin']){
                 unset($sale['cliente_nome'],$sale['cliente_id'],
                     $sale['valor_tabela'],$sale['valor_cobrado'],$sale['preco_plano_atual'],
+                    $sale['saldo_cobranca'],
                     $sale['familia_plano_id'],$sale['plano_versao_id'],
                     $sale['segundo_corretor_pessoa_id'],$sale['atendente_pessoa_id'],
                     $sale['atendente_adicional_pessoa_id'],$sale['gerente_pessoa_id']);
