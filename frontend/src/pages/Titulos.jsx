@@ -199,6 +199,7 @@ export default function Titulos({role='admin',navigate}){
           <div className="ti-meta">
             <div><span>Início da vigência</span><strong>{dateBR(t.data_inicio)}</strong></div>
             <div><span>{t.status_titulo==='A_QUITAR'?'Nova validade após quitação':'Vencimento'}</span><strong>{dateBR(t.data_vencimento)}</strong></div>
+            {t.status_titulo==='A_QUITAR'&&<div><span>Vencimento do título anterior</span><strong>{dateBR(t.data_vencimento_vigente)}</strong></div>}
             <div><span>Data da venda</span><strong>{dateBR(t.data_venda)}</strong></div>
             {admin&&<div><span>Preço desta operação</span><strong>{money(t.valor_cobrado)}</strong></div>}
           </div>
