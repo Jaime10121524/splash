@@ -153,4 +153,158 @@ final class TitulosController extends CommercialBaseController
             ->setHeader('Cache-Control','no-store');
     }
 
+
+    public function movimentar(int|string $id): ResponseInterface
+    {
+        if($denied=$this->admin())return $denied;
+        $body=$this->jsonPayload();
+        $kind=(string)($body['tipo']??'');
+        $reason=$this->cleanText($body['justificativa']??null,500,true);
+        $date=(string)($body['data_venda']??'');
+        $versionId=$this->optionalId($body['plano_versao_id']??null);
+        $discount=VendaMoney::cents((string)($body['desconto_corretor']??'0'),true);
+        if(!in_array($kind,['RENOVACAO','UPGRADE'],true)||$reason===false
+            ||mb_strlen((string)$reason)<5||!$this->validateDate($date,false)
+            ||!$versionId||$discount===null){
+            return $this->errorResponse(422,'Informe tipo, plano, data válida, desconto e justificativa (mínimo 5 caracteres).');
+        }
+        $db=db_connect();
+        $db->transBegin();
+        try{
+            $source=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$source || $source['situacao']!=='VENDA' || !$source['data_vencimento']){
+                $db->transRollback();
+                return $this->errorResponse(404,'Título original inválido.');
+            }
+            if($db->table('titulo_vinculos')->where('operacao_origem_id',(int)$id)->countAllResults()){
+                $db->transRollback();
+                return $this->errorResponse(409,'Este título já foi renovado ou substituído. Selecione o título vigente.');
+            }
+            if($date<(string)$source['data_venda']){
+                $db->transRollback();
+                return $this->errorResponse(422,'O movimento não pode ter data anterior à venda original.');
+            }
+            if(!$this->clienteQuitou($db,$source)){
+                $db->transRollback();
+                return $this->errorResponse(409,'Quite o saldo da venda original antes de renovar ou fazer upgrade.');
+            }
+            $version=$db->table('plano_versoes')->where('id',$versionId)->where('ativo',1)
+                ->get()->getRowArray();
+            $prevVersion=$db->table('plano_versoes')->where('id',$source['plano_versao_id'])
+                ->get()->getRowArray();
+            if(!$version || !$prevVersion){
+                $db->transRollback();
+                return $this->errorResponse(422,'Plano novo ou histórico do plano anterior inválido.');
+            }
+            if($kind==='RENOVACAO' && (int)$version['plano_id']!==(int)$prevVersion['plano_id']){
+                $db->transRollback();
+                return $this->errorResponse(422,'Renovação exige a mesma família de plano. Para mudar de categoria, use Upgrade.');
+            }
+            $root=$source;$visited=[];
+            for($depth=0;$depth<150;$depth++){
+                $rootId=(int)$root['id'];
+                if(isset($visited[$rootId]))throw new \RuntimeException('Ciclo inválido no histórico.');
+                $visited[$rootId]=true;
+                $incoming=$db->table('titulo_vinculos')->where('operacao_nova_id',$rootId)
+                    ->get()->getRowArray();
+                if(!$incoming)break;
+                $root=$db->table('venda_operacoes')->where('id',(int)$incoming['operacao_origem_id'])
+                    ->get()->getRowArray();
+                if(!$root)throw new \RuntimeException('Origem de título ausente.');
+            }
+            if($root===null || !$root['data_inicio'])throw new \RuntimeException('Vigência original não encontrada.');
+            if($kind==='RENOVACAO'){
+                $dates=VigenciaTitulo::renovar((string)$source['data_vencimento'],$date,(int)$version['duracao_meses']);
+                $price=(string)$version['valor'];
+            }else{
+                $dates=VigenciaTitulo::upgrade((string)$root['data_inicio'],(string)$source['data_vencimento'],
+                    (int)$version['duracao_meses'],(string)$prevVersion['valor'],(string)$version['valor']);
+                $price=$dates['adicional'];
+            }
+            $money=VendaMoney::cents($price);
+            if($money===null||$discount>=$money){
+                $db->transRollback();
+                return $this->errorResponse(422,'O desconto precisa ser inferior ao valor desta renovação/upgrade.');
+            }
+            $client=$db->table('clientes')->where('id',(int)$source['cliente_id'])->where('ativo',1)->get()->getRowArray();
+            if(!$client){
+                $db->transRollback();
+                return $this->errorResponse(409,'Cliente desativado: não é possível movimentar o título.');
+            }
+            // Se não informado, o participante atual é preservado; ainda assim
+            // verificamos papéis ativos porque o novo rateio será independente.
+            $person=function(string $field,string $role,bool $required=false)use($body,$source,$db){
+                $value=array_key_exists($field,$body)?$body[$field]:$source[$field];
+                return $this->validatePerson($db,$value,$role,!$required);
+            };
+            $broker=$person('corretor_pessoa_id','corretor',true);
+            $second=$person('segundo_corretor_pessoa_id','corretor');
+            $attendant=$person('atendente_pessoa_id','atendente');
+            $attendant2=$person('atendente_adicional_pessoa_id','atendente');
+            $manager=$person('gerente_pessoa_id','gerente');
+            if(($second!==null && $second===$broker)
+                ||($attendant2!==null && $attendant2===$attendant)){
+                $db->transRollback();
+                return $this->errorResponse(422,'Segundo corretor/atendente precisa ser diferente do primeiro.');
+            }
+            $matching=$db->table('venda_operacoes')
+                ->select('cliente_id,numero_titulo,sigla_plano,titulo_sequencia')
+                ->where('numero_titulo',$source['numero_titulo'])
+                ->where('sigla_plano',$version['codigo'])->get()->getResultArray();
+            $sequence=VigenciaTitulo::sequencia($matching,(string)$source['numero_titulo'],
+                (string)$version['codigo'],(int)$source['cliente_id']);
+            $rules=ComissaoAutomatica::configs($db);
+            $baseRule=$rules['AVISTA_ATUAL'];
+            $now=\CodeIgniter\I18n\Time::now(config('App')->appTimezone)->toDateTimeString();
+            $db->table('venda_operacoes')->insert([
+                'cliente_id'=>(int)$source['cliente_id'],'visita_id'=>null,
+                'plano_versao_id'=>(int)$version['id'],'situacao'=>'VENDA','historica'=>0,
+                'numero_titulo'=>$source['numero_titulo'],'sigla_plano'=>$version['codigo'],
+                'titulo_sequencia'=>$sequence,'prazo_meses'=>(int)$version['duracao_meses'],
+                'valor_tabela'=>VendaMoney::decimal($money),
+                'desconto_corretor'=>VendaMoney::decimal($discount),
+                'valor_cobrado'=>VendaMoney::decimal($money-$discount),
+                'regra_comissao_id'=>$baseRule['id'],
+                'regra_snapshot'=>json_encode($baseRule,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'regras_automaticas_snapshot'=>json_encode($rules,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                'comissao_prevista'=>null,
+                'observacao_comissao'=>'Aguardando quitação da '.($kind==='RENOVACAO'?'renovação':'diferença do upgrade').' para apurar comissão.',
+                'corretor_pessoa_id'=>$broker,'segundo_corretor_pessoa_id'=>$second,
+                'dono_corrente_pessoa_id'=>(int)$source['dono_corrente_pessoa_id'],
+                'atendente_pessoa_id'=>$attendant,'atendente_adicional_pessoa_id'=>$attendant2,
+                'gerente_pessoa_id'=>$manager,
+                'data_negociacao'=>$date,'data_venda'=>$date,
+                'data_inicio'=>$dates['inicio'],'data_vencimento'=>$dates['vencimento'],
+                'retorno_previsto'=>null,
+                'observacoes'=>($kind==='RENOVACAO'?'Renovação':'Upgrade')
+                    .' vinculado à operação #'.(int)$id.'. '.$reason,
+                'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_em'=>$now,
+            ]);
+            $newId=(int)$db->insertID();
+            if($newId<1)throw new \RuntimeException('Falha ao registrar venda vinculada.');
+            $db->table('titulo_vinculos')->insert([
+                'operacao_origem_id'=>(int)$id,'operacao_nova_id'=>$newId,
+                'tipo'=>$kind,'vencimento_anterior'=>$source['data_vencimento'],
+                'vencimento_novo'=>$dates['vencimento'],
+                'preco_anterior'=>$prevVersion['valor'],'preco_novo'=>$version['valor'],
+                'valor_adicional'=>VendaMoney::decimal($money),
+                'justificativa'=>$reason,
+                'criado_por_usuario_id'=>(int)auth('session')->user()->id,'criado_em'=>$now,
+            ]);
+            if($db->transStatus()===false)throw new \RuntimeException('Falha de integridade da renovação/upgrade.');
+            $this->commitOrFail($db);
+            return $this->responseOK(($kind==='RENOVACAO'?'Renovação':'Upgrade')
+                .' registrado. Receba o pagamento na nova venda; as comissões anteriores permanecem intactas.',
+                201,['operacao_id'=>$newId,'valor_cobrado'=>VendaMoney::decimal($money-$discount),
+                    'vencimento'=>$dates['vencimento']]);
+        }catch(InvalidArgumentException $e){
+            $db->transRollback();
+            return $this->errorResponse(422,$e->getMessage());
+        }catch(Throwable $e){
+            $db->transRollback();
+            return $this->unexpected($e,'movimentar título');
+        }
+    }
+
 }
