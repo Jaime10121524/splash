@@ -163,7 +163,9 @@ class VendasController extends CommercialBaseController
         $history=$db->table('venda_operacoes_auditoria')->select('id,acao,justificativa,criado_em,usuario_id')
             ->where('operacao_id',(int)$id)->orderBy('id','DESC')->get()->getResultArray();
         $periodo=ProtecaoVendaFechada::fechamento($db,(int)$id);
-        $editavel=$periodo===null && $op['comissao_ajustada']===null;
+        $tituloAnterior=$db->table('titulo_vinculos')->where('operacao_nova_id',(int)$id)->get()->getRowArray();
+        $tituloPosterior=$db->table('titulo_vinculos')->where('operacao_origem_id',(int)$id)->get()->getRowArray();
+        $editavel=$periodo===null && !$tituloAnterior && !$tituloPosterior && $op['comissao_ajustada']===null;
         if($this->temRateio($db,(int)$id)||$this->temPagamentoTitular($db,(int)$id))$editavel=false;
         foreach($movements as $mov){
             if($mov['tipo']==='DEVOLUCAO') $editavel=false;
@@ -182,6 +184,7 @@ class VendasController extends CommercialBaseController
         }
         return $this->response->setJSON([
             'editavel'=>$editavel,'fechamento'=>$periodo,'comissoes'=>$comissaoStatus,
+            'titulo_anterior'=>$tituloAnterior,'titulo_posterior'=>$tituloPosterior,
             'entrada_clube_para_titular_no_periodo'=>$recClube,
             'historico_correcoes'=>$history,
             'operacao'=>$op,'movimentos'=>$movements,
