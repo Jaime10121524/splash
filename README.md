@@ -30,7 +30,7 @@ Depois:
 4. Terminal A: `cd backend; php spark serve --host 127.0.0.1 --port 8080`.
 5. Terminal B: `cd frontend; npm run dev` (normalmente porta 5173).
 
-**Atenção:** isso prepara as dependências; os endpoints de login SPA, as permissões da API, as telas e as migrations SPLASH serão desenvolvidos nas próximas implementações. Não é ainda um aplicativo funcional de gestão de vendas.
+**Estado atual:** os módulos operacionais de vendas, visitas, comissões, fechamentos, relatórios e alertas já possuem implementação. Antes de usar em produção, execute as migrations e os testes locais e siga o guia de implantação na HostGator. O app nativo requer domínio HTTPS e configuração Firebase/Android Studio para validação final.
 
 ## Organização planejada
 ```text
@@ -54,3 +54,11 @@ splash/
 7. A pasta `backend/public` (ou um ponto de entrada devidamente isolado) deve ser a única parte do backend exposta publicamente na HostGator.
 
 Consulte [REQUISITOS](docs/REQUISITOS.md) e [MODELO DE DADOS](docs/MODELO_DADOS.md) antes de implementar mudanças.
+
+## Publicação e aplicativo móvel
+
+- [Guia de implantação HostGator, Capacitor e backups](docs/IMPLANTACAO_SPLASH_HOSTGATOR_CAPACITOR.md)
+- Preparar pacotes na raiz: `powershell -ExecutionPolicy Bypass -File .\\deploy\\hostgator\\preparar-pacote.ps1`
+- Backend privado: `php spark splash:backup` e `php spark splash:avisos` para cron.
+- Capacitor: `frontend/capacitor.config.ts` com frontend compilado; `frontend/.env.capacitor.local` obrigatório para autenticação HTTPS.
+- Nenhuma credencial ou arquivo de banco deve ser armazenado no GitHub.
