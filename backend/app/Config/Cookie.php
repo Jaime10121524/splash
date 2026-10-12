@@ -111,6 +111,10 @@ class Cookie extends BaseConfig
     public function __construct()
     {
         parent::__construct();
+        if(ENVIRONMENT==='production'){
+            $this->secure=true;
+            $this->httponly=true;
+        }
         if(filter_var(env('SPLASH_CAPACITOR_CORS',false),FILTER_VALIDATE_BOOLEAN)){
             $this->secure=true;
             $this->httponly=true;
