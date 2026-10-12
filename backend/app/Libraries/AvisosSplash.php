@@ -51,6 +51,27 @@ final class AvisosSplash
                 }
                 $due[$root]=($due[$root]??0)+$owner;
             }
+            if($apurada){
+                $paid=[];
+                foreach($db->table('comissao_titular_movimentos')
+                    ->select('corretor_pessoa_id,tipo,valor')->where('operacao_id',$operationId)
+                    ->get()->getResultArray() as $m){
+                    $person=(int)$m['corretor_pessoa_id'];
+                    $paid[$person]=($paid[$person]??0)+($m['tipo']==='PAGAMENTO'?1:-1)
+                        *VendaMoney::cents((string)$m['valor'],true);
+                }
+                if($rates){
+                    $byRate=[];
+                    foreach($rates as $r)$byRate[(int)$r['id']]=(int)$r['beneficiario_pessoa_id'];
+                    foreach($db->table('comissao_repasses')->select('rateio_id,tipo,valor')
+                        ->whereIn('rateio_id',array_keys($byRate))->get()->getResultArray() as $m){
+                        $person=$byRate[(int)$m['rateio_id']];
+                        $paid[$person]=($paid[$person]??0)+($m['tipo']==='PAGAMENTO'?1:-1)
+                            *VendaMoney::cents((string)$m['valor'],true);
+                    }
+                }
+                foreach($due as $person=>$gross)$due[$person]=max(0,$gross-($paid[$person]??0));
+            }
             $titulo=trim((string)$op['numero_titulo'].' '.(string)$op['sigla_plano']);
             $kind=$apurada?'COMISSAO_APURADA':'VENDA_REGISTRADA';
             $stamp=date('Y-m-d H:i:s');
@@ -60,7 +81,7 @@ final class AvisosSplash
                 // Não atribuir valor zero a alguém cujo rateio ainda não existe.
                 if($apurada && $amount===null)continue;
                 $message=$apurada
-                    ?'Sua comissão nesta venda: R$ '.number_format(max(0,$amount)/100,2,',','.').'.'
+                    ?'Sua comissão a receber nesta venda: R$ '.number_format(max(0,$amount)/100,2,',','.').'.'
                     :'Você participa de uma nova venda. Comissão a apurar conforme pagamento e fechamento.';
                 $event=$kind.':'.$operationId;
                 $exists=$db->table('splash_notificacoes')->where('user_id',$uid)
