@@ -26,6 +26,18 @@ final class AvisosSplash
             $ids=array_values(array_unique($ids));if(!$ids)return;
             $people=$db->table('pessoas')->select('id,user_id')->whereIn('id',$ids)
                 ->where('ativo',1)->where('user_id IS NOT NULL',null,false)->get()->getResultArray();
+            if($apurada){
+                $sum=0;
+                foreach($db->table('venda_recebimentos')->select('tipo,valor')
+                    ->where('operacao_id',$operationId)->get()->getResultArray() as $m){
+                    $sum+=($m['tipo']==='ENTRADA'?1:-1)*VendaMoney::cents((string)$m['valor'],true);
+                }
+                if($sum!==VendaMoney::cents((string)$op['valor_cobrado'],true))return;
+                $auto=$db->table('comissao_auto_apuracoes')->where('operacao_id',$operationId)->get()->getRowArray();
+                // Não divulgar um valor do titular enquanto as participações
+                // ainda precisam de apuração ou revisão.
+                if(!$auto || ($auto['status']??'')==='REVISAR')return;
+            }
             $due=[];
             $root=(int)$op['corretor_pessoa_id'];
             $base=$op['comissao_ajustada']??$op['comissao_prevista'];
