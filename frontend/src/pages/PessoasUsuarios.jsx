@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FormControl } from '../components/UiFields.jsx'
+import { comercialGet, comercialPost } from '../lib/comercialApi.js'
 import PhoneInput, { formatPhone } from '../components/PhoneInput.jsx'
 import './PessoasUsuarios.css'
 
@@ -13,18 +14,9 @@ const userRoles = papelOptions
 const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],ativo:true})
 const emptyLogin = () => ({username:'',email:'',password:'',group:'corretor'})
 
-async function request(url, options={}) {
-  const response=await fetch(url,{credentials:'same-origin',headers:{Accept:'application/json',...(options.headers||{})},...options})
-  const body=(response.headers.get('content-type')||'').includes('application/json')
-    ? await response.json().catch(()=>({})) : {}
-  if(!response.ok)throw new Error(body.message||('Erro HTTP '+response.status))
-  return body
-}
-async function mutate(url,payload) {
-  const session=await request('/api/session')
-  if(!session.authenticated||!session.csrf)throw new Error('Sua sessão expirou. Faça login novamente.')
-  return request(url,{method:'POST',headers:{'Content-Type':'application/json',[session.csrf.header]:session.csrf.hash},body:JSON.stringify(payload)})
-}
+// Todas as rotas passam pelo mesmo cliente HTTP usado no app e no navegador.
+const request = url => comercialGet(url)
+const mutate = (url, payload) => comercialPost(url, payload)
 function initials(name) {
   return String(name||'?').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('')
 }
