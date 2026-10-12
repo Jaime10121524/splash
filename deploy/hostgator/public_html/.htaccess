@@ -1,0 +1,29 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Somente HTTPS na aplicação publicada (configure SSL e proxy corretamente).
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Entregue /api/* ao front controller PHP isolado, sem cair no React.
+RewriteRule ^api(?:/|$) - [L]
+
+# Nunca revele dotfiles, dumps ou arquivos de configuração.
+RewriteRule (^|/)\.(?!well-known/) - [F,L]
+RewriteRule \.(?:sql|sqlite|bak|old|log|ini|env|gz|zip)$ - [F,L,NC]
+
+# Arquivos da compilação Vite continuam sendo servidos diretamente.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Rotas do React SPA (não reescrever APIs).
+RewriteRule ^ index.html [L]
+</IfModule>
+<IfModule mod_headers.c>
+Header always set X-Content-Type-Options "nosniff"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set X-Frame-Options "DENY"
+</IfModule>
