@@ -23,6 +23,8 @@ final class NotificacoesController extends CommercialBaseController
             'avisos'=>$rows,'nao_lidas'=>$unread,
             'push_disponivel'=>EnvioPushSplash::disponivel(),
             'push_nativo_disponivel'=>\App\Libraries\EnvioPushNativoSplash::disponivel(),
+            'push_nativo_diagnostico'=>auth('session')->user()->inGroup('admin')
+                ? \App\Libraries\EnvioPushNativoSplash::diagnostico() : null,
             'vapid_publica'=>(string)(env('SPLASH_VAPID_PUBLIC')?:''),
         ])->setHeader('Cache-Control','no-store');
     }
