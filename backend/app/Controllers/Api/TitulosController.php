@@ -105,4 +105,52 @@ final class TitulosController extends CommercialBaseController
             'administrador'=>$actor['admin'],'limite'=>300,
         ])->setHeader('Cache-Control','no-store');
     }
+
+    public function opcoes(): ResponseInterface
+    {
+        if($denied=$this->admin())return $denied;
+        $db=db_connect();
+        $planos=$db->table('plano_versoes v')
+            ->select('v.id,v.plano_id,v.codigo,v.valor,v.duracao_meses,v.ativo')
+            ->where('v.ativo',1)->orderBy('v.codigo')->get()->getResultArray();
+        $pessoas=$db->table('pessoas p')->select('p.id,p.nome,pp.papel')
+            ->join('pessoa_papeis pp','pp.pessoa_id=p.id')->where('p.ativo',1)
+            ->orderBy('p.nome')->get()->getResultArray();
+        return $this->response->setJSON(['planos'=>$planos,'pessoas'=>$pessoas])
+            ->setHeader('Cache-Control','no-store');
+    }
+
+    public function historico(int|string $id): ResponseInterface
+    {
+        if($denied=$this->admin())return $denied;
+        $db=db_connect();
+        $sale=$db->table('venda_operacoes')->where('id',(int)$id)->get()->getRowArray();
+        if(!$sale || $sale['situacao']!=='VENDA')return $this->errorResponse(404,'Título não encontrado.');
+        $steps=[];$visited=[];
+        for($n=0;$n<150;$n++){
+            $sid=(int)$sale['id'];
+            if(isset($visited[$sid]))return $this->errorResponse(409,'Histórico de título inconsistente.');
+            $visited[$sid]=true;
+            $link=$db->table('titulo_vinculos')->where('operacao_nova_id',$sid)->get()->getRowArray();
+            $steps[]=[
+                'operacao_id'=>$sid,'tipo'=>$link['tipo']??'ORIGINAL',
+                'numero_titulo'=>$sale['numero_titulo'],'sigla_plano'=>$sale['sigla_plano'],
+                'data_venda'=>$sale['data_venda'],'data_inicio'=>$sale['data_inicio'],
+                'data_vencimento'=>$sale['data_vencimento'],
+                'valor_cobrado'=>$sale['valor_cobrado'],
+                'valor_tabela'=>$sale['valor_tabela'],
+                'vencimento_anterior'=>$link['vencimento_anterior']??null,
+                'preco_anterior'=>$link['preco_anterior']??null,
+                'preco_novo'=>$link['preco_novo']??null,
+                'justificativa'=>$link['justificativa']??null,
+            ];
+            if(!$link)break;
+            $sale=$db->table('venda_operacoes')
+                ->where('id',(int)$link['operacao_origem_id'])->get()->getRowArray();
+            if(!$sale)return $this->errorResponse(409,'Operação anterior não encontrada.');
+        }
+        return $this->response->setJSON(['historico'=>array_reverse($steps)])
+            ->setHeader('Cache-Control','no-store');
+    }
+
 }
