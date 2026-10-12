@@ -3,6 +3,7 @@ import { ClientFields, SurfaceModal, normalizeClient } from '../components/Comer
 import { comercialGet, comercialPost, dateBR } from '../lib/comercialApi.js'
 import './ComercialPages.css'
 import { formatPhone } from '../components/PhoneInput.jsx'
+import WhatsAppLink from '../components/WhatsAppLink.jsx'
 
 export default function Clientes({navigate}) {
   const [rows,setRows]=useState([])
@@ -98,6 +99,7 @@ export default function Clientes({navigate}) {
               <small>Cadastro {dateBR(c.criado_em)}</small>
             </div>
             <div className="com-actions">
+              <WhatsAppLink phone={c.telefone} label="WhatsApp" message={'Olá, '+c.nome+'! Tudo bem?'} />
               <button type="button" onClick={()=>openClient(c)}>Editar</button>
               <button type="button" onClick={()=>openHistory(c)}>Corrente</button>
               <button type="button" className="primary" disabled={saving || !c.ativo}
