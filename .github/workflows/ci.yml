@@ -46,6 +46,8 @@ jobs:
         run: php backend/tests/relatorio_acerto_semanal_smoke.php
       - name: Secure individual sales for brokers and sellers
         run: php backend/tests/minhas_vendas_smoke.php
+      - name: Profile, password recovery, push and reports
+        run: php backend/tests/alertas_conta_relatorios_smoke.php
       - name: Financial ledger permission and role isolation
         run: php backend/tests/extrato_permissoes_smoke.php
       - name: Central custody and reconciliation tests
