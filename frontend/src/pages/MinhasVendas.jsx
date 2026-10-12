@@ -50,6 +50,7 @@ export default function MinhasVendas({role='corretor',navigate}){
   const [hasMore,setHasMore]=useState(false)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [reload,setReload]=useState(0)
   const [detail,setDetail]=useState(null)
   const [detailBusy,setDetailBusy]=useState(false)
   const [detailError,setDetailError]=useState('')
@@ -77,7 +78,7 @@ export default function MinhasVendas({role='corretor',navigate}){
     }).catch(e=>{if(active){setRows([]);setHasMore(false);setError(e.message)}})
       .finally(()=>{if(active)setLoading(false)})
     return ()=>{active=false}
-  },[query])
+  },[query,reload])
 
   const filtered=rows.filter(item=>status==='TODOS'||item.comissao?.situacao===status)
   const ownerLabel=role==='vendedor'?'Seus atendimentos e comissões':
@@ -136,7 +137,7 @@ export default function MinhasVendas({role='corretor',navigate}){
       </div>
       {!dateValid&&<p className="mv-note">Para aplicar o filtro de datas, informe um intervalo válido com data inicial e final.</p>}
       {error&&<div className="com-alert error" role="alert">{error}
-        <button type="button" onClick={()=>setPage(x=>x===1?2:1)}>Tentar novamente</button></div>}
+        <button type="button" onClick={()=>setReload(n=>n+1)}>Tentar novamente</button></div>}
       {loading?<div className="com-empty">Carregando as suas vendas...</div>
       :filtered.length===0?<div className="com-empty"><strong>Nenhuma venda encontrada.</strong>
           <p>Verifique os filtros. Vendas sem rateio podem aparecer como “A apurar”.</p></div>
