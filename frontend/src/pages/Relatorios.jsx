@@ -35,10 +35,10 @@ function printStatement(){
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body><main class="rel-print-sheet">'+
     html+'</main></body></html>')
   popup.document.close()
-  popup.focus()
-  popup.addEventListener('load',()=>{popup.focus();popup.print()},{once:true})
-  // CSS may already be loaded before the listener on cached builds.
-  if(popup.document.readyState==='complete')popup.print()
+  let printed=false
+  const doPrint=()=>{if(printed)return;printed=true;popup.focus();popup.print()}
+  popup.addEventListener('load',doPrint,{once:true})
+  if(popup.document.readyState==='complete')setTimeout(doPrint,350)
 }
 
 function SummaryCard({title,value,description,accent=false}){
