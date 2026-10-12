@@ -154,6 +154,7 @@ class VisitasController extends CommercialBaseController
             if($sameDay && in_array($sameDay['status'],['SEM_VENDA','RETORNO','PENDENCIA'],true)){
                 $this->reopen($db,$sameDay,$now,$brokers);
                 $this->commitOrFail($db);
+                \App\Libraries\VisitasAvisos::registrar((int)$sameDay['id'],'RETOMADA');
                 return $this->responseOK('Visita retomada no mesmo dia, sem duplicação.',200,[
                     'visita_id'=>(int)$sameDay['id'],'cliente_id'=>$clientId,'retomada'=>true,
                 ]);
@@ -175,6 +176,7 @@ class VisitasController extends CommercialBaseController
             $id=(int)$db->insertID();
             $this->logStatus($db,$id,null,'AGUARDANDO',$now);
             $this->commitOrFail($db);
+            \App\Libraries\VisitasAvisos::registrar($id,'CHEGADA');
             return $this->responseOK('Chegada registrada. Horário marcado automaticamente.',201,[
                 'visita_id'=>$id,'cliente_id'=>$clientId,
             ]);
@@ -237,6 +239,7 @@ class VisitasController extends CommercialBaseController
             ]);
             $this->logStatus($db,(int)$id,'AGUARDANDO','ATENDENDO',$now);
             $this->commitOrFail($db);
+            \App\Libraries\VisitasAvisos::registrar((int)$id,'INICIADO');
             return $this->responseOK('Atendimento iniciado. Cronômetro registrado pelo servidor.');
         }catch(Throwable $e){
             $db->transRollback();
@@ -304,6 +307,7 @@ class VisitasController extends CommercialBaseController
             ]);
             $this->logStatus($db,(int)$id,'ATENDENDO',$status,$now);
             $this->commitOrFail($db);
+            \App\Libraries\VisitasAvisos::registrar((int)$id,$status);
             return $this->responseOK($status==='VENDA'
                 ? 'Venda fechada registrada como resultado comercial. Lance o título e os valores no módulo de Vendas quando disponível.'
                 : 'Atendimento encerrado e duração registrada.');
@@ -332,6 +336,7 @@ class VisitasController extends CommercialBaseController
             }
             $this->saveBrokers($db,$visit,$brokers,$this->nowLocal());
             $this->commitOrFail($db);
+            \App\Libraries\VisitasAvisos::registrar((int)$id,'CORRETORES');
             return $this->responseOK('Corretores da visita atualizados. Corrente preservada.');
         }catch(Throwable $e){
             $db->transRollback();
@@ -370,6 +375,7 @@ class VisitasController extends CommercialBaseController
             }
             $this->reopen($db,$visit,$now,$brokers);
             $this->commitOrFail($db);
+            \App\Libraries\VisitasAvisos::registrar((int)$id,'RETOMADA');
             return $this->responseOK('Mesmo atendimento retomado, mantendo o histórico de resultados.');
         }catch(Throwable $e){
             $db->transRollback();
