@@ -19,7 +19,7 @@ function monthsLater(iso,count){
   const d=new Date(year,month-1+count,Math.min(day,last))
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
 }
-const statusLabel={ATIVO:'Ativo',A_VENCER:'A vencer',VENCIDO:'Vencido'}
+const statusLabel={ATIVO:'Ativo',A_VENCER:'A vencer',VENCIDO:'Vencido',A_QUITAR:'Aguardando pagamento'}
 const blanks=()=>({
   tipo:'RENOVACAO',plano_versao_id:'',data_venda:localDateISO(),
   desconto_corretor:'0,00',justificativa:'',
@@ -163,6 +163,7 @@ export default function Titulos({role='admin',navigate}){
         ['Ativos',summary.ativos||0],
         ['A vencer em 60 dias',summary.a_vencer||0],
         ['Vencidos',summary.vencidos||0],
+        ['Novas cobranças pendentes',summary.a_quitar||0],
       ].map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}
     </section>
     <section className="com-panel">
@@ -178,6 +179,7 @@ export default function Titulos({role='admin',navigate}){
           {value:'ATIVO',label:'Ativos'},
           {value:'A_VENCER',label:'A vencer em 60 dias'},
           {value:'VENCIDO',label:'Vencidos'},
+          {value:'A_QUITAR',label:'Aguardando pagamento'},
         ]}/>
       </div>
       {loading?<div className="com-empty">Carregando títulos...</div>:
