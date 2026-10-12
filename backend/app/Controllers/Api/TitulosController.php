@@ -68,10 +68,11 @@ final class TitulosController extends CommercialBaseController
         $actor=$this->actor();if($actor instanceof ResponseInterface)return $actor;
         $db=db_connect();
         $query=$db->table('venda_operacoes v')
-            ->select('v.id,v.cliente_id,v.numero_titulo,v.sigla_plano,v.data_inicio,v.data_vencimento,v.data_venda,v.prazo_meses,v.plano_versao_id,v.valor_tabela,v.valor_cobrado,v.corretor_pessoa_id,v.segundo_corretor_pessoa_id,v.atendente_pessoa_id,v.atendente_adicional_pessoa_id,v.gerente_pessoa_id,v.titulo_sequencia,pv.plano_id AS familia_plano_id,pv.valor AS preco_plano_atual,p.nome AS corretor_nome,c.nome AS cliente_nome,lin.tipo AS movimento_origem')
+            ->select('v.id,v.cliente_id,v.numero_titulo,v.sigla_plano,v.data_inicio,v.data_vencimento,v.data_venda,v.prazo_meses,v.plano_versao_id,v.valor_tabela,v.valor_cobrado,v.corretor_pessoa_id,v.segundo_corretor_pessoa_id,v.atendente_pessoa_id,v.atendente_adicional_pessoa_id,v.gerente_pessoa_id,v.titulo_sequencia,pv.plano_id AS familia_plano_id,pv.valor AS preco_plano_atual,p.nome AS corretor_nome,c.nome AS cliente_nome,lin.tipo AS movimento_origem,ante.data_vencimento AS vencimento_anterior')
             ->join('plano_versoes pv','pv.id=v.plano_versao_id')
             ->join('titulo_vinculos lout','lout.operacao_origem_id=v.id','left')
             ->join('titulo_vinculos lin','lin.operacao_nova_id=v.id','left')
+            ->join('venda_operacoes ante','ante.id=lin.operacao_origem_id','left')
             ->join('pessoas p','p.id=v.corretor_pessoa_id')
             ->join('clientes c','c.id=v.cliente_id')
             ->where('v.situacao','VENDA')->where('lout.id IS NULL',null,false);
@@ -86,7 +87,7 @@ final class TitulosController extends CommercialBaseController
             ->get()->getResultArray();
         $now=\CodeIgniter\I18n\Time::now(config('App')->appTimezone)->toDateString();
         $limit=(new \DateTimeImmutable($now))->modify('+60 days')->format('Y-m-d');
-        $items=[];$summary=['total'=>0,'ativos'=>0,'a_vencer'=>0,'vencidos'=>0];
+        $items=[];$summary=['total'=>0,'ativos'=>0,'a_vencer'=>0,'vencidos'=>0,'a_quitar'=>0];
         foreach($all as $sale){
             $due=(string)$sale['data_vencimento'];
             $status=$due<$now?'VENCIDO':($due<=$limit?'A_VENCER':'ATIVO');
