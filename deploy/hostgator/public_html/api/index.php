@@ -16,6 +16,25 @@ defined('ENVIRONMENT') || define('ENVIRONMENT', 'production');
 use CodeIgniter\Boot;
 use Config\Paths;
 
+// Android Capacitor carrega HTML embarcado sob https://localhost.
+// Permitir SOMENTE essa origem (e a origem iOS prevista), com credenciais
+// e CSRF ativos. Responder OPTIONS antes do roteamento do CodeIgniter,
+// pois as rotas /api/* nao declaram explicitamente o metodo OPTIONS.
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (is_string($origin) && in_array($origin, ['https://localhost', 'capacitor://localhost'], true)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Accept, Content-Type, X-CSRF-TOKEN');
+    header('Access-Control-Max-Age: 600');
+    header('Vary: Origin');
+
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
+}
+
 $backend=dirname(__DIR__,2).DIRECTORY_SEPARATOR.'splash-backend';
 $entry=$backend.'/app/Config/Paths.php';
 if(!is_file($entry)){
