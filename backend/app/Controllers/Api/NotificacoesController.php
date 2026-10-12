@@ -65,4 +65,33 @@ final class NotificacoesController extends CommercialBaseController
             ->where('endpoint_hash',hash('sha256',$endpoint))->update(['ativo'=>0]);
         return $this->responseOK('Notificações deste aparelho desativadas.');
     }
+    /** Token nativo Android FCM, sempre atribuído à conta autenticada. */
+    public function registrarNativo():ResponseInterface
+    {
+        $uid=$this->uid();if($uid instanceof ResponseInterface)return $uid;
+        $data=$this->jsonPayload();$token=(string)($data['token']??'');
+        if(($data['plataforma']??'')!=='android'
+            || !preg_match('/^[A-Za-z0-9:_-]{60,512}$/D',$token))
+            return $this->errorResponse(422,'Token de dispositivo Android inválido.');
+        $db=db_connect();$hash=hash('sha256',$token);
+        $current=$db->table('splash_push_nativo_dispositivos')->where('token_hash',$hash)->get()->getRowArray();
+        $save=['user_id'=>$uid,'token'=>$token,'plataforma'=>'android',
+            'ativo'=>1,'atualizado_em'=>date('Y-m-d H:i:s')];
+        if($current)$db->table('splash_push_nativo_dispositivos')->where('id',$current['id'])->update($save);
+        else $db->table('splash_push_nativo_dispositivos')->insert(['token_hash'=>$hash,...$save]);
+        return $this->responseOK('Aplicativo Android registrado para seus avisos.');
+    }
+
+    public function removerNativo():ResponseInterface
+    {
+        $uid=$this->uid();if($uid instanceof ResponseInterface)return $uid;
+        $token=(string)($this->jsonPayload()['token']??'');
+        if(!preg_match('/^[A-Za-z0-9:_-]{60,512}$/D',$token))
+            return $this->errorResponse(422,'Token inválido.');
+        db_connect()->table('splash_push_nativo_dispositivos')
+            ->where('user_id',$uid)->where('token_hash',hash('sha256',$token))
+            ->update(['ativo'=>0]);
+        return $this->responseOK('Dispositivo desvinculado da conta.');
+    }
+
 }
