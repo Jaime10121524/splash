@@ -23,6 +23,7 @@ if(str_contains($interface,'window.print(')||str_contains($interfaceWeekly,'wind
  throw new RuntimeException('Impressão antiga do navegador voltou ao fluxo.');
 }
 
+if(!defined('WRITEPATH'))define('WRITEPATH',$root.'/writable/');
 if(is_file($root.'/vendor/autoload.php')){
  require_once $root.'/vendor/autoload.php';
  if(class_exists(\Mpdf\Mpdf::class)){
