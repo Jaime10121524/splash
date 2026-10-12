@@ -12,6 +12,7 @@ import RegrasComissoes from './pages/RegrasComissoes.jsx'
 import Relatorios from './pages/Relatorios.jsx'
 import Titulos from './pages/Titulos.jsx'
 import MinhasVendas from './pages/MinhasVendas.jsx'
+import MeuPerfil from './pages/MeuPerfil.jsx'
 
 const paths = {
   grid: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
@@ -71,6 +72,7 @@ const nav = [
   { id: 'emprestimos', label: 'Meus empréstimos', icon: 'arrows', roles: ['corretor'], section: 'Gestão' },
   { id: 'fechamentos', label: 'Fechamentos', icon: 'arrows', roles: ['admin','corretor'], section: 'Gestão' },
   { id: 'relatorios', label: 'Relatórios', icon: 'chart', roles: ['admin','corretor','vendedor','gerente'], section: 'Gestão' },
+  { id: 'meu-perfil', label: 'Meu perfil', icon: 'user', roles: ['admin','corretor','vendedor','gerente','operador'], section: 'Sistema' },
   { id: 'usuarios', label: 'Usuários', icon: 'shield', roles: ['admin'], section: 'Sistema' },
   { id: 'origens', label: 'Origens e motivos', icon: 'tag', roles: ['admin'], section: 'Sistema' },
   { id: 'configuracoes', label: 'Configurações', icon: 'settings', roles: ['admin'], section: 'Sistema' },
@@ -115,7 +117,48 @@ async function getJSON(url, opts = {}) {
   return data
 }
 
-function Login({ onLogin, error, busy, offline, onRetry }) {
+function RecuperarSenha({onBack}){
+  const token=new URLSearchParams(window.location.search).get('recuperar')||''
+  const [email,setEmail]=useState('')
+  const [password,setPassword]=useState('')
+  const [confirm,setConfirm]=useState('')
+  const [busy,setBusy]=useState(false)
+  const [message,setMessage]=useState('')
+  const [error,setError]=useState('')
+  async function submit(e){
+    e.preventDefault();setError('');setMessage('')
+    if(token&&password!==confirm)return setError('As senhas não conferem.')
+    setBusy(true)
+    try{
+      const csrf=(await getJSON('/api/session')).csrf
+      const url=token?'/api/conta/redefinir':'/api/conta/recuperar'
+      const res=await getJSON(url,{method:'POST',headers:{
+        'Content-Type':'application/json',[csrf.header]:csrf.hash,
+      },body:JSON.stringify(token?{token,nova_senha:password}:{email})})
+      setMessage(res.message)
+    }catch(err){setError(err.message)}
+    finally{setBusy(false)}
+  }
+  return <div className="auth-page"><section className="auth-story">
+    <Brand/><div className="auth-story-copy"><h2>Seu acesso, protegido.</h2><p>Recuperação por e-mail com link único que expira em 30 minutos.</p></div></section>
+    <main className="auth-form-side"><div className="auth-form-wrap">
+      <div className="auth-welcome"><span className="eyebrow">SPLASH / SEGURANÇA</span>
+        <h1>{token?'Redefinir senha':'Recuperar senha'}</h1>
+        <p>{token?'Digite sua nova senha.':'Informe o e-mail associado à sua conta.'}</p></div>
+      <form onSubmit={submit} className="auth-fields">
+        {token?<><label>Nova senha *</label><div className="input-wrap"><input type="password" value={password} autoComplete="new-password" onChange={e=>setPassword(e.target.value)} required minLength={8}/></div>
+          <label>Confirmar nova senha *</label><div className="input-wrap"><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} required minLength={8}/></div>
+          <p className="mv-note">Mínimo 8 caracteres, uma maiúscula e um número.</p></>:
+          <><label>E-mail *</label><div className="input-wrap"><input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/></div></>}
+        {error&&<p className="feedback error" role="alert">{error}</p>}
+        {message&&<p className="feedback" role="status">{message}</p>}
+        <button className="button primary signin" disabled={busy} type="submit">{busy?'Enviando...':token?'Redefinir senha':'Enviar link de recuperação'}</button>
+        <button className="button" type="button" onClick={onBack}>Voltar ao login</button>
+      </form></div></main>
+  </div>
+}
+
+function Login({ onLogin, error, busy, offline, onRetry, onForgot }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [visible, setVisible] = useState(false)
@@ -144,7 +187,7 @@ function Login({ onLogin, error, busy, offline, onRetry }) {
         <form onSubmit={submit} className="auth-fields">
           <label htmlFor="username">Nome de usuário</label>
           <div className="input-wrap"><Icon name="user" size={19}/><input id="username" autoComplete="username" placeholder="Digite seu usuário" value={username} onChange={e => setUsername(e.target.value)} required maxLength={100}/></div>
-          <div className="label-line"><label htmlFor="password">Senha</label><a href="/login/magic-link">Esqueceu a senha?</a></div>
+          <div className="label-line"><label htmlFor="password">Senha</label><button type="button" className="inline-button" onClick={onForgot}>Esqueceu a senha?</button></div>
           <div className="input-wrap"><Icon name="key" size={19}/><input id="password" type={visible ? 'text' : 'password'} autoComplete="current-password" placeholder="Digite sua senha" value={password} onChange={e => setPassword(e.target.value)} required/><button className="input-eye" type="button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}><Icon name={visible?'eyeoff':'eye'} size={19}/></button></div>
           <button type="submit" className="button primary signin" disabled={busy || offline}>{busy ? 'Entrando...' : 'Acessar sistema'}<Icon name="arrow" size={19}/></button>
         </form>
@@ -358,6 +401,7 @@ function App() {
   const [initialSaleOperation, setInitialSaleOperation] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
+  const [forgotOpen,setForgotOpen]=useState(false)
   const [theme, setTheme] = useState('light')
 
   async function refresh() {
@@ -420,7 +464,9 @@ function App() {
     setCurrent(id);setNoticesOpen(false);window.scrollTo({top:0,behavior:'smooth'})
   }
   if (session.status==='loading') return <div className="splash-loading"><Brand/><span className="loading-spinner"/><p>Preparando seu espaço...</p></div>
-  if (session.status!=='in') return <Login onLogin={login} error={error} busy={busy} offline={session.status==='offline'} onRetry={refresh}/>
+  if (session.status!=='in') return <>{(forgotOpen||new URLSearchParams(window.location.search).has('recuperar'))
+    ?<RecuperarSenha onBack={()=>{setForgotOpen(false);window.history.replaceState(null,'','/')}}/>
+    :<Login onLogin={login} error={error} busy={busy} offline={session.status==='offline'} onRetry={refresh} onForgot={()=>setForgotOpen(true)}/>}</>
   const user=session.user || {username:'Usuário',role:'restrito'}
   const allowed=nav.filter(x=>x.roles.includes(user.role))
   const active=allowed.some(x=>x.id===current)?current:'dashboard'
@@ -434,11 +480,11 @@ function App() {
           <span className="connection-indicator"><span/> Conectado</span>
           <button className="icon-btn" title="Alternar tema" aria-label="Alternar tema" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}><Icon name={theme==='light'?'moon':'sun'} size={20}/></button>
           <div className="notification-wrap"><button className="icon-btn" title="Notificações" aria-label="Notificações" aria-expanded={noticesOpen} onClick={()=>setNoticesOpen(s=>!s)}><Icon name="bell" size={20}/></button>{noticesOpen&&<div className="notification-pop"><strong>Notificações</strong><p>Os avisos de renovação e retornos aparecerão aqui quando o módulo estiver ativo.</p></div>}</div>
-          <span className="top-avatar" title={user.username}>{initials(user.username)}</span>
+          <button type="button" className="top-avatar" title="Abrir meu perfil" aria-label="Meu perfil" onClick={()=>go('meu-perfil')}>{initials(user.username)}</button>
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
