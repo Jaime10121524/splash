@@ -10,6 +10,8 @@ $routes->group('api', static function ($routes): void {
     $routes->get('session', 'Api\\SessionController::show');
     $routes->post('session/login', 'Api\\SessionController::login', ['filter' => 'csrf']);
     $routes->post('session/logout', 'Api\\SessionController::logout', ['filter' => 'csrf']);
+    $routes->get('alertas-comerciais/config', 'Api\\AlertasComerciaisController::consultar');
+    $routes->post('alertas-comerciais/config', 'Api\\AlertasComerciaisController::salvar', ['filter'=>'csrf']);
     $routes->get('notificacoes', 'Api\\NotificacoesController::index');
     $routes->post('notificacoes/(:num)/ler', 'Api\\NotificacoesController::marcar/$1', ['filter'=>'csrf']);
     $routes->post('notificacoes/dispositivos', 'Api\\NotificacoesController::registrarDispositivo', ['filter'=>'csrf']);
