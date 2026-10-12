@@ -15,6 +15,7 @@ import MinhasVendas from './pages/MinhasVendas.jsx'
 import MeuPerfil from './pages/MeuPerfil.jsx'
 import AlertasComerciais from './pages/AlertasComerciais.jsx'
 import NotificacoesSplash, {stopCurrentPush} from './components/NotificacoesSplash.jsx'
+import {apiUrl,apiCredentials} from './lib/nativeApi.js'
 
 const paths = {
   grid: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
@@ -114,7 +115,7 @@ function initials(value) {
   return (value || 'S').split(/[ ._-]+/).filter(Boolean).slice(0,2).map(s => s[0].toUpperCase()).join('')
 }
 async function getJSON(url, opts = {}) {
-  const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json', ...(opts.headers || {}) }, ...opts })
+  const response = await fetch(apiUrl(url), { credentials: apiCredentials, headers: { Accept: 'application/json', ...(opts.headers || {}) }, ...opts })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw Object.assign(new Error(data.message || 'Não foi possível concluir a operação.'), { data, status: response.status })
   return data
