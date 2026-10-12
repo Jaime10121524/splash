@@ -43,6 +43,12 @@ $routes->group('api', static function ($routes): void {
     $routes->post('atendimentos/(:num)/retomar', 'Api\VisitasController::retomar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/corretores', 'Api\VisitasController::corretores/$1', ['filter'=>'csrf']);
 
+    // Carteira de títulos: renovação / upgrade geram nova venda vinculada.
+    $routes->get('titulos', 'Api\\TitulosController::index');
+    $routes->get('titulos/opcoes', 'Api\\TitulosController::opcoes');
+    $routes->get('titulos/(:num)/historico', 'Api\\TitulosController::historico/$1');
+    $routes->post('titulos/(:num)/movimentar', 'Api\\TitulosController::movimentar/$1', ['filter'=>'csrf']);
+
     // Operações de vendas: títulos e negociações compartilham o mesmo extrato.
     $routes->get('vendas/opcoes', 'Api\VendasController::opcoes');
     $routes->get('vendas/resumo', 'Api\VendasController::resumo');
