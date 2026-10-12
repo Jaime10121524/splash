@@ -16,6 +16,11 @@ defined('ENVIRONMENT') || define('ENVIRONMENT', 'production');
 use CodeIgniter\Boot;
 use Config\Paths;
 
+// Identificador publico para confirmar qual versao do gateway esta em producao.
+// Nenhuma credencial ou informacao interna e divulgada.
+header('X-Splash-API-Entrypoint: android-cors-20261012-v3');
+header('Cache-Control: no-store');
+
 // Android Capacitor carrega HTML embarcado sob https://localhost.
 // Permitir SOMENTE essa origem (e a origem iOS prevista), com credenciais
 // e CSRF ativos. Responder OPTIONS antes do roteamento do CodeIgniter,
