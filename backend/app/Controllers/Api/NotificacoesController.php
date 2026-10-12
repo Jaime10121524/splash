@@ -22,7 +22,7 @@ final class NotificacoesController extends CommercialBaseController
         return $this->response->setJSON([
             'avisos'=>$rows,'nao_lidas'=>$unread,
             'push_disponivel'=>EnvioPushSplash::disponivel(),
-            'vapid_publica'=>(string)(getenv('SPLASH_VAPID_PUBLIC')?:''),
+            'vapid_publica'=>(string)(env('SPLASH_VAPID_PUBLIC')?:''),
         ])->setHeader('Cache-Control','no-store');
     }
     public function marcar(int|string $id):ResponseInterface
