@@ -8,6 +8,11 @@
  */
 declare(strict_types=1);
 
+// Front controller exclusivamente de producao (HostGator).
+// Garante que nenhum CI_ENVIRONMENT=development herdado do servidor exponha
+// excecoes, caminhos de arquivos ou detalhes internos ao publico.
+defined('ENVIRONMENT') || define('ENVIRONMENT', 'production');
+
 use CodeIgniter\Boot;
 use Config\Paths;
 
