@@ -28,14 +28,12 @@ if(!is_dir(FCPATH)){
 }
 chdir(FCPATH);
 
-// O front controller publico esta em /api/index.php, mas as rotas do
-// CodeIgniter incluem o prefixo /api. Ao processar REQUEST_URI, o CI4
-// remove automaticamente a parte do caminho que coincide com SCRIPT_NAME.
-// Corrige apenas esse caminho virtual para preservar /api/session etc.
-$scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-if (preg_match('~^(.*)/api/index\\.php$~', $scriptName, $matches) === 1) {
-    $_SERVER['SCRIPT_NAME'] = ($matches[1] ?: '') . '/index.php';
-}
+// Este arquivo publico vive em /api/index.php, mas as rotas da API
+// possuem o prefixo /api. O CI4 usa SCRIPT_NAME para remover o prefixo comum
+// de REQUEST_URI. Algumas hospedagens informam variacoes de SCRIPT_NAME
+// apos o rewrite; portanto forca a localizacao virtual na raiz.
+// Assim, GET /api/session continua sendo a rota "api/session".
+$_SERVER['SCRIPT_NAME'] = '/index.php';
 
 require $entry;
 $paths=new Paths();
