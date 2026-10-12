@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react'
 import {comercialGet,dateBR} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
 import RelatoriosGerenciais from './RelatoriosGerenciais.jsx'
+import {apiUrl} from '../lib/nativeApi.js'
 import './ComercialPages.css'
 import './Relatorios.css'
 
@@ -141,7 +142,7 @@ export default function Relatorios({role='admin'}){
           <p>Fechamento #{data.fechamento.id} · {dateBR(data.fechamento.inicio)} a {dateBR(data.fechamento.fim)}
             {reportAdmin&&data.fechamento.responsavel_nome?' · Responsável: '+data.fechamento.responsavel_nome:''}</p>
         </div>
-        <a className="rel-print no-print" href={'/api/relatorios/fechamentos/'+data.fechamento.id+'/pdf'}
+        <a className="rel-print no-print" href={apiUrl('/api/relatorios/fechamentos/'+data.fechamento.id+'/pdf')}
            target="_blank" rel="noopener noreferrer">
           Abrir / salvar PDF
         </a>
