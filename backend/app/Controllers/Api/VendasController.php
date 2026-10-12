@@ -25,8 +25,12 @@ class VendasController extends CommercialBaseController
     private function impedeVendaFechada($db,int $id): ?ResponseInterface
     {
         $periodo=ProtecaoVendaFechada::fechamento($db,$id);
-        return $periodo===null?null:$this->errorResponse(409,
+        if($periodo!==null)return $this->errorResponse(409,
             ProtecaoVendaFechada::MESSAGE.' Fechamento #'.$periodo['id'].'.');
+        if($db->table('titulo_vinculos')->where('operacao_origem_id',$id)->countAllResults()>0){
+            return $this->errorResponse(409,'Título renovado ou substituído. Venda anterior preservada sem alterações.');
+        }
+        return null;
     }
 
     public function opcoes(): ResponseInterface
@@ -345,6 +349,10 @@ class VendasController extends CommercialBaseController
             }
             if($blocked=$this->impedeVendaFechada($db,(int)$id)){
                 $db->transRollback();return $blocked;
+            }
+            if($db->table('titulo_vinculos')->where('operacao_nova_id',(int)$id)->countAllResults()>0){
+                $db->transRollback();
+                return $this->errorResponse(409,'Cadastro de renovação ou upgrade protegido: a diferença cobrada e a vigência não podem ser recalculadas.');
             }
             $movementRows=$db->table('venda_recebimentos')
                 ->select('tipo,valor')->where('operacao_id',(int)$id)->get()->getResultArray();
