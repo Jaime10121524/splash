@@ -24,6 +24,16 @@ final class VisitasAvisos
                 $id=(int)($v[$field]??0);
                 if($id>0)$roles[]=$id;
             }
+            if($evento==='CORRETORES'){
+                $before=$db->table('visita_corretor_historico')
+                    ->select('anterior_corretor_id,anterior_segundo_id')
+                    ->where('visita_id',$visitaId)->orderBy('id','DESC')->get()->getRowArray();
+                if($before){
+                    foreach(['anterior_corretor_id','anterior_segundo_id'] as $field){
+                        if((int)($before[$field]??0)>0)$roles[]=(int)$before[$field];
+                    }
+                }
+            }
             $users=[];
             if($roles){
                 foreach($db->table('pessoas')->select('user_id')->whereIn('id',array_unique($roles))
