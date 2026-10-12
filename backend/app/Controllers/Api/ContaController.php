@@ -53,4 +53,36 @@ final class ContaController extends BaseController
         }
     }
 
+    public function solicitarRecuperacao():ResponseInterface {
+        $out=['message'=>'Se o email estiver cadastrado, enviaremos um link de recuperação.'];
+        if(!service('throttler')->check('splash-recover-'.sha1($this->request->getIPAddress()),5,HOUR))
+            return $this->answer($out);
+        $p=$this->request->getJSON(true)??[];
+        $email=strtolower(trim((string)($p['email']??'')));
+        if(!filter_var($email,FILTER_VALIDATE_EMAIL)||strlen($email)>254)return $this->answer($out);
+        try{
+            $u=auth()->getProvider()->findByCredentials(['email'=>$email]);
+            if(!$u||$u->isBanned())return $this->answer($out);
+            $db=db_connect();
+            if($db->table('splash_recuperacao_senha')->where('user_id',(int)$u->id)
+                ->where('criado_em >=',date('Y-m-d H:i:s',time()-300))->countAllResults())
+                return $this->answer($out);
+            $token=bin2hex(random_bytes(32));
+            $db->table('splash_recuperacao_senha')->insert([
+                'user_id'=>(int)$u->id,'token_hash'=>hash('sha256',$token),
+                'expira_em'=>date('Y-m-d H:i:s',time()+1800),'criado_em'=>date('Y-m-d H:i:s')
+            ]);
+            $base=rtrim((string)(getenv('SPLASH_FRONTEND_URL')?:config('App')->baseURL),'/');
+            $mail=service('email');
+            $mail->setFrom((string)(getenv('SPLASH_MAIL_FROM')?:config('Email')->fromEmail),'SPLASH');
+            $mail->setTo((string)$u->email);
+            $mail->setSubject('SPLASH - Recuperacao de senha');
+            $mail->setMessage("Para criar uma senha nova, acesse em ate 30 minutos:\n".$base.'/?recuperar='.$token."\nSe nao solicitou, ignore.");
+            if(!$mail->send())log_message('error','Falha SMTP na recuperação SPLASH.');
+        }catch(\Throwable $e){
+            log_message('error','Recuperação SPLASH: {message}',['message'=>$e->getMessage()]);
+        }
+        return $this->answer($out);
+    }
+
 }
