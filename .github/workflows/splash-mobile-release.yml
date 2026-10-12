@@ -1,0 +1,58 @@
+name: SPLASH - pacotes mobile e HostGator
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/splash-mobile-release.yml'
+      - 'frontend/src/**'
+      - 'frontend/index.html'
+      - 'backend/app/Libraries/EnvioPushNativoSplash.php'
+      - 'backend/app/Controllers/Api/NotificacoesController.php'
+
+permissions:
+  contents: read
+
+jobs:
+  pacotes:
+    name: Gerar frontend e backend para HostGator
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Compilar frontend para navegador e PWA
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Criar pacotes ZIP nas raizes corretas
+        run: |
+          cd frontend/dist
+          zip -q -r ../../splash-site-mobile.zip .
+          cd ../../backend
+          zip -q ../splash-backend-firebase.zip \
+            app/Libraries/EnvioPushNativoSplash.php \
+            app/Controllers/Api/NotificacoesController.php
+          cd ..
+          test -s splash-site-mobile.zip
+          test -s splash-backend-firebase.zip
+      - name: Entregar frontend para raiz do subdominio
+        uses: actions/upload-artifact@v4
+        with:
+          name: SPLASH-SITE-MOBILE-ATUALIZADO
+          path: splash-site-mobile.zip
+          retention-days: 7
+          if-no-files-found: error
+      - name: Entregar backend Firebase para pasta privada
+        uses: actions/upload-artifact@v4
+        with:
+          name: SPLASH-BACKEND-FIREBASE-DIAGNOSTICO
+          path: splash-backend-firebase.zip
+          retention-days: 7
+          if-no-files-found: error
