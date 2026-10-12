@@ -15,6 +15,8 @@ $routes->group('api', static function ($routes): void {
     $routes->get('notificacoes', 'Api\\NotificacoesController::index');
     $routes->post('notificacoes/(:num)/ler', 'Api\\NotificacoesController::marcar/$1', ['filter'=>'csrf']);
     $routes->post('notificacoes/dispositivos', 'Api\\NotificacoesController::registrarDispositivo', ['filter'=>'csrf']);
+    $routes->post('notificacoes/nativo', 'Api\\NotificacoesController::registrarNativo', ['filter'=>'csrf']);
+    $routes->post('notificacoes/nativo/remover', 'Api\\NotificacoesController::removerNativo', ['filter'=>'csrf']);
     $routes->post('notificacoes/dispositivos/remover', 'Api\\NotificacoesController::removerDispositivo', ['filter'=>'csrf']);
     $routes->get('conta/perfil', 'Api\\ContaController::perfil');
     $routes->post('conta/perfil', 'Api\\ContaController::atualizar', ['filter'=>'csrf']);
