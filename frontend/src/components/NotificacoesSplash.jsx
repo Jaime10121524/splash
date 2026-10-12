@@ -1,3 +1,5 @@
+import {PushNotifications} from '@capacitor/push-notifications'
+import {isNative} from '../lib/nativeApi.js'
 import {useEffect,useState} from 'react'
 import {comercialGet,comercialPost,dateBR} from '../lib/comercialApi.js'
 import './NotificacoesSplash.css'
@@ -8,6 +10,14 @@ function decodeKey(encoded){
  return Uint8Array.from(raw,ch=>ch.charCodeAt(0))
 }
 export async function stopCurrentPush(){
+ if(isNative()){
+   const token=localStorage.getItem('splash_android_push_token')
+   if(token){
+     try{await comercialPost('/api/notificacoes/nativo/remover',{token})}catch{}
+     localStorage.removeItem('splash_android_push_token')
+   }
+   return
+ }
  if(!('serviceWorker' in navigator))return
  try{
   const reg=await navigator.serviceWorker.getRegistration('/')
@@ -31,6 +41,35 @@ export default function NotificacoesSplash({navigate}){
   const id=setInterval(refresh,90000)
   return ()=>clearInterval(id)
  },[])
+ async function enableNative(){
+  setError('');setNotice('')
+  if(!data.push_nativo_disponivel){
+   setNotice('O aplicativo foi preparado, mas o administrador ainda precisa configurar o projeto Firebase no servidor para entregar notificações ao Android.')
+   return
+  }
+  setBusy(true)
+  try{
+   const permission=await PushNotifications.requestPermissions()
+   if(permission.receive!=='granted')throw new Error('Permissão de notificações negada no Android.')
+   await PushNotifications.removeAllListeners()
+   await PushNotifications.addListener('registration',async result=>{
+    try{
+     await comercialPost('/api/notificacoes/nativo',{token:result.value,plataforma:'android'})
+     localStorage.setItem('splash_android_push_token',result.value)
+     setNotice('Notificações Android ativadas para sua conta.')
+    }catch(e){setError(e.message)}
+   })
+   await PushNotifications.addListener('registrationError',err=>setError(err.error||'Falha no cadastro FCM.'))
+   await PushNotifications.addListener('pushNotificationReceived',()=>refresh())
+   await PushNotifications.addListener('pushNotificationActionPerformed',event=>{
+    const route=event.notification?.data?.route
+    if(['vendas','atendimentos','titulos','pendencias','relatorios'].includes(route))navigate(route)
+    refresh()
+   })
+   await PushNotifications.register()
+  }catch(e){setError(e.message)}
+  finally{setBusy(false)}
+ }
  async function enable(){
   setError('');setNotice('')
   if(!window.isSecureContext || !('Notification' in window) || !('serviceWorker' in navigator)
@@ -69,7 +108,11 @@ export default function NotificacoesSplash({navigate}){
   <div className="sn-header"><div><strong>Notificações</strong>
     <small>{data.nao_lidas} não lida(s)</small></div>
     <button onClick={refresh} type="button" aria-label="Atualizar avisos">Atualizar</button></div>
-  {data.push_disponivel
+  {isNative()
+   ?<button type="button" className="sn-enable" onClick={enableNative} disabled={busy}>
+     {busy?'Configurando Android...':'Ativar notificações Android'}
+    </button>
+   :data.push_disponivel
    ?<button type="button" className="sn-enable" onClick={enable} disabled={busy}>
       {busy?'Configurando aparelho...':'Ativar notificações neste celular'}
     </button>
