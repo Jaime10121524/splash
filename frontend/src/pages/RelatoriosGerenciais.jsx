@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react'
 import {comercialGet,localDateISO,dateBR} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
+import {apiUrl} from '../lib/nativeApi.js'
 import './Relatorios.css'
 import './RelatoriosGerenciais.css'
 
@@ -38,7 +39,7 @@ export default function RelatoriosGerenciais(){
   }).catch(()=>{});return()=>{mounted=false}
  },[])
  const changeType=value=>{setType(value);setData(null);setLastParams(null)}
- const pdfUrl=lastParams?'/api/relatorios/gerenciais/pdf?'+lastParams:null
+ const pdfUrl=lastParams?apiUrl('/api/relatorios/gerenciais/pdf?'+lastParams):null
  async function pesquisar(event){
   event.preventDefault();setError('');setData(null);setLastParams(null)
   if(!start||!end||start>end)return setError('Informe a data inicial e final do período, em ordem válida.')
