@@ -30,6 +30,8 @@ final class EnvioPushSplash
                 'privateKey'=>env('SPLASH_VAPID_PRIVATE'),
             ]]):null;
             foreach($list as $notice){
+                $owner=auth()->getProvider()->findById((int)$notice['user_id']);
+                if(!$owner||$owner->isBanned())continue;
                 $subscriptions=$db->table('splash_push_dispositivos')
                     ->where('user_id',(int)$notice['user_id'])->where('ativo',1)
                     ->limit(8)->get()->getResultArray();
