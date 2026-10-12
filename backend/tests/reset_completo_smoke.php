@@ -11,6 +11,7 @@ if($source===false || !preg_match('/public const TABLES = \[(.*?)\];/s',$source,
 preg_match_all("/'([a-z_]+)'/",$inventory[1],$names);
 $tables=$names[1];
 $required=[
+    'titulo_vinculos',
     'fechamento_custodia_pix_vinculos','fechamento_custodia_movimentos',
     'fechamento_periodo_eventos','fechamento_periodo_abates',
     'fechamento_periodo_repasses','fechamento_periodo_titulares',
@@ -57,6 +58,7 @@ foreach ([
     ['financeiro_emprestimo_abates','comissao_lotes_pagamento'],
     ['comissao_repasses','comissao_rateios'],
     ['venda_recebimentos','venda_operacoes'],
+    ['titulo_vinculos','venda_operacoes'],
     ['visita_sessoes','visitas'],
     ['visita_corretor_historico','visitas'],
     ['visita_resultados_historico','visitas'],
@@ -86,4 +88,4 @@ if ($source===false || $command===false
 if (is_file(dirname(__DIR__).'/app/Database/Migrations/2026-10-11-000001_ResetCompletoDadosTestes.php')) {
     throw new RuntimeException('Reset completo não pode entrar em migrations normais.');
 }
-echo "Reset completo: 30 tabelas, relações, cadastros e proteções OK\n";
+echo "Reset completo: 31 tabelas, relações, cadastros e proteções OK\n";
