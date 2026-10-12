@@ -3,6 +3,12 @@ namespace App\Libraries;
 
 final class VigenciaTitulo
 {
+    public static function renovar(string $anterior,string $data,int $meses): array
+    {
+        $base=max($anterior,$data);
+        return ['inicio'=>$base,'vencimento'=>self::vencimento($base,$meses)];
+    }
+
     public static function vencimento(string $inicio, int $meses): string
     {
         $date=new \DateTimeImmutable($inicio.' 12:00:00');
