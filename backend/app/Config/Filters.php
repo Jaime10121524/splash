@@ -26,6 +26,7 @@ class Filters extends BaseFilters
      */
     public array $aliases = [
         'csrf'          => CSRF::class,
+        'capacitorcors' => \App\Filters\CapacitorCors::class,
         'toolbar'       => DebugToolbar::class,
         'honeypot'      => Honeypot::class,
         'invalidchars'  => InvalidChars::class,
@@ -72,11 +73,13 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
+            'capacitorcors',
             // 'honeypot',
             // 'csrf',
             // 'invalidchars',
         ],
         'after' => [
+            'capacitorcors',
             // 'honeypot',
             // 'secureheaders',
         ],
