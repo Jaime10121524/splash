@@ -13,6 +13,7 @@ final class AvisosSplashCommand extends BaseCommand
  protected $name='splash:avisos';
  protected $description='Gera lembretes de títulos, visitas e pendências; entrega Web Push em lote.';
  public function run(array $params){
+  date_default_timezone_set((string)config('App')->appTimezone);
   $db=db_connect();$today=date('Y-m-d');
   $adminIds=[];
   foreach(auth()->getProvider()->findAll(200) as $u){
