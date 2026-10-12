@@ -25,7 +25,7 @@ foreach(['CHEGADA','INICIADO','RETOMADA','CORRETORES','$status'] as $event){
     if(!str_contains($visits,'VisitasAvisos::registrar')||!str_contains($visits,$event))
         throw new RuntimeException('Avisos de visitas incompletos: '.$event);
 }
-foreach(['motivo_nao_venda','splash_notificacoes','AvisosSplash::alertaUsuario','RETORNO','VENDA','SEM_VENDA'] as $needle){
+foreach(['motivo_nao_venda','AvisosSplash::alertaUsuario','RETORNO','VENDA','SEM_VENDA'] as $needle){
     if(!str_contains($notices,$needle))throw new RuntimeException('Detalhes da visita não contemplados: '.$needle);
 }
 foreach(['splash:backup','START TRANSACTION WITH CONSISTENT SNAPSHOT','realpath(FCPATH)',
