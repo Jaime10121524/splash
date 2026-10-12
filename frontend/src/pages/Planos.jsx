@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './Planos.css'
 import { FormControl } from '../components/UiFields.jsx'
+import { comercialGet, comercialPost } from '../lib/comercialApi.js'
 
 const moeda = n => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(Number(n))
 const prazo = n => Number(n)%12===0 ? (Number(n)/12)+' ano(s)' : n+' mês(es)'
@@ -11,18 +12,9 @@ function normalizarValor(s) {
   if(/^\d{1,3}(\.\d{3})+$/.test(s)) return s.replace(/\./g,'')
   return s
 }
-async function api(url, options={}) {
-  const res=await fetch(url,{credentials:'same-origin',headers:{Accept:'application/json',...(options.headers||{})},...options})
-  const type=res.headers.get('content-type')||''
-  const data=type.includes('application/json')?await res.json().catch(()=>({})):{}
-  if(!res.ok) throw new Error(data.message||('Erro HTTP '+res.status))
-  return data
-}
-async function enviar(url, data) {
-  const session=await api('/api/session')
-  if(!session.authenticated || !session.csrf) throw new Error('Sessão expirada. Entre novamente.')
-  return api(url,{method:'POST',headers:{'Content-Type':'application/json',[session.csrf.header]:session.csrf.hash},body:JSON.stringify(data)})
-}
+// Mesmo cliente autenticado (origem remota no Capacitor, cookies e CSRF).
+const api = url => comercialGet(url)
+const enviar = (url, data) => comercialPost(url, data)
 export default function Planos() {
   const [list,setList]=useState([])
   const [loading,setLoading]=useState(true)
