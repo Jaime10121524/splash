@@ -2,6 +2,10 @@ name: SPLASH - APK Android com Firebase
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-apk.yml'
 
 permissions:
   contents: read
@@ -31,7 +35,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -47,6 +51,11 @@ jobs:
 
       - name: Instalar dependencias do frontend
         run: npm ci --no-audit --no-fund
+
+      - name: Instalar TypeScript exigido pela configuracao Capacitor
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund typescript@5.9.3
+          node -e "const ts=require('typescript'); if (!ts.transpileModule) process.exit(1); console.log('TypeScript',ts.version,'disponivel')"
 
       - name: Validar Firebase configurado
         env:
