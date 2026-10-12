@@ -11,9 +11,9 @@ final class EnvioPushSplash
     public static function disponivel():bool
     {
         return class_exists(WebPush::class) &&
-            strlen((string)getenv('SPLASH_VAPID_PUBLIC'))>50 &&
-            strlen((string)getenv('SPLASH_VAPID_PRIVATE'))>30 &&
-            filter_var((string)getenv('SPLASH_VAPID_SUBJECT'),FILTER_VALIDATE_EMAIL);
+            strlen((string)env('SPLASH_VAPID_PUBLIC'))>50 &&
+            strlen((string)env('SPLASH_VAPID_PRIVATE'))>30 &&
+            filter_var((string)env('SPLASH_VAPID_SUBJECT'),FILTER_VALIDATE_EMAIL);
     }
     public static function enviar(int $limit=35):array
     {
@@ -23,9 +23,9 @@ final class EnvioPushSplash
             ->where('tentativas <',5)->orderBy('id','ASC')->limit($limit)->get()->getResultArray();
         try{
             $push=new WebPush(['VAPID'=>[
-                'subject'=>'mailto:'.getenv('SPLASH_VAPID_SUBJECT'),
-                'publicKey'=>getenv('SPLASH_VAPID_PUBLIC'),
-                'privateKey'=>getenv('SPLASH_VAPID_PRIVATE'),
+                'subject'=>'mailto:'.env('SPLASH_VAPID_SUBJECT'),
+                'publicKey'=>env('SPLASH_VAPID_PUBLIC'),
+                'privateKey'=>env('SPLASH_VAPID_PRIVATE'),
             ]]);
             foreach($list as $notice){
                 $subscriptions=$db->table('splash_push_dispositivos')
