@@ -96,6 +96,8 @@ final class TitulosController extends CommercialBaseController
             $sale['status_titulo']=$status;
             if(!$actor['admin']){
                 unset($sale['cliente_nome'],$sale['cliente_id'],
+                    $sale['valor_tabela'],$sale['valor_cobrado'],$sale['preco_plano_atual'],
+                    $sale['familia_plano_id'],$sale['plano_versao_id'],
                     $sale['segundo_corretor_pessoa_id'],$sale['atendente_pessoa_id'],
                     $sale['atendente_adicional_pessoa_id'],$sale['gerente_pessoa_id']);
             }
