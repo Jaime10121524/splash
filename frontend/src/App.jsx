@@ -13,6 +13,7 @@ import Relatorios from './pages/Relatorios.jsx'
 import Titulos from './pages/Titulos.jsx'
 import MinhasVendas from './pages/MinhasVendas.jsx'
 import MeuPerfil from './pages/MeuPerfil.jsx'
+import NotificacoesSplash, {stopCurrentPush} from './components/NotificacoesSplash.jsx'
 
 const paths = {
   grid: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
@@ -446,6 +447,7 @@ function App() {
   async function logout() {
     setBusy(true);setError('')
     try {
+      await stopCurrentPush()
       const token = (await getJSON('/api/session')).csrf
       if (!token?.header || !token?.hash) throw new Error('Token de sessão indisponível.')
       const data = await getJSON('/api/session/logout',{method:'POST',headers:{[token.header]:token.hash}})
@@ -479,7 +481,7 @@ function App() {
         <div className="top-actions">
           <span className="connection-indicator"><span/> Conectado</span>
           <button className="icon-btn" title="Alternar tema" aria-label="Alternar tema" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}><Icon name={theme==='light'?'moon':'sun'} size={20}/></button>
-          <div className="notification-wrap"><button className="icon-btn" title="Notificações" aria-label="Notificações" aria-expanded={noticesOpen} onClick={()=>setNoticesOpen(s=>!s)}><Icon name="bell" size={20}/></button>{noticesOpen&&<div className="notification-pop"><strong>Notificações</strong><p>Os avisos de renovação e retornos aparecerão aqui quando o módulo estiver ativo.</p></div>}</div>
+          <div className="notification-wrap"><button className="icon-btn" title="Notificações" aria-label="Notificações" aria-expanded={noticesOpen} onClick={()=>setNoticesOpen(s=>!s)}><Icon name="bell" size={20}/></button>{noticesOpen&&<div className="notification-pop"><NotificacoesSplash navigate={go}/></div>}</div>
           <button type="button" className="top-avatar" title="Abrir meu perfil" aria-label="Meu perfil" onClick={()=>go('meu-perfil')}>{initials(user.username)}</button>
         </div>
       </header>
