@@ -17,7 +17,9 @@ final class EnvioPushNativoSplash
         $real=$file!==''?realpath($file):false;
         $public=realpath(FCPATH);
         return extension_loaded('curl') && extension_loaded('openssl')
-            && $real!==false && is_readable($real) && (!$public || !str_starts_with($real,$public));
+            && $real!==false && is_readable($real)
+            && !preg_match('~[/\\\\]public_html(?:[/\\\\]|$)~i',$real)
+            && (!$public || !str_starts_with($real,$public));
     }
     private static function b64(string $data):string
     {
