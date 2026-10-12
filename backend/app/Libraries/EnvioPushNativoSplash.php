@@ -11,16 +11,39 @@ use Throwable;
 final class EnvioPushNativoSplash
 {
     private static ?string $accessToken=null;
+    /**
+     * Apenas codigos de estado, sem revelar caminhos, nomes de projeto ou chaves.
+     * O controller expoe o diagnostico somente ao administrador autenticado.
+     */
+    public static function diagnostico():string
+    {
+        if(!extension_loaded('curl') || !extension_loaded('openssl'))return 'extensao_php_ausente';
+        $file=trim((string)(env('SPLASH_FIREBASE_SERVICE_ACCOUNT')?:''));
+        if($file==='')return 'caminho_nao_configurado';
+        $real=realpath($file);
+        if($real===false || !is_file($real))return 'arquivo_nao_encontrado';
+        $public=realpath(FCPATH);
+        if(preg_match('~[/\\\\]public_html(?:[/\\\\]|$)~i',$real)
+            || ($public && str_starts_with($real,$public))){
+            return 'local_publico_proibido';
+        }
+        if(!is_readable($real))return 'sem_permissao_leitura';
+        $cfg=json_decode((string)file_get_contents($real),true);
+        if(!is_array($cfg))return 'json_invalido';
+        if(($cfg['type']??'')!=='service_account'
+            || !preg_match('/^[a-z0-9-]+$/D',(string)($cfg['project_id']??''))
+            || !str_ends_with((string)($cfg['client_email']??''),'.gserviceaccount.com')
+            || !str_contains((string)($cfg['private_key']??''),'BEGIN PRIVATE KEY')){
+            return 'credenciais_invalidas';
+        }
+        return 'ok';
+    }
+
     public static function disponivel():bool
     {
-        $file=(string)(env('SPLASH_FIREBASE_SERVICE_ACCOUNT')?:'');
-        $real=$file!==''?realpath($file):false;
-        $public=realpath(FCPATH);
-        return extension_loaded('curl') && extension_loaded('openssl')
-            && $real!==false && is_readable($real)
-            && !preg_match('~[/\\\\]public_html(?:[/\\\\]|$)~i',$real)
-            && (!$public || !str_starts_with($real,$public));
+        return self::diagnostico()==='ok';
     }
+
     private static function b64(string $data):string
     {
         return rtrim(strtr(base64_encode($data),'+/','-_'),'=');
