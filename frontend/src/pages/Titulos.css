@@ -17,6 +17,7 @@
 .ti-status.ativo{color:#13855e;background:#e4f8f0}
 .ti-status.a_vencer{color:#92753f;background:#fff2dd}
 .ti-status.vencido{color:#be5265;background:#fff0f0}
+.ti-status.a_quitar{color:#7662ae;background:var(--brand-light)}
 .ti-has-history{color:var(--brand);background:var(--brand-light)}
 .ti-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .ti-meta>div,.ti-source>div,.ti-preview>div{padding:12px;border:1px solid var(--border);border-radius:10px;display:grid;gap:7px;background:var(--surface-alt);min-width:0}
