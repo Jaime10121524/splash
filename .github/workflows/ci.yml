@@ -44,6 +44,8 @@ jobs:
         run: php backend/tests/auditoria_rateios_smoke.php
       - name: Weekly report and subordinate isolation
         run: php backend/tests/relatorio_acerto_semanal_smoke.php
+      - name: PDF routes, isolation and mPDF rendering when installed
+        run: php backend/tests/relatorios_pdf_smoke.php
       - name: Secure individual sales for brokers and sellers
         run: php backend/tests/minhas_vendas_smoke.php
       - name: Profile, password recovery, push and reports
