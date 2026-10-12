@@ -112,6 +112,30 @@ export function SelectInput({value, onChange, options, placeholder='Selecione', 
       setOpen(false)
     }
   }
+  // Em Android, iPhone e PWA mobile, usar o seletor nativo do sistema.
+  // Portals com position:fixed sofrem deslocamento quando o WebView aplica
+  // insets, teclado, scroll e escala do viewport (vide tela de chegadas).
+  // Em desktop, preservamos o componente visual personalizado.
+  const nativeMobile = typeof window !== 'undefined'
+    && (window.matchMedia('(max-width: 700px)').matches
+      || (window.matchMedia('(pointer: coarse)').matches
+        && window.matchMedia('(max-width: 1024px)').matches))
+  if (nativeMobile) {
+    const current = selected ? String(selected.value) : ''
+    return <span className="ui-native-select-wrap">
+      <select className="ui-input ui-native-select" value={current}
+        disabled={disabled} aria-label={ariaLabel||placeholder}
+        onChange={event=>{
+          const found = values.find(o=>String(o.value)===event.target.value)
+          if (found && !found.disabled) onChange(found.value)
+        }}>
+        {!selected && <option value="" disabled>{placeholder}</option>}
+        {values.map((option,index)=><option key={index}
+          value={String(option.value)} disabled={!!option.disabled}>{option.label}</option>)}
+      </select>
+      <span className="ui-native-select-arrow" aria-hidden="true"><Chevron/></span>
+    </span>
+  }
   return <>
     <button type="button" className={'ui-input ui-select-trigger'+(open?' open':'')} ref={anchor}
       aria-haspopup="listbox" aria-expanded={open} aria-controls={open?listId:undefined}
