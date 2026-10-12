@@ -4,6 +4,7 @@ import {FormControl} from '../components/UiFields.jsx'
 import {SurfaceModal} from '../components/ComercialForms.jsx'
 import './ComercialPages.css'
 import './Titulos.css'
+import WhatsAppLink from '../components/WhatsAppLink.jsx'
 
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0))
 const toCents=value=>Math.round(Number(value||0)*100)
@@ -204,6 +205,7 @@ export default function Titulos({role='admin',navigate}){
             {admin&&<div><span>Preço desta operação</span><strong>{money(t.valor_cobrado)}</strong></div>}
           </div>
           {admin&&<div className="ti-actions">
+            <WhatsAppLink phone={t.cliente_telefone} label="WhatsApp" message={'Olá! Sobre seu título '+t.numero_titulo+' '+t.sigla_plano+'.'} />
             <button type="button" onClick={()=>showHistory(t)} disabled={busy}>Histórico</button>
             <button type="button" onClick={()=>begin(t)} disabled={busy||t.status_titulo==='A_QUITAR'}>Renovar / Upgrade</button>
             <button type="button" onClick={()=>navigate('vendas',{operacao_id:t.id})}>{t.status_titulo==='A_QUITAR'?'Receber nova cobrança':'Extrato da venda'}</button>
