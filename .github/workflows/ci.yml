@@ -44,6 +44,8 @@ jobs:
         run: php backend/tests/auditoria_rateios_smoke.php
       - name: Weekly report and subordinate isolation
         run: php backend/tests/relatorio_acerto_semanal_smoke.php
+      - name: Secure individual sales for brokers and sellers
+        run: php backend/tests/minhas_vendas_smoke.php
       - name: Financial ledger permission and role isolation
         run: php backend/tests/extrato_permissoes_smoke.php
       - name: Central custody and reconciliation tests
