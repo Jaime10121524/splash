@@ -1,6 +1,7 @@
+import {apiUrl,apiCredentials} from './nativeApi.js'
 export async function comercialGet(url) {
-  const response = await fetch(url, {
-    credentials: 'same-origin',
+  const response = await fetch(apiUrl(url), {
+    credentials: apiCredentials,
     headers: { Accept: 'application/json' },
   })
   const contentType = response.headers.get('content-type') || ''
@@ -13,9 +14,9 @@ export async function comercialGet(url) {
 export async function comercialPost(url, payload) {
   const session = await comercialGet('/api/session')
   if (!session.authenticated || !session.csrf) throw new Error('Sua sessão expirou. Entre novamente.')
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl(url), {
     method: 'POST',
-    credentials: 'same-origin',
+    credentials: apiCredentials,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
