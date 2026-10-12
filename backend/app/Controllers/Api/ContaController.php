@@ -72,9 +72,9 @@ final class ContaController extends BaseController
                 'user_id'=>(int)$u->id,'token_hash'=>hash('sha256',$token),
                 'expira_em'=>date('Y-m-d H:i:s',time()+1800),'criado_em'=>date('Y-m-d H:i:s')
             ]);
-            $base=rtrim((string)(getenv('SPLASH_FRONTEND_URL')?:config('App')->baseURL),'/');
+            $base=rtrim((string)(env('SPLASH_FRONTEND_URL')?:config('App')->baseURL),'/');
             $mail=service('email');
-            $mail->setFrom((string)(getenv('SPLASH_MAIL_FROM')?:config('Email')->fromEmail),'SPLASH');
+            $mail->setFrom((string)(env('SPLASH_MAIL_FROM')?:config('Email')->fromEmail),'SPLASH');
             $mail->setTo((string)$u->email);
             $mail->setSubject('SPLASH - Recuperacao de senha');
             $mail->setMessage("Para criar uma senha nova, acesse em ate 30 minutos:\n".$base.'/?recuperar='.$token."\nSe nao solicitou, ignore.");
