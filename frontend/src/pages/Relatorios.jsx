@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react'
 import {comercialGet,dateBR} from '../lib/comercialApi.js'
 import {FormControl} from '../components/UiFields.jsx'
+import RelatoriosGerenciais from './RelatoriosGerenciais.jsx'
 import './ComercialPages.css'
 import './Relatorios.css'
 
@@ -144,6 +145,7 @@ export default function Relatorios({role='admin'}){
           'Seus direitos e pagamentos serão disponibilizados após o responsável concluir o fechamento.'}</p>
       </div>
     </header>
+    {admin&&<RelatoriosGerenciais/>}
     <section className="com-panel rel-selector no-print">
       <div className="rel-section-heading"><h2>Acerto semanal</h2><small>Somente fechamentos concluídos</small></div>
       <div className="rel-filters">
