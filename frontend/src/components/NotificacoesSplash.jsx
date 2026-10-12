@@ -4,6 +4,16 @@ import {useEffect,useState} from 'react'
 import {comercialGet,comercialPost,dateBR} from '../lib/comercialApi.js'
 import './NotificacoesSplash.css'
 
+const firebaseDiagnostico={
+ caminho_nao_configurado:'HostGator: a variavel SPLASH_FIREBASE_SERVICE_ACCOUNT nao foi configurada no .env privado.',
+ arquivo_nao_encontrado:'HostGator: o arquivo privado da conta de servico Firebase nao existe no caminho indicado no .env.',
+ sem_permissao_leitura:'HostGator: o PHP nao consegue ler o arquivo da conta de servico Firebase. Confira as permissoes.',
+ local_publico_proibido:'HostGator: a chave privada do Firebase esta em uma pasta publica. Mova-a para splash-backend/secrets.',
+ json_invalido:'HostGator: o arquivo da conta de servico Firebase nao e um JSON valido.',
+ credenciais_invalidas:'HostGator: o JSON nao e uma conta de servico Firebase valida. O google-services.json do APK nao substitui essa chave.',
+ extensao_php_ausente:'HostGator: habilite as extensoes PHP curl e openssl.',
+}
+
 function decodeKey(encoded){
  const padding='='.repeat((4-encoded.length%4)%4)
  const raw=atob((encoded+padding).replace(/-/g,'+').replace(/_/g,'/'))
@@ -45,7 +55,7 @@ export default function NotificacoesSplash({navigate}){
  async function enableNative(){
   setError('');setNotice('')
   if(!data.push_nativo_disponivel){
-   setNotice('O aplicativo foi preparado, mas o administrador ainda precisa configurar o projeto Firebase no servidor para entregar notificações ao Android.')
+   setNotice(firebaseDiagnostico[data.push_nativo_diagnostico] || 'O APK ja possui Firebase, mas a API da HostGator ainda nao confirmou uma conta de servico Firebase valida. Atualize o backend ou solicite verificacao ao administrador.')
    return
   }
   setBusy(true)
