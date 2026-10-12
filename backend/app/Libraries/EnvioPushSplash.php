@@ -17,23 +17,25 @@ final class EnvioPushSplash
     }
     public static function enviar(int $limit=35):array
     {
-        if(!self::disponivel())return ['enviados'=>0,'erro'=>'Web Push não configurado no servidor. Avisos internos permanecem disponíveis.'];
+        $webAvailable=self::disponivel();
+        $nativeAvailable=EnvioPushNativoSplash::disponivel();
+        if(!$webAvailable && !$nativeAvailable)return ['enviados'=>0,'erro'=>'Serviço Push ainda não configurado. Avisos internos disponíveis.'];
         $db=db_connect();$sent=0;$failed=0;
         $list=$db->table('splash_notificacoes')->where('enviado_em',null)
             ->where('tentativas <',5)->orderBy('id','ASC')->limit($limit)->get()->getResultArray();
         try{
-            $push=new WebPush(['VAPID'=>[
+            $push=$webAvailable?new WebPush(['VAPID'=>[
                 'subject'=>'mailto:'.env('SPLASH_VAPID_SUBJECT'),
                 'publicKey'=>env('SPLASH_VAPID_PUBLIC'),
                 'privateKey'=>env('SPLASH_VAPID_PRIVATE'),
-            ]]);
+            ]]):null;
             foreach($list as $notice){
                 $subscriptions=$db->table('splash_push_dispositivos')
                     ->where('user_id',(int)$notice['user_id'])->where('ativo',1)
                     ->limit(8)->get()->getResultArray();
-                if(!$subscriptions)continue; // continua visível no painel; pode instalar depois
-                $success=0;
-                foreach($subscriptions as $sub){
+                if(!$subscriptions && !$nativeAvailable)continue;
+                $success=$nativeAvailable?EnvioPushNativoSplash::enviar($notice):0;
+                foreach(($webAvailable?$subscriptions:[]) as $sub){
                     try{
                         $data=json_decode((string)$sub['assinatura_json'],true,512,JSON_THROW_ON_ERROR);
                         $payload=json_encode([
