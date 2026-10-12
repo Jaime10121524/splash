@@ -85,4 +85,39 @@ final class ContaController extends BaseController
         return $this->answer($out);
     }
 
+    public function redefinirSenha():ResponseInterface {
+        if(!service('throttler')->check('splash-reset-'.sha1($this->request->getIPAddress()),10,HOUR))
+            return $this->answer(['message'=>'Muitas tentativas.'],429);
+        $p=$this->request->getJSON(true)??[];
+        $token=(string)($p['token']??'');
+        $password=(string)($p['nova_senha']??'');
+        if(!preg_match('/^[a-f0-9]{64}$/D',$token)||!$this->validPassword($password))
+            return $this->answer(['message'=>'Link inválido ou senha fora do padrão.'],422);
+        $db=db_connect();
+        $db->transBegin();
+        try{
+            $row=$db->query('SELECT * FROM splash_recuperacao_senha WHERE token_hash=? FOR UPDATE',
+                [hash('sha256',$token)])->getRowArray();
+            if(!$row||$row['usado_em']!==null||$row['expira_em']<date('Y-m-d H:i:s')){
+                $db->transRollback();
+                return $this->answer(['message'=>'Link expirado ou utilizado. Solicite outro.'],422);
+            }
+            $provider=auth()->getProvider();$u=$provider->findById((int)$row['user_id']);
+            if(!$u||$u->isBanned()){
+                $db->transRollback();
+                return $this->answer(['message'=>'Não foi possível recuperar essa conta.'],422);
+            }
+            $u->fill(['password'=>$password]);$provider->save($u);
+            $db->table('splash_recuperacao_senha')->where('user_id',(int)$u->id)
+                ->where('usado_em',null)->update(['usado_em'=>date('Y-m-d H:i:s')]);
+            if($db->transStatus()===false)throw new \RuntimeException('Transação inválida.');
+            $db->transCommit();
+            return $this->answer(['message'=>'Senha redefinida. Entre novamente.']);
+        }catch(\Throwable $e){
+            $db->transRollback();
+            log_message('error','Recuperação SPLASH: {message}',['message'=>$e->getMessage()]);
+            return $this->answer(['message'=>'Erro ao redefinir senha.'],500);
+        }
+    }
+
 }
