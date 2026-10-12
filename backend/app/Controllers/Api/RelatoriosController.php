@@ -185,4 +185,30 @@ final class RelatoriosController extends CommercialBaseController
             return $this->unexpected($e,'relatório semanal de fechamento');
         }
     }
+    /**
+     * PDF reutiliza exatamente a autorização e os cálculos do demonstrativo JSON.
+     * Nenhum ID de pessoa é aceito do navegador.
+     */
+    public function pdf(int|string $id): ResponseInterface
+    {
+        $json=$this->acertoSemanal($id);
+        if($json->getStatusCode()!==200)return $json;
+        $data=json_decode((string)$json->getBody(),true);
+        if(!is_array($data)||!isset($data['fechamento'])){
+            return $this->errorResponse(500,'Não foi possível preparar o demonstrativo.');
+        }
+        try{
+            $bytes=\App\Libraries\PdfRelatorios::acerto($data);
+            $file='SPLASH_acerto_'.(int)$id.'.pdf';
+            return $this->response->setStatusCode(200)
+                ->setHeader('Content-Type','application/pdf')
+                ->setHeader('Content-Disposition','inline; filename="'.$file.'"')
+                ->setHeader('X-Content-Type-Options','nosniff')
+                ->setHeader('Cache-Control','private, no-store')
+                ->setBody($bytes);
+        }catch(Throwable $e){
+            return $this->unexpected($e,'gerar PDF do acerto semanal');
+        }
+    }
+
 }
