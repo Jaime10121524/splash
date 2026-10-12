@@ -34,3 +34,9 @@
 .ui-time-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;align-content:start}
 .ui-time-grid .ui-choice{justify-content:center;font-size:11px;padding:8px}
 @media(max-width:400px){.ui-datetime{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:7px}.ui-floating{max-width:calc(100vw - 20px)}}
+
+/* Android/PWA: manter o visual do SPLASH, abrir a escolha nativa do sistema.
+   Evita que portals CSS aparecam longe do campo quando a tela tem insets. */
+.ui-native-select-wrap{display:block;position:relative;width:100%;min-width:0}
+.ui-native-select{display:block;appearance:none;-webkit-appearance:none;width:100%;padding-right:42px;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.ui-native-select-arrow{pointer-events:none;display:flex;align-items:center;justify-content:center;position:absolute;top:0;bottom:0;right:12px;color:var(--muted-dark,#717b92)}
