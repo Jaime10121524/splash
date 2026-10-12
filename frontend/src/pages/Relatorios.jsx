@@ -7,6 +7,39 @@ import './Relatorios.css'
 const reais=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))
 const total=(items,key)=>items.reduce((sum,p)=>sum+Math.round(Number(p.resumo?.[key]||0)*100),0)/100
 
+/**
+ * Janela de impressão independente do layout SPA.
+ * O print da página principal ficava em branco no Chrome devido aos
+ * contêineres da aplicação e aos elementos escondidos em @media print.
+ */
+function printStatement(){
+  const root=document.querySelector('.rel-print-sheet')
+  if(!root)return
+  const popup=window.open('','_blank','width=940,height=760')
+  if(!popup){window.alert('Autorize a janela de impressão para salvar o relatório.');return}
+  const clone=root.cloneNode(true)
+  clone.querySelectorAll('.no-print,.rel-expand').forEach(el=>el.remove())
+  clone.querySelectorAll('.rel-person-lines').forEach(el=>{el.style.display='block'})
+  const html=clone.innerHTML
+  const css=Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+    .map(link=>'<link rel="stylesheet" href="'+link.href+'">').join('')
+  popup.document.open()
+  popup.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>SPLASH - Demonstrativo</title>'+css+
+    '<style>@page{size:A4;margin:12mm}html,body{background:white!important;color:#172036!important;margin:0!important;font-family:Arial,sans-serif!important}'+
+    '.rel-print-sheet{display:block!important;width:auto!important;max-width:none!important;padding:0!important;overflow:visible!important;border:0!important;box-shadow:none!important}'+
+    '.rel-section{margin:16px 0!important;display:block!important}.rel-kpis{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:7px!important}.rel-stat{border:1px solid #dce0e8!important;padding:10px!important}'+
+    '.rel-report-head{display:flex!important;justify-content:space-between!important}.rel-person,.rel-sale{break-inside:avoid-page!important;border:1px solid #e0e2e9!important;margin:8px 0!important}'+
+    '.rel-person-lines{display:block!important}.rel-table-scroll{overflow:visible!important}.rel-table{min-width:0!important;width:100%!important}.rel-table td,.rel-table th{font-size:9px!important}'+
+    '.rel-report-brand,.rel-stat strong,.rel-person-balance strong,.rel-pending{color:#5742c5!important}.no-print{display:none!important}'+
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body><main class="rel-print-sheet">'+
+    html+'</main></body></html>')
+  popup.document.close()
+  popup.focus()
+  popup.addEventListener('load',()=>{popup.focus();popup.print()},{once:true})
+  // CSS may already be loaded before the listener on cached builds.
+  if(popup.document.readyState==='complete')popup.print()
+}
+
 function SummaryCard({title,value,description,accent=false}){
   return <div className={'rel-stat'+(accent?' accent':'')}>
     <span>{title}</span>
@@ -139,7 +172,7 @@ export default function Relatorios({role='admin'}){
           <p>Fechamento #{data.fechamento.id} · {dateBR(data.fechamento.inicio)} a {dateBR(data.fechamento.fim)}
             {reportAdmin&&data.fechamento.responsavel_nome?' · Responsável: '+data.fechamento.responsavel_nome:''}</p>
         </div>
-        <button className="rel-print no-print" type="button" onClick={()=>window.print()}>
+        <button className="rel-print no-print" type="button" onClick={printStatement}>
           Imprimir / Salvar PDF
         </button>
       </div>
