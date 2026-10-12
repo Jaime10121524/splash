@@ -74,6 +74,17 @@ final class RelatoriosGerenciaisController extends CommercialBaseController
                 $sales=$q->limit(1000)->get()->getResultArray();
                 $ids=array_map(static fn($r)=>(int)$r['id'],$sales);
                 if($ids){
+                    $received=[];
+                    foreach($db->table('venda_recebimentos')->select('operacao_id,tipo,valor')
+                        ->whereIn('operacao_id',$ids)->get()->getResultArray() as $m){
+                        $k=(int)$m['operacao_id'];
+                        $received[$k]=($received[$k]??0)+($m['tipo']==='ENTRADA'?1:-1)*VendaMoney::cents((string)$m['valor'],true);
+                    }
+                    $apurar=[];
+                    foreach($db->table('comissao_auto_apuracoes')->select('operacao_id,status')
+                        ->whereIn('operacao_id',$ids)->get()->getResultArray() as $a){
+                        $apurar[(int)$a['operacao_id']]=$a['status'];
+                    }
                     $rateios=$db->table('comissao_rateios')->whereIn('operacao_id',$ids)->get()->getResultArray();
                     $payments=$db->table('comissao_repasses')->select('rateio_id,tipo,valor')
                         ->whereIn('rateio_id',array_map(static fn($r)=>(int)$r['id'],$rateios)?:[0])->get()->getResultArray();
@@ -99,7 +110,9 @@ final class RelatoriosGerenciaisController extends CommercialBaseController
                     foreach($sales as $v){
                         $id=(int)$v['id'];$owner=(int)$v['corretor_pessoa_id'];
                         $base=$v['comissao_ajustada']??$v['comissao_prevista'];
-                        if($base===null)continue;
+                        if($base===null ||
+                            ($received[$id]??0)!==VendaMoney::cents((string)$v['valor_cobrado'],true)
+                            ||!isset($apurar[$id]) || $apurar[$id]==='REVISAR')continue;
                         $gross=VendaMoney::cents((string)$base,true);$out=0;
                         foreach($bySale[$id]??[] as $r){
                             $due=VendaMoney::cents((string)$r['valor'],true);
