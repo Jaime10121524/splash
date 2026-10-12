@@ -3,6 +3,7 @@ import { ClientFinder, SurfaceModal } from '../components/ComercialForms.jsx'
 import { FormControl } from '../components/UiFields.jsx'
 import { comercialGet, comercialPost, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
+import WhatsAppLink from '../components/WhatsAppLink.jsx'
 import RateiosVenda from './RateiosVenda.jsx'
 import './ComercialPages.css'
 import './Vendas.css'
@@ -363,7 +364,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <small>{op.comissao_ajustada!==null?'Comissão bruta ajustada: '+currency(op.comissao_ajustada):'Comissão bruta apurada: '+(op.comissao_prevista===null?'Após quitação':currency(op.comissao_prevista))}</small>
           {op.comissao_pendente!==null&&<small><b>Comissão liquidada (pagamentos/abatimentos): {currency(op.comissao_paga)}</b> · {Number(op.comissao_pendente)>0?'Falta pagar: '+currency(op.comissao_pendente):'Comissões quitadas'}</small>}
         </div>
-        <div className="com-actions"><button type="button" onClick={()=>openDetail(op)}>Extrato</button>
+        <div className="com-actions"><WhatsAppLink phone={op.cliente_telefone} label="WhatsApp" message={'Olá! Sobre seu título '+(op.numero_titulo||'')+' '+(op.sigla_plano||'')+'.'} /><button type="button" onClick={()=>openDetail(op)}>Extrato</button>
           {op.situacao==='PENDENCIA'&&<button type="button" className="primary" onClick={()=>openConvert(op)}>Fechar venda</button>}
         </div>
       </article>)}</div>}
