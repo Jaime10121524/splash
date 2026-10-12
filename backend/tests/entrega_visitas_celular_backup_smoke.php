@@ -36,7 +36,7 @@ foreach(['firebase.messaging','openssl_sign','CURLOPT_SSL_VERIFYPEER','SPLASH_FI
     'splash_push_nativo_dispositivos'] as $needle){
     if(!str_contains($native,$needle))throw new RuntimeException('Push nativo incompleto: '.$needle);
 }
-if(str_contains($mobile,'url:')||!str_contains($mobile,"webDir: 'dist'"))
+if(preg_match('/^\\s*url\\s*:/m',$mobile)||!str_contains($mobile,"webDir: 'dist'"))
     throw new RuntimeException('Não usar server.url remoto em build de produção.');
 foreach([$client,$sales,$titles] as $file){
     if(!str_contains($file,'<WhatsAppLink'))throw new RuntimeException('Faltou botão WhatsApp.');
