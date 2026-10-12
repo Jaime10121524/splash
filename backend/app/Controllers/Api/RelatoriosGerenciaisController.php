@@ -136,4 +136,27 @@ final class RelatoriosGerenciaisController extends CommercialBaseController
             ])->setHeader('Cache-Control','no-store');
         }catch(Throwable $e){return $this->unexpected($e,'relatórios gerenciais');}
     }
+    /** Mesmas regras do relatório gerencial, com renderização mPDF. */
+    public function pdf(): ResponseInterface
+    {
+        $json=$this->index();
+        if($json->getStatusCode()!==200)return $json;
+        $data=json_decode((string)$json->getBody(),true);
+        if(!is_array($data)||!isset($data['linhas'])){
+            return $this->errorResponse(500,'Não foi possível preparar o relatório.');
+        }
+        try{
+            $bytes=\App\Libraries\PdfRelatorios::gerencial($data);
+            $kind=preg_replace('/[^A-Z_]/','',(string)($data['tipo']??'GERENCIAL'));
+            return $this->response->setStatusCode(200)
+                ->setHeader('Content-Type','application/pdf')
+                ->setHeader('Content-Disposition','inline; filename="SPLASH_'.$kind.'.pdf"')
+                ->setHeader('X-Content-Type-Options','nosniff')
+                ->setHeader('Cache-Control','private, no-store')
+                ->setBody($bytes);
+        }catch(Throwable $e){
+            return $this->unexpected($e,'gerar PDF gerencial');
+        }
+    }
+
 }
