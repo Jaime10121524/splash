@@ -19,9 +19,10 @@ function imprimir(){
  popup.document.open()
  popup.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>SPLASH - Relatório Gerencial</title>'+css+'</head><body>'+section.innerHTML+'</body></html>')
  popup.document.close()
- popup.focus()
- popup.addEventListener('load',()=>popup.print(),{once:true})
- if(popup.document.readyState==='complete')popup.print()
+ let printed=false
+ const doPrint=()=>{if(printed)return;printed=true;popup.focus();popup.print()}
+ popup.addEventListener('load',doPrint,{once:true})
+ if(popup.document.readyState==='complete')setTimeout(doPrint,350)
 }
 export default function RelatoriosGerenciais(){
  const today=localDateISO()
