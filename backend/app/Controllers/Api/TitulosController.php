@@ -325,6 +325,8 @@ final class TitulosController extends CommercialBaseController
             ]);
             if($db->transStatus()===false)throw new \RuntimeException('Falha de integridade da renovação/upgrade.');
             $this->commitOrFail($db);
+            \App\Libraries\AvisosSplash::venda($newId);
+            \App\Libraries\EnvioPushSplash::enviar(5);
             return $this->responseOK(($kind==='RENOVACAO'?'Renovação':'Upgrade')
                 .' registrado. Receba o pagamento na nova venda; as comissões anteriores permanecem intactas.',
                 201,['operacao_id'=>$newId,'valor_cobrado'=>VendaMoney::decimal($money-$discount),
