@@ -320,16 +320,19 @@ a { text-decoration: none; }
 @media(max-width:700px){
   .notification-pop{
     position:fixed;
-    top:calc(76px + env(safe-area-inset-top));
+    top:74px;
+    bottom:76px;
     left:10px;
     right:10px;
     width:auto;
+    min-width:0;
     max-width:none;
-    max-height:calc(100dvh - 96px - env(safe-area-inset-top));
+    max-height:none;
     overflow-y:auto;
     overflow-x:hidden;
     padding:12px;
     border-radius:14px;
+    overscroll-behavior:contain;
   }
   .main-content{padding-bottom:calc(78px + var(--splash-bottom-safe, env(safe-area-inset-bottom)));}
 }
