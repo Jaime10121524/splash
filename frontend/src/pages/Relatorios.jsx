@@ -108,7 +108,7 @@ export default function Relatorios({role='admin'}){
     <header className="com-heading rel-screen-head">
       <div><span className="com-eyebrow">SPLASH / RELATÓRIOS</span>
         <h1>{admin?'Relatórios gerenciais':'Meus demonstrativos'}</h1>
-        <p>{admin?'Acerto semanal por responsável, vendas e participante. Consulte somente fechamentos concluídos.':
+        <p>{admin?'Consulte vendas, comissões, atendimentos, pendências, títulos e acertos. Exporte PDFs prontos para impressão.':
           'Seus direitos e pagamentos serão disponibilizados após o responsável concluir o fechamento.'}</p>
       </div>
     </header>
