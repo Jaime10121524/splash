@@ -601,6 +601,8 @@ class FechamentosController extends CommercialBaseController
                 };
                 $counts[$key]++;
                 $this->commitOrFail($db);
+                if($status==='GERADO'||$status==='JA_APURADA'||$status==='RATEIO_MANUAL')
+                    \App\Libraries\AvisosSplash::venda($id,true);
             }catch(Throwable $e){
                 $db->transRollback();
                 return $this->unexpected($e,'sincronizar rateios automáticos');
@@ -1090,6 +1092,8 @@ class FechamentosController extends CommercialBaseController
                 'criado_em'=>$now,
             ]);
             $this->commitOrFail($db);
+            \App\Libraries\AvisosSplash::venda((int)$id,true);
+            \App\Libraries\EnvioPushSplash::enviar(5);
             return $this->responseOK('Participações apuradas e registradas; nenhum pagamento foi realizado.');
         }catch(Throwable $e){
             $db->transRollback();return $this->unexpected($e,'ratear comissão');
