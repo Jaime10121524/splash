@@ -8,10 +8,10 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "android:prepare": "npm run build && npx cap sync android",
+    "android:prepare": "vite build --mode capacitor && npx cap sync android",
     "android:open": "npx cap open android",
     "android:run": "npx cap run android",
-    "ios:prepare": "npm run build && npx cap sync ios",
+    "ios:prepare": "vite build --mode capacitor && npx cap sync ios",
     "ios:open": "npx cap open ios"
   },
   "dependencies": {
