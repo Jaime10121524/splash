@@ -322,6 +322,10 @@ class VendasController extends CommercialBaseController
             $id=(int)$db->insertID();
             if($id<1)throw new \RuntimeException('Falha ao inserir operação.');
             $this->commitOrFail($db);
+            if($kind==='VENDA'){
+                \App\Libraries\AvisosSplash::venda($id);
+                \App\Libraries\EnvioPushSplash::enviar(5);
+            }
             return $this->responseOK($kind==='PENDENCIA'?'Pendência criada.':'Venda vinculada ao título.',201,['operacao_id'=>$id]);
         }catch(Throwable $e){
             $db->transRollback();
@@ -535,6 +539,9 @@ class VendasController extends CommercialBaseController
             }
             RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
             $this->commitOrFail($db);
+            \App\Libraries\AvisosSplash::venda((int)$id);
+            \App\Libraries\AvisosSplash::venda((int)$id,true);
+            \App\Libraries\EnvioPushSplash::enviar(5);
             return $this->responseOK('Pendência convertida em venda; todos os pagamentos foram preservados.');
         }catch(Throwable $e){
             $db->transRollback();
@@ -599,6 +606,8 @@ class VendasController extends CommercialBaseController
             $this->updateEstimate($db,(int)$id,$op);
             RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
             $this->commitOrFail($db);
+            \App\Libraries\AvisosSplash::venda((int)$id,true);
+            \App\Libraries\EnvioPushSplash::enviar(5);
             return $this->responseOK('Recebimento registrado. O extrato financeiro foi preservado.');
         }catch(Throwable $e){
             $db->transRollback();
