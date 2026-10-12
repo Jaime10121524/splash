@@ -31,3 +31,5 @@ jobs:
       - name: Verificar sintaxe PHP
         run: |
           find backend/app -type f -name '*.php' -print0 | xargs -0 -n 1 php -l
+      - name: Segurança de visitas, alertas, backup e Capacitor
+        run: php backend/tests/entrega_visitas_celular_backup_smoke.php
