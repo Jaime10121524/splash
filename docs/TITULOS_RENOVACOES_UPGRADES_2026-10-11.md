@@ -25,6 +25,12 @@
 
 **Exemplo de diferença:** título de R$ 1.000,00 para título de R$ 1.850,00: nova cobrança de R$ 850,00 antes de descontos. Não transferir comissão ou pagamentos do título anterior para essa cobrança.
 
+## Ativação somente após quitação
+
+A nova validade de uma renovação/upgrade é **provisória até a quitação da nova cobrança**. O cliente conserva os direitos de validade do título anterior enquanto existir saldo pendente na nova venda. A carteira marca a nova operação como **Aguardando pagamento**, mostra a validade anterior e a nova validade prevista e permite abrir a nova venda para receber.
+
+Depois do recebimento integral, a carteira muda automaticamente para a validade do novo plano. Pagamento parcial não ativa antecipadamente o prazo novo e não dispara comissão. A operação de origem continua protegida para impedir duplicidades.
+
 ## Histórico e proteção financeira
 
 - `titulo_vinculos` possui índice único em origem e destino: não permite que uma mesma operação tenha dois sucessores nem duas origens.
