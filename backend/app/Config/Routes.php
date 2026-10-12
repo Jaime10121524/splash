@@ -93,8 +93,10 @@ $routes->group('api', static function ($routes): void {
 
     // Relatório semanal: somente CONCLUÍDO, consulta pessoal filtrada no servidor.
     $routes->get('relatorios/gerenciais', 'Api\\RelatoriosGerenciaisController::index');
+    $routes->get('relatorios/gerenciais/pdf', 'Api\\RelatoriosGerenciaisController::pdf');
     $routes->get('relatorios/fechamentos', 'Api\\RelatoriosController::periodos');
     $routes->get('relatorios/fechamentos/(:num)/acerto', 'Api\\RelatoriosController::acertoSemanal/$1');
+    $routes->get('relatorios/fechamentos/(:num)/pdf', 'Api\\RelatoriosController::pdf/$1');
 
     // Fechamento do período tem escopo próprio e NÃO agrega corretores independentes.
     // Todas as rotas revalidam o responsável associado à sessão Shield.
