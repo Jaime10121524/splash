@@ -40,13 +40,13 @@ $reset=file_get_contents(dirname(__DIR__).'/app/Database/ResetScripts/2026-10-11
 $migration=file_get_contents(dirname(__DIR__).'/app/Database/Migrations/2026-10-11-000018_TitulosRenovacoesUpgrades.php');
 if(!$routes||!$source||!$sales||!$reset||!$migration
     ||!str_contains($source,'SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE')
-    ||!str_contains($source,"'titulo_sequencia'=>$sequence")
-    ||!str_contains($source,"'operacao_origem_id'=>(int)$id")
+    ||!str_contains($source,"'titulo_sequencia'=>\$sequence")
+    ||!str_contains($source,"'operacao_origem_id'=>(int)\$id")
     ||!str_contains($source,"'comissao_prevista'=>null")
     ||!str_contains($source,'$this->clienteQuitou(')
-    ||!str_contains($source,"'cliente_id'=>(int)$source['cliente_id']")
-    ||!str_contains($sales,"where('operacao_origem_id',$id)")
-    ||!str_contains($sales,"where('operacao_nova_id',(int)$id)")
+    ||!str_contains($source,"'cliente_id'=>(int)\$source['cliente_id']")
+    ||!str_contains($sales,"where('operacao_origem_id',\$id)")
+    ||!str_contains($sales,"where('operacao_nova_id',(int)\$id)")
     ||!str_contains($routes,'TitulosController::movimentar')
     ||!str_contains($reset,"'titulo_vinculos'")
     ||!str_contains($migration,'uq_titulo_origem')
