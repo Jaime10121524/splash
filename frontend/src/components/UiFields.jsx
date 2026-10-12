@@ -9,31 +9,45 @@ import PhoneInput from './PhoneInput.jsx'
  * Os popups não ficam escondidos por overflow de modal/grid.
  */
 function usePopup(open, anchor, contentRef) {
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 210, maxHeight: 320 })
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 210, maxHeight: 320, above: false })
   useEffect(() => {
     if (!open) return
     const reposition = () => {
       const rect = anchor.current?.getBoundingClientRect()
       if (!rect) return
-      const availableBelow = window.innerHeight - rect.bottom - 12
-      const availableAbove = rect.top - 12
-      const above = availableBelow < 200 && availableAbove > availableBelow
-      const maxHeight = Math.max(140, Math.min(330, (above ? availableAbove : availableBelow) - 6))
-      const width = Math.min(Math.max(rect.width, 190), window.innerWidth - 20)
+      const viewport = window.visualViewport
+      const vTop = viewport?.offsetTop ?? 0
+      const vLeft = viewport?.offsetLeft ?? 0
+      const vBottom = vTop + (viewport?.height ?? window.innerHeight)
+      const vRight = vLeft + (viewport?.width ?? window.innerWidth)
+      const below = Math.max(0, vBottom - rect.bottom - 12)
+      const aboveSpace = Math.max(0, rect.top - vTop - 12)
+      const menuHeight = contentRef.current?.scrollHeight ?? 220
+      const above = below < Math.min(menuHeight, 200) && aboveSpace > below
+      const room = above ? aboveSpace : below
+      const maxHeight = Math.max(40, Math.min(330, room - 4))
+      const width = Math.max(120, Math.min(Math.max(rect.width, 190), vRight - vLeft - 20))
       setPosition({
-        top: above ? Math.max(10, rect.top - maxHeight - 6) : Math.min(window.innerHeight - 145, rect.bottom + 5),
-        left: Math.min(Math.max(rect.left, 10), window.innerWidth - width - 10),
-        width, maxHeight,
+        // Acima, alinhar a borda inferior do popup ao campo usando sua altura REAL.
+        top: above ? rect.top - 5 : rect.bottom + 5,
+        left: Math.min(Math.max(rect.left, vLeft + 10), vRight - width - 10),
+        width, maxHeight, above,
       })
     }
     reposition()
+    const raf = requestAnimationFrame(reposition)
     window.addEventListener('resize', reposition)
     window.addEventListener('scroll', reposition, true)
+    window.visualViewport?.addEventListener('resize', reposition)
+    window.visualViewport?.addEventListener('scroll', reposition)
     return () => {
+      cancelAnimationFrame(raf)
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
+      window.visualViewport?.removeEventListener('resize', reposition)
+      window.visualViewport?.removeEventListener('scroll', reposition)
     }
-  }, [open, anchor])
+  }, [open, anchor, contentRef])
 
   useEffect(() => {
     if (!open) return
@@ -107,7 +121,7 @@ export function SelectInput({value, onChange, options, placeholder='Selecione', 
     </button>
     {open && createPortal(<div className="ui-floating ui-select-menu" ref={popup}
       id={listId} role="listbox" aria-label={ariaLabel||placeholder}
-      style={{top:position.top,left:position.left,width:position.width,maxHeight:position.maxHeight}}
+      style={{top:position.top,left:position.left,width:position.width,maxHeight:position.maxHeight,transform:position.above?'translateY(-100%)':undefined}}
       onKeyDown={keyboard}>
       {values.map((option,index)=><button key={index} type="button" role="option"
         aria-selected={selected?.value===option.value} disabled={option.disabled}
@@ -188,7 +202,7 @@ export function DateInput({value='',onChange,placeholder='dd/mm/aaaa',disabled=f
         aria-label={'Abrir calendário: '+ariaLabel} aria-expanded={open} disabled={disabled}><CalendarIcon/></button>
     </div>
     {open&&createPortal(<div className="ui-floating ui-calendar" ref={popup}
-      style={{top:position.top,left:Math.max(10,Math.min(position.left,window.innerWidth-Math.max(278,position.width)-10)),width:Math.max(278,position.width),maxHeight:position.maxHeight}}
+      style={{top:position.top,left:Math.max(10,Math.min(position.left,window.innerWidth-Math.max(278,position.width)-10)),width:Math.max(278,position.width),maxHeight:position.maxHeight,transform:position.above?'translateY(-100%)':undefined}}
       onKeyDown={e=>{if(e.key==='Escape'){setOpen(false);anchor.current?.querySelector('input')?.focus()}}}>
       <div className="ui-calendar-head">
         <button type="button" onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Mês anterior">‹</button>
@@ -239,7 +253,7 @@ export function TimeInput({value='',onChange,ariaLabel='Hora',disabled=false}) {
       <button className="ui-input-icon" type="button" disabled={disabled} onClick={()=>setOpen(v=>!v)} aria-label="Selecionar hora"><ClockIcon/></button>
     </div>
     {open&&createPortal(<div className="ui-floating ui-time-grid" ref={popup}
-      style={{top:position.top,left:position.left,width:position.width,maxHeight:position.maxHeight}}>
+      style={{top:position.top,left:position.left,width:position.width,maxHeight:position.maxHeight,transform:position.above?'translateY(-100%)':undefined}}>
       {hours.map(h=><button key={h} type="button" className={'ui-choice'+(h===value?' selected':'')} onClick={()=>{onChange(h);setText(h);setOpen(false)}}>{h}</button>)}
     </div>,document.body)}
   </>
