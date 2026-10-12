@@ -16,6 +16,7 @@ export async function stopCurrentPush(){
      try{await comercialPost('/api/notificacoes/nativo/remover',{token})}catch{}
      localStorage.removeItem('splash_android_push_token')
    }
+   try{await PushNotifications.unregister()}catch{}
    return
  }
  if(!('serviceWorker' in navigator))return
