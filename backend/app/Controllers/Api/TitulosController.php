@@ -187,6 +187,10 @@ final class TitulosController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'O movimento não pode ter data anterior à venda original.');
             }
+            if($kind==='UPGRADE' && $source['data_vencimento']<$date){
+                $db->transRollback();
+                return $this->errorResponse(409,'Título vencido: faça a renovação antes do upgrade.');
+            }
             if(!$this->clienteQuitou($db,$source)){
                 $db->transRollback();
                 return $this->errorResponse(409,'Quite o saldo da venda original antes de renovar ou fazer upgrade.');
