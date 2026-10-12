@@ -515,6 +515,19 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <div><span>Cliente já pagou</span><strong>{currency(detail.recebido)}</strong></div>
           <div><span>Falta o cliente pagar</span><strong>{currency(detail.saldo)}</strong></div></div>
         <div className="com-inform">Esses três valores mostram pagamentos do CLIENTE pelo título, não o que o clube deve de comissão ao corretor.</div>
+        {detail.titulo_anterior&&<div className="com-inform">
+          <strong>{detail.titulo_anterior.tipo==='RENOVACAO'?'Renovação de título':'Upgrade de título'}.</strong>
+          {' '}Nova operação vinculada à venda #{detail.titulo_anterior.operacao_origem_id}.
+          {' '}Valor desta operação: {currency(detail.operacao.valor_cobrado)}.
+          {' '}Vigência anterior até {dateBR(detail.titulo_anterior.vencimento_anterior)}; nova validade até {dateBR(detail.titulo_anterior.vencimento_novo)}.
+          {' '}O histórico e os pagamentos da venda anterior permanecem separados.
+        </div>}
+        {detail.titulo_posterior&&<div className="com-alert" role="status">
+          <strong>Título substituído</strong>
+          {' '}Existe uma {detail.titulo_posterior.tipo==='RENOVACAO'?'renovação':'atualização de plano'}
+          {' '}na operação #{detail.titulo_posterior.operacao_nova_id}.
+          {' '}Este cadastro e seus recebimentos estão protegidos; consulte a nova operação para continuar.
+        </div>}
         {detail.fechamento&&<div className="com-alert success" role="status">
           <strong>Venda protegida · Fechamento #{detail.fechamento.id} ({detail.fechamento.status==='CONCLUIDO'?'Concluído':'Em andamento'})</strong>
           <p>Cadastro, recebimentos do cliente e distribuição de comissões bloqueados. Consulte os lançamentos do fechamento correspondente.</p>
@@ -596,9 +609,9 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
           <button type="button" className="cm-button" disabled={!detail.editavel} onClick={openEdit}>Editar cadastro</button>
           <button type="button" className="cm-button" disabled={!!detail.fechamento} onClick={openAdjustment}>Ajustar comissão</button>
-          <button type="button" className="cm-button" disabled={!!detail.fechamento||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
-          <button type="button" className="cm-button" disabled={!!detail.fechamento||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
-          <button type="button" className="cm-button primary" disabled={!!detail.fechamento||Number(detail.saldo)<=0} onClick={()=>{setMoveForm({...blankMovement(),valor:suggestedAmount(detail.saldo)});setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
+          <button type="button" className="cm-button" disabled={!!detail.fechamento||!!detail.titulo_posterior||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
+          <button type="button" className="cm-button" disabled={!!detail.fechamento||!!detail.titulo_posterior||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
+          <button type="button" className="cm-button primary" disabled={!!detail.fechamento||!!detail.titulo_posterior||Number(detail.saldo)<=0} onClick={()=>{setMoveForm({...blankMovement(),valor:suggestedAmount(detail.saldo)});setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
         </div>
       </div>}
 
