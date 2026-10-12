@@ -55,6 +55,14 @@ class SessionController extends BaseController
         }
 
         $authenticator = auth('session')->getAuthenticator();
+        // No aplicativo Android/iOS, usa o Remember-Me nativo do Shield:
+        // token rotativo no banco, cookie HTTPS HttpOnly e validade de 30 dias.
+        // Navegador web continua com o fluxo normal; nunca salva a senha no aparelho.
+        $nativeOrigin = (string) $this->request->getHeaderLine('Origin');
+        if (filter_var(env('SPLASH_CAPACITOR_CORS', false), FILTER_VALIDATE_BOOLEAN)
+            && in_array($nativeOrigin, ['https://localhost', 'capacitor://localhost'], true)) {
+            $authenticator->remember(true);
+        }
         $result = $authenticator->attempt([
             'username' => $username,
             'password' => $password,
