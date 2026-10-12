@@ -10,6 +10,10 @@ $routes->group('api', static function ($routes): void {
     $routes->get('session', 'Api\\SessionController::show');
     $routes->post('session/login', 'Api\\SessionController::login', ['filter' => 'csrf']);
     $routes->post('session/logout', 'Api\\SessionController::logout', ['filter' => 'csrf']);
+    $routes->get('conta/perfil', 'Api\\ContaController::perfil');
+    $routes->post('conta/perfil', 'Api\\ContaController::atualizar', ['filter'=>'csrf']);
+    $routes->post('conta/recuperar', 'Api\\ContaController::solicitarRecuperacao', ['filter'=>'csrf']);
+    $routes->post('conta/redefinir', 'Api\\ContaController::redefinirSenha', ['filter'=>'csrf']);
     // Cadastros comerciais: as autorizações são conferidas também no controller.
     $routes->get('planos', 'Api\PlanosController::index');
     $routes->post('planos', 'Api\PlanosController::create', ['filter' => 'csrf']);
