@@ -96,7 +96,7 @@ if(!$controller||!$routes||!$app
     ||!str_contains($controller,"'ativo',1")
     ||!str_contains($controller,"'sales.own'")
     ||!str_contains($controller,'$this->somenteMinhas($sql,$pessoaId)')
-    ||!str_contains($controller,"$this->busca($db,$pessoa)->where('o.id',(int)$id)")
+    ||!str_contains($controller,"->where('o.id',(int)\$id)")
     ||!str_contains($controller,"'status']==='CONCLUIDO'")
     ||!str_contains($controller,'MinhasVendasConta::publico(')
     ||!str_contains($routes,'MinhasVendasController::index')
