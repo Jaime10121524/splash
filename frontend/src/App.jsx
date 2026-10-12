@@ -13,6 +13,7 @@ import Relatorios from './pages/Relatorios.jsx'
 import Titulos from './pages/Titulos.jsx'
 import MinhasVendas from './pages/MinhasVendas.jsx'
 import MeuPerfil from './pages/MeuPerfil.jsx'
+import AlertasComerciais from './pages/AlertasComerciais.jsx'
 import NotificacoesSplash, {stopCurrentPush} from './components/NotificacoesSplash.jsx'
 
 const paths = {
@@ -77,6 +78,7 @@ const nav = [
   { id: 'usuarios', label: 'Usuários', icon: 'shield', roles: ['admin'], section: 'Sistema' },
   { id: 'origens', label: 'Origens e motivos', icon: 'tag', roles: ['admin'], section: 'Sistema' },
   { id: 'configuracoes', label: 'Configurações', icon: 'settings', roles: ['admin'], section: 'Sistema' },
+  { id: 'alertas', label: 'Alertas comerciais', icon: 'bell', roles: ['admin'], section: 'Sistema' },
 ]
 const descriptions = {
   atendimentos: 'Organize chegadas, atendentes e resultados de cada visita.',
@@ -489,7 +491,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='alertas'?<AlertasComerciais/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
