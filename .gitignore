@@ -35,3 +35,14 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# HostGator: pacotes de instalação gerados localmente
+/deploy/_saida_hostgator/
+
+# Credenciais nativas Firebase/Apple e assinatura Android
+/frontend/android/app/google-services.json
+/frontend/ios/App/App/GoogleService-Info.plist
+/frontend/android/*.keystore
+/frontend/android/*.jks
+/frontend/**/*.p12
+/frontend/**/*.mobileprovision
