@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/android-apk.yml'
+      - 'frontend/scripts/android/MainActivity.java'
 
 permissions:
   contents: read
@@ -71,6 +72,13 @@ jobs:
           printf '%s\n' 'VITE_SPLASH_API_ORIGIN=https://splash.ahritech.com.br' > .env.capacitor.local
           npm run build -- --mode capacitor
           npx cap add android
+
+      - name: Permitir cookies de sessao na WebView Android
+        run: |
+          target="android/app/src/main/java/br/com/ahritech/splash/MainActivity.java"
+          test -f "$target"
+          test -f "scripts/android/MainActivity.java"
+          cp scripts/android/MainActivity.java "$target"
 
       - name: Configurar google-services.json do Firebase
         env:
