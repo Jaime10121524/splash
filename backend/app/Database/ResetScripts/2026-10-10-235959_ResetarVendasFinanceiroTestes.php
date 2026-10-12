@@ -28,6 +28,7 @@ final class ResetarVendasFinanceiroTestes extends Migration
             throw new RuntimeException('RESET BLOQUEADO: permitido somente via CLI, em development e com confirmação explícita.');
         }
         $tables=[
+            'splash_notificacoes',
             'titulo_vinculos',
             'fechamento_custodia_pix_vinculos',
             'fechamento_custodia_movimentos',
