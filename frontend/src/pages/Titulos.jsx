@@ -206,7 +206,7 @@ export default function Titulos({role='admin',navigate}){
           {admin&&<div className="ti-actions">
             <button type="button" onClick={()=>showHistory(t)} disabled={busy}>Histórico</button>
             <button type="button" onClick={()=>begin(t)} disabled={busy}>Renovar / Upgrade</button>
-            <button type="button" onClick={()=>navigate('vendas',{operacao_id:t.id})}>Extrato da venda</button>
+            <button type="button" onClick={()=>navigate('vendas',{operacao_id:t.id})}>{t.status_titulo==='A_QUITAR'?'Receber nova cobrança':'Extrato da venda'}</button>
           </div>}
         </article>)}</div>}
     </section>
