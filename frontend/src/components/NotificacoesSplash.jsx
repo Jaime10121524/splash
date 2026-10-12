@@ -39,7 +39,7 @@ export default function NotificacoesSplash({navigate}){
     return
   }
   if(!data.push_disponivel){
-    setError('O administrador ainda precisa configurar Web Push/VAPID na hospedagem.')
+    setNotice('O envio de avisos ao celular ainda não foi ativado na hospedagem. Os avisos neste painel continuam funcionando normalmente.')
     return
   }
   // Solicite permissão diretamente após o clique, exigido em celulares.
@@ -69,9 +69,14 @@ export default function NotificacoesSplash({navigate}){
   <div className="sn-header"><div><strong>Notificações</strong>
     <small>{data.nao_lidas} não lida(s)</small></div>
     <button onClick={refresh} type="button" aria-label="Atualizar avisos">Atualizar</button></div>
-  <button type="button" className="sn-enable" onClick={enable} disabled={busy}>
-    {busy?'Configurando aparelho...':'Ativar notificações neste celular'}
-  </button>
+  {data.push_disponivel
+   ?<button type="button" className="sn-enable" onClick={enable} disabled={busy}>
+      {busy?'Configurando aparelho...':'Ativar notificações neste celular'}
+    </button>
+   :<div className="sn-setup-info">
+      <strong>Avisos no SPLASH ativos</strong>
+      <span>Você já pode consultar as notificações aqui. Para receber alertas nativos no celular, falta configurar as chaves VAPID e o HTTPS do domínio na hospedagem.</span>
+    </div>}
   {notice&&<p role="status" className="sn-note">{notice}</p>}
   {error&&<p role="alert" className="sn-error">{error}</p>}
   {!data.avisos.length?<p className="sn-empty">Ainda não existem avisos na sua conta.</p>:
