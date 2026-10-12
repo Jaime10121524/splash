@@ -22,6 +22,8 @@ jobs:
         run: php backend/tests/reset_completo_smoke.php
       - name: Title validity and upgrade smoke test
         run: php backend/tests/titulos_renovacoes_smoke.php
+      - name: Visits, security, backup, Capacitor and HostGator
+        run: php backend/tests/entrega_visitas_celular_backup_smoke.php
       - name: Financial calculation smoke test
         run: php backend/tests/venda_money_smoke.php
       - name: Commission distribution smoke test
