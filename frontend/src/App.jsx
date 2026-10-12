@@ -396,7 +396,10 @@ function App() {
   const [session, setSession] = useState({ status: 'loading', user: null, csrf: null })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [current, setCurrent] = useState('dashboard')
+  const [current, setCurrent] = useState(()=>{
+    const target=new URLSearchParams(window.location.search).get('go')
+    return ['vendas','titulos','atendimentos','pendencias','relatorios'].includes(target)?target:'dashboard'
+  })
   const [arrivalClient, setArrivalClient] = useState(null)
   const [initialSaleVisit, setInitialSaleVisit] = useState(null)
   const [initialSaleOperation, setInitialSaleOperation] = useState(null)
