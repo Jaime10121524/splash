@@ -1,4 +1,4 @@
-.sn-panel{width:min(370px,calc(100vw - 26px));max-height:min(73vh,700px);overflow:auto;display:grid;gap:9px}
+.sn-panel{width:100%;max-width:100%;min-width:0;max-height:min(73dvh,700px);overflow-x:hidden;overflow-y:auto;display:grid;gap:9px;box-sizing:border-box}
 .sn-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .sn-header>div{display:grid;gap:5px}
 .sn-header strong{font-size:14px;color:var(--text)}
@@ -19,3 +19,9 @@
 .sn-setup-info{display:grid;gap:7px;background:var(--surface-alt);border:1px solid var(--border);border-radius:11px;padding:13px;line-height:1.55}
 .sn-setup-info strong{color:var(--text);font-size:11px}
 .sn-setup-info span{font-size:10px;color:var(--muted-dark)}
+
+.sn-panel>*{min-width:0;max-width:100%}
+.sn-header>div,.sn-list,.sn-item,.sn-item>*{min-width:0;max-width:100%}
+.sn-item{width:100%;overflow-wrap:anywhere;word-break:normal;box-sizing:border-box}
+.sn-note,.sn-error,.sn-empty,.sn-footnote,.sn-setup-info span{overflow-wrap:anywhere}
+.sn-list{overflow-x:hidden}
