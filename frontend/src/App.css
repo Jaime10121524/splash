@@ -268,7 +268,7 @@ a { text-decoration: none; }
   .module-heading h1 { font-size:25px; }
   .module-heading-icon { width:49px;height:49px; }
   .module-heading p { line-height:1.5; }
-  .mobile-bottom { display:flex;align-items:center;position:fixed;bottom:0;left:0;right:0;height:calc(67px + env(safe-area-inset-bottom));padding:3px 5px env(safe-area-inset-bottom);background:var(--surface);border-top:1px solid var(--border);z-index:20;box-shadow:0 -9px 28px rgba(15,23,42,.045); }
+  .mobile-bottom { display:flex;align-items:center;position:fixed;bottom:0;left:0;right:0;height:calc(63px + var(--splash-bottom-safe, env(safe-area-inset-bottom)));padding:3px 5px var(--splash-bottom-safe, env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border);z-index:20;box-shadow:0 -9px 28px rgba(15,23,42,.045); }
   .mobile-tab { flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:transparent;color:var(--muted);padding:4px 2px;font-size:9px;font-weight:800;white-space:nowrap; }
   .mobile-tab.active { color:var(--brand); }
   .mobile-tab svg { width:21px;height:21px; }
@@ -314,3 +314,22 @@ a { text-decoration: none; }
 
 .dashboard-columns.dashboard-operator{grid-template-columns:minmax(0,1fr)}
 .dashboard-operator .quick-panel{max-width:960px}
+
+/* Notificacoes: abrir dentro da viewport, inclusive Android/PWA em telas estreitas. */
+.notification-pop {box-sizing:border-box;min-width:0;max-width:calc(100vw - 20px);}
+@media(max-width:700px){
+  .notification-pop{
+    position:fixed;
+    top:calc(76px + env(safe-area-inset-top));
+    left:10px;
+    right:10px;
+    width:auto;
+    max-width:none;
+    max-height:calc(100dvh - 96px - env(safe-area-inset-top));
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:12px;
+    border-radius:14px;
+  }
+  .main-content{padding-bottom:calc(78px + var(--splash-bottom-safe, env(safe-area-inset-bottom)));}
+}
