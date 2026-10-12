@@ -1,0 +1,41 @@
+name: SPLASH - diagnostico HTTPS Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnostico-api-android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Probar API real sem credenciais
+        shell: bash
+        run: |
+          set -u
+          for base in "https://splash.ahritech.com.br" "https://www.splash.ahritech.com.br"; do
+            for case_name in get get_origin preflight; do
+              echo "====== $base / $case_name ======"
+              hdr=$(mktemp)
+              body=$(mktemp)
+              args=(-sS --max-time 12 -D "$hdr" -o "$body" -w "HTTP_RESULT %{http_code} IP %{remote_ip} TLS_VERIFY %{ssl_verify_result} URL %{url_effective}\n")
+              case "$case_name" in
+                get) ;;
+                get_origin) args+=(-H "Origin: https://localhost");;
+                preflight) args+=(-X OPTIONS -H "Origin: https://localhost" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type,x-csrf-token");;
+              esac
+              curl "${args[@]}" "$base/api/session" || echo "CURL_FAILED exit $?"
+              echo "--- response headers ---"
+              grep -iE '^(HTTP/|location:|access-control-|vary:|content-type:|server:|set-cookie:)' "$hdr" | sed -E 's/(set-cookie:)[^;]+/\1 [redacted]/I' || true
+              echo "--- content preview (no session data) ---"
+              head -c 130 "$body" | tr '\n' ' '
+              echo
+              rm -f "$hdr" "$body"
+            done
+          done
