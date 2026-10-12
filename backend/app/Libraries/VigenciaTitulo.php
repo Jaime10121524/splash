@@ -21,6 +21,17 @@ final class VigenciaTitulo
         ];
     }
 
+    public static function sequencia(array $existentes,string $numero,string $codigo,int $clienteId): int
+    {
+        $seq=0;
+        foreach($existentes as $row){
+            if((string)$row['numero_titulo']!==$numero||(string)$row['sigla_plano']!==$codigo)continue;
+            if((int)$row['cliente_id']!==$clienteId)throw new \InvalidArgumentException('Numeração pertencente a outro cliente.');
+            $seq=max($seq,(int)$row['titulo_sequencia']+1);
+        }
+        return $seq;
+    }
+
     public static function vencimento(string $inicio, int $meses): string
     {
         $date=new \DateTimeImmutable($inicio.' 12:00:00');
