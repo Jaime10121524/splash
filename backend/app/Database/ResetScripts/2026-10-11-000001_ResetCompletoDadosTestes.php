@@ -23,6 +23,7 @@ final class ResetCompletoDadosTestes extends Migration
 
     /** Listagem explícita, na ordem de dependências (filhos antes dos pais). */
     public const TABLES = [
+            'splash_notificacoes',
             'titulo_vinculos',
         // Conciliação e fechamento (referenciam vendas e movimentos).
         'fechamento_custodia_pix_vinculos',
