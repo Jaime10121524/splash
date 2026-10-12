@@ -49,6 +49,11 @@ $routes->group('api', static function ($routes): void {
     $routes->get('titulos/(:num)/historico', 'Api\\TitulosController::historico/$1');
     $routes->post('titulos/(:num)/movimentar', 'Api\\TitulosController::movimentar/$1', ['filter'=>'csrf']);
 
+    // Consulta individual exclusivamente pela pessoa vinculada ao login Shield.
+    // Nunca aceita pessoa_id do navegador nem expõe dados de associados.
+    $routes->get('minhas-vendas', 'Api\\MinhasVendasController::index');
+    $routes->get('minhas-vendas/(:num)', 'Api\\MinhasVendasController::detalhe/$1');
+
     // Operações de vendas: títulos e negociações compartilham o mesmo extrato.
     $routes->get('vendas/opcoes', 'Api\VendasController::opcoes');
     $routes->get('vendas/resumo', 'Api\VendasController::resumo');
