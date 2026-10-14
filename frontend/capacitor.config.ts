@@ -14,6 +14,12 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
   },
+  plugins: {
+    PushNotifications: {
+      // Exibe aviso e som também quando o aplicativo está aberto.
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+  },
 }
 
 export default config
