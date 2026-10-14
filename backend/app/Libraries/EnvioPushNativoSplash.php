@@ -113,7 +113,13 @@ final class EnvioPushNativoSplash
                     'token'=>$d['token'],
                     'notification'=>['title'=>$notice['titulo'],'body'=>$notice['mensagem']],
                     'data'=>['route'=>(string)$notice['rota'],'event'=>(string)$notice['chave_evento']],
-                    'android'=>['priority'=>'normal'],
+                    'android'=>[
+                        'priority'=>$notice['categoria']==='VENDA_PAGA'?'high':'normal',
+                        'notification'=>[
+                            'channel_id'=>$notice['categoria']==='VENDA_PAGA'?'splash_venda_paga':'splash_avisos',
+                            'default_sound'=>true,
+                        ],
+                    ],
                 ]],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
                 $resp=self::request($url,['Authorization: Bearer '.$access,'Content-Type: application/json'],$body);
                 if($resp['status']===200){$ok++;continue;}

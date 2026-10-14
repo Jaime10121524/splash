@@ -45,7 +45,7 @@ final class EnvioPushSplash
                             'url'=>'/?go='.rawurlencode((string)$notice['rota']),'tag'=>$notice['chave_evento'],
                         ],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
                         $result=$push->sendOneNotification(Subscription::create($data),$payload,
-                            ['TTL'=>86400,'urgency'=>'normal']);
+                            ['TTL'=>86400,'urgency'=>$notice['categoria']==='VENDA_PAGA'?'high':'normal']);
                         if($result->isSuccess()){$success++;continue;}
                         if($result->isSubscriptionExpired()){
                             $db->table('splash_push_dispositivos')->where('id',$sub['id'])->update(['ativo'=>0]);

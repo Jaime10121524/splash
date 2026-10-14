@@ -35,6 +35,14 @@ final class NotificacoesController extends CommercialBaseController
             ->where('user_id',$u)->update(['lido_em'=>date('Y-m-d H:i:s')]);
         return $this->responseOK('Notificação lida.');
     }
+    public function marcarTodas():ResponseInterface
+    {
+        $uid=$this->uid();if($uid instanceof ResponseInterface)return $uid;
+        db_connect()->table('splash_notificacoes')->where('user_id',$uid)
+            ->where('lido_em',null)->update(['lido_em'=>date('Y-m-d H:i:s')]);
+        return $this->responseOK('Todas as notificações foram marcadas como lidas.');
+    }
+
     public function registrarDispositivo():ResponseInterface
     {
         $u=$this->uid();if($u instanceof ResponseInterface)return $u;

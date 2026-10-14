@@ -100,6 +100,51 @@ final class AvisosSplash
         }
     }
 
+    /**
+     * Aviso de quitação real, disparado apenas após a soma das entradas atingir
+     * o valor cobrado. Sem expor dados pessoais ou comissões de terceiros.
+     */
+    public static function vendaPaga(int $operationId):void
+    {
+        try{
+            $db=db_connect();
+            $op=$db->table('venda_operacoes')->where('id',$operationId)->get()->getRowArray();
+            if(!$op||$op['situacao']!=='VENDA')return;
+            $received=0;
+            foreach($db->table('venda_recebimentos')->select('tipo,valor')
+                ->where('operacao_id',$operationId)->get()->getResultArray() as $move){
+                $received+=($move['tipo']==='ENTRADA'?1:-1)*VendaMoney::cents((string)$move['valor'],true);
+            }
+            if($received!==VendaMoney::cents((string)$op['valor_cobrado'],true))return;
+            $ids=[];
+            foreach(['corretor_pessoa_id','segundo_corretor_pessoa_id','atendente_pessoa_id',
+                'atendente_adicional_pessoa_id','gerente_pessoa_id'] as $field){
+                if((int)($op[$field]??0)>0)$ids[]=(int)$op[$field];
+            }
+            foreach($db->table('comissao_rateios')->select('beneficiario_pessoa_id')
+                ->where('operacao_id',$operationId)->get()->getResultArray() as $rate)
+                $ids[]=(int)$rate['beneficiario_pessoa_id'];
+            $owner=$db->table('fechamento_responsabilidades')
+                ->where('corretor_pessoa_id',(int)$op['corretor_pessoa_id'])->get()->getRowArray();
+            if($owner)$ids[]=(int)$owner['responsavel_pessoa_id'];
+            $users=[];
+            if($ids)foreach($db->table('pessoas')->select('user_id')
+                ->whereIn('id',array_unique($ids))->where('ativo',1)
+                ->where('user_id IS NOT NULL',null,false)->get()->getResultArray() as $person){
+                $users[]=(int)$person['user_id'];
+            }
+            foreach($db->table('auth_groups_users')->select('user_id')
+                ->where('group','admin')->get()->getResultArray() as $admin)
+                $users[]=(int)$admin['user_id'];
+            $title=trim((string)$op['numero_titulo'].' '.(string)$op['sigla_plano']);
+            $header='💰 Venda paga'.($title!==''?' · '.$title:'');
+            foreach(array_unique(array_filter($users)) as $uid){
+                self::alertaUsuario((int)$uid,'VENDA_PAGA:'.$operationId,'VENDA_PAGA',
+                    $header,'O pagamento integral do título foi confirmado.','vendas');
+            }
+        }catch(Throwable $e){log_message('error','Aviso venda paga: {error}',['error'=>$e->getMessage()]);}
+    }
+
     public static function alertaUsuario(int $userId,string $key,string $type,string $title,string $body,string $route):void
     {
         try{

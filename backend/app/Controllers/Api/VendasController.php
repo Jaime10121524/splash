@@ -541,7 +541,8 @@ class VendasController extends CommercialBaseController
             $this->commitOrFail($db);
             \App\Libraries\AvisosSplash::venda((int)$id);
             \App\Libraries\AvisosSplash::venda((int)$id,true);
-            \App\Libraries\EnvioPushSplash::enviar(5);
+            \App\Libraries\AvisosSplash::vendaPaga((int)$id);
+            \App\Libraries\EnvioPushSplash::enviar(30);
             return $this->responseOK('Pendência convertida em venda; todos os pagamentos foram preservados.');
         }catch(Throwable $e){
             $db->transRollback();
@@ -607,7 +608,8 @@ class VendasController extends CommercialBaseController
             RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
             $this->commitOrFail($db);
             \App\Libraries\AvisosSplash::venda((int)$id,true);
-            \App\Libraries\EnvioPushSplash::enviar(5);
+            \App\Libraries\AvisosSplash::vendaPaga((int)$id);
+            \App\Libraries\EnvioPushSplash::enviar(30);
             return $this->responseOK('Recebimento registrado. O extrato financeiro foi preservado.');
         }catch(Throwable $e){
             $db->transRollback();
