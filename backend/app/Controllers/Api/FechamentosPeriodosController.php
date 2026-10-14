@@ -169,11 +169,17 @@ class FechamentosPeriodosController extends CommercialBaseController
             if(!in_array($closing['status'],['RECEBIMENTOS','REPASSES'],true)){
                 $db->transRollback();return $this->errorResponse(409,'Só é possível cancelar fechamento em andamento.');
             }
-            foreach(['fechamento_periodo_repasses','fechamento_periodo_titulares','fechamento_periodo_abates'] as $table){
-                if($db->table($table)->where('fechamento_id',(int)$id)->countAllResults()){
+            foreach(['fechamento_periodo_repasses','fechamento_periodo_titulares'] as $table){
+                if($db->table($table)->where('fechamento_id',(int)$id)
+                    ->where('situacao','ATIVO')->countAllResults()){
                     $db->transRollback();return $this->errorResponse(409,
-                        'Há pagamentos/abatimentos vinculados. Reverta todos os movimentos antes de cancelar.');
+                        'Existem pagamentos ativos. Estorne-os antes de cancelar.');
                 }
+            }
+            if($db->table('fechamento_periodo_abates')
+                ->where('fechamento_id',(int)$id)->countAllResults()){
+                $db->transRollback();return $this->errorResponse(409,
+                    'Existem abatimentos de empréstimos. Desfaça-os antes de cancelar.');
             }
             if($db->table('fechamento_custodia_movimentos')->where('fechamento_id',(int)$id)
                 ->where('situacao','ATIVO')->countAllResults()){
