@@ -15,6 +15,7 @@ import MinhasVendas from './pages/MinhasVendas.jsx'
 import MeuPerfil from './pages/MeuPerfil.jsx'
 import AlertasComerciais from './pages/AlertasComerciais.jsx'
 import NotificacoesSplash, {stopCurrentPush} from './components/NotificacoesSplash.jsx'
+import {comercialGet} from './lib/comercialApi.js'
 import {apiUrl,apiCredentials} from './lib/nativeApi.js'
 
 const paths = {
@@ -409,6 +410,7 @@ function App() {
   const [initialSaleOperation, setInitialSaleOperation] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
+  const [unreadCount,setUnreadCount]=useState(0)
   const [forgotOpen,setForgotOpen]=useState(false)
   const [theme, setTheme] = useState('light')
 
@@ -424,6 +426,18 @@ function App() {
   }
   useEffect(() => { refresh() }, [])
   useEffect(() => { document.documentElement.dataset.theme = theme; document.title = 'SPLASH · Gestão de títulos' }, [theme])
+  useEffect(()=>{
+    if(session.status!=='in'){setUnreadCount(0);return}
+    let active=true
+    const poll=()=>comercialGet('/api/notificacoes')
+      .then(result=>{if(active)setUnreadCount(Number(result.nao_lidas||0))})
+      .catch(()=>{})
+    poll()
+    const timer=setInterval(poll,30000)
+    const visible=()=>{if(document.visibilityState==='visible')poll()}
+    document.addEventListener('visibilitychange',visible)
+    return ()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',visible)}
+  },[session.status,session.user?.id])
 
   async function login(username, password) {
     setBusy(true);setError('')
@@ -488,7 +502,7 @@ function App() {
         <div className="top-actions">
           <span className="connection-indicator"><span/> Conectado</span>
           <button className="icon-btn" title="Alternar tema" aria-label="Alternar tema" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}><Icon name={theme==='light'?'moon':'sun'} size={20}/></button>
-          <div className="notification-wrap"><button className="icon-btn" title="Notificações" aria-label="Notificações" aria-expanded={noticesOpen} onClick={()=>setNoticesOpen(s=>!s)}><Icon name="bell" size={20}/></button>{noticesOpen&&<div className="notification-pop"><NotificacoesSplash navigate={go}/></div>}</div>
+          <div className="notification-wrap"><button className="icon-btn" title="Notificações" aria-label={unreadCount?'Notificações, '+unreadCount+' não lidas':'Notificações'} aria-expanded={noticesOpen} onClick={()=>setNoticesOpen(s=>!s)}><Icon name="bell" size={20}/>{unreadCount>0&&<span className="notification-count">{unreadCount>99?'99+':unreadCount}</span>}</button>{noticesOpen&&<div className="notification-pop"><NotificacoesSplash navigate={go} onUnreadChange={setUnreadCount}/></div>}</div>
           <button type="button" className="top-avatar" title="Abrir meu perfil" aria-label="Meu perfil" onClick={()=>go('meu-perfil')}>{initials(user.username)}</button>
         </div>
       </header>

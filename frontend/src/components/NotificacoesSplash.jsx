@@ -38,18 +38,18 @@ export async function stopCurrentPush(){
   await sub.unsubscribe()
  }catch{}
 }
-export default function NotificacoesSplash({navigate}){
+export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
  const [data,setData]=useState({avisos:[],nao_lidas:0,push_disponivel:false,vapid_publica:''})
  const [error,setError]=useState('')
  const [notice,setNotice]=useState('')
  const [busy,setBusy]=useState(false)
  async function refresh(){
-  try{setData(await comercialGet('/api/notificacoes'));setError('')}
+  try{const r=await comercialGet('/api/notificacoes');setData(r);onUnreadChange(Number(r.nao_lidas||0));setError('')}
   catch(e){setError(e.message)}
  }
  useEffect(()=>{
   refresh()
-  const id=setInterval(refresh,90000)
+  const id=setInterval(refresh,30000)
   return ()=>clearInterval(id)
  },[])
  async function enableNative(){
@@ -62,6 +62,14 @@ export default function NotificacoesSplash({navigate}){
   try{
    const permission=await PushNotifications.requestPermissions()
    if(permission.receive!=='granted')throw new Error('Permissão de notificações negada no Android.')
+   await PushNotifications.createChannel({
+    id:'splash_venda_paga',name:'Vendas pagas',
+    description:'Pagamentos integrais confirmados',importance:5,visibility:1,vibration:true,
+   })
+   await PushNotifications.createChannel({
+    id:'splash_avisos',name:'Avisos Splash',description:'Visitas e atualizações comerciais',
+    importance:4,visibility:1,vibration:true,
+   })
    await PushNotifications.removeAllListeners()
    await PushNotifications.addListener('registration',async result=>{
     try{
@@ -109,6 +117,15 @@ export default function NotificacoesSplash({navigate}){
   }catch(e){setError(e.message)}
   finally{setBusy(false)}
  }
+ async function readAll(){
+  if(busy||!data.nao_lidas)return
+  setBusy(true);setError('')
+  try{
+   const r=await comercialPost('/api/notificacoes/ler-todas',{})
+   setNotice(r.message);await refresh()
+  }catch(e){setError(e.message)}
+  finally{setBusy(false)}
+ }
  async function open(item){
   if(!item.lido_em){
     try{await comercialPost('/api/notificacoes/'+item.id+'/ler',{});refresh()}catch{}
@@ -118,7 +135,10 @@ export default function NotificacoesSplash({navigate}){
  return <div className="sn-panel">
   <div className="sn-header"><div><strong>Notificações</strong>
     <small>{data.nao_lidas} não lida(s)</small></div>
-    <button onClick={refresh} type="button" aria-label="Atualizar avisos">Atualizar</button></div>
+    <div className="sn-actions">
+      <button onClick={readAll} type="button" disabled={busy||!data.nao_lidas}>Ler todas</button>
+      <button onClick={refresh} type="button" aria-label="Atualizar avisos">Atualizar</button>
+    </div></div>
   {isNative()
    ?<button type="button" className="sn-enable" onClick={enableNative} disabled={busy}>
      {busy?'Configurando Android...':'Ativar notificações Android'}

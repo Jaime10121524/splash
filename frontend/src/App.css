@@ -336,3 +336,6 @@ a { text-decoration: none; }
   }
   .main-content{padding-bottom:calc(78px + var(--splash-bottom-safe, env(safe-area-inset-bottom)));}
 }
+
+.notification-wrap .icon-btn{position:relative;overflow:visible}
+.notification-count{position:absolute;right:-5px;top:-6px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#dc3545;color:#fff;font-size:10px;font-weight:800;line-height:1;box-shadow:0 0 0 2px var(--surface);pointer-events:none}

@@ -25,3 +25,7 @@
 .sn-item{width:100%;overflow-wrap:anywhere;word-break:normal;box-sizing:border-box}
 .sn-note,.sn-error,.sn-empty,.sn-footnote,.sn-setup-info span{overflow-wrap:anywhere}
 .sn-list{overflow-x:hidden}
+
+.sn-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.sn-actions button:disabled{opacity:.45;cursor:default}
+.sn-actions button:hover:not(:disabled){filter:brightness(.92)}
