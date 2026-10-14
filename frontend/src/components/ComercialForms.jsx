@@ -95,6 +95,7 @@ export function ClientFields({ fields, onChange, catalogs, compact=false, origin
   )
   const set=(key,value)=>onChange({ ...fields,[key]:value })
   const owners=personOptions(catalogs.pessoas||[],['corretor','vendedor'])
+    .filter(p=>!catalogs.pessoa_logada||p.value===String(catalogs.pessoa_logada))
   const options=(catalogs.origens||[]).filter(o=>o.ativo || String(o.id)===String(fields.origem_id))
     .map(o=>({value:String(o.id),label:o.nome}))
   const selectedOrigin=(catalogs.origens||[]).find(o=>String(o.id)===String(fields.origem_id))

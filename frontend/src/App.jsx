@@ -63,10 +63,10 @@ function Icon({ name, size = 20, stroke = 1.8, ...props }) {
 
 const nav = [
   { id: 'dashboard', label: 'Visão geral', icon: 'grid', roles: ['admin','corretor','vendedor','gerente','operador'], section: 'Principal' },
-  { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin','operador'], section: 'Operação' },
+  { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
   { id: 'planos', label: 'Planos', icon: 'tag', roles: ['admin'], section: 'Operação' },
   { id: 'pessoas', label: 'Pessoas', icon: 'users', roles: ['admin'], section: 'Operação' },
-  { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin','operador'], section: 'Operação' },
+  { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
   { id: 'vendas', label: 'Vendas', icon: 'bag', roles: ['admin','corretor','vendedor','gerente'], section: 'Operação' },
   { id: 'pendencias', label: 'Pendências', icon: 'clock', roles: ['admin'], section: 'Operação' },
   { id: 'titulos', label: 'Títulos e renovações', icon: 'calendar', roles: ['admin','corretor'], section: 'Operação' },
@@ -362,7 +362,8 @@ function Dashboard({ user, navigate }) {
           ]:operator?[
             {label:'Atendimentos',detail:'Acompanhar visitantes',id:'atendimentos',icon:'clipboard'},
           ]:[
-            {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
+            {label:'Atendimentos',detail:'Minhas visitas e retornos',id:'atendimentos',icon:'clipboard'},
+             {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
             ...(user.role==='corretor'?[{label:'Meus fechamentos',detail:'Recebimentos e repasses por período',id:'fechamentos',icon:'arrows'}]:[]),
             {label:'Minhas despesas',detail:'Registrar gastos',id:'despesas',icon:'receipt'},
             {label:'Empréstimos',detail:'Consultar saldos',id:'emprestimos',icon:'arrows'},

@@ -24,6 +24,8 @@ class ClientesController extends CommercialBaseController
             ->join('lead_origens o','o.id=c.origem_id','left')
             ->join('pessoas p','p.id=c.dono_corrente_pessoa_id','left')
             ->join('clientes i','i.id=c.indicador_cliente_id','left');
+        $scope=$this->visitorScopeId();
+        if($scope!==null)$builder->where('c.dono_corrente_pessoa_id',$scope);
         if($q!=='') {
             $digits=preg_replace('/\D/','',$q);
             $builder->groupStart()->like('c.nome',$q);
@@ -53,7 +55,11 @@ class ClientesController extends CommercialBaseController
         if ($denied=$this->authorizeOperations()) return $denied;
         $db=db_connect();
         $input=$this->jsonPayload();
+        $scope=$this->visitorScopeId();
+        if($scope!==null)$input['dono_corrente_pessoa_id']=$scope;
         $clean=ClienteRules::validate($db,$input);
+        if($scope!==null && !isset($clean['error']) && (int)$clean['dono_corrente_pessoa_id']!==$scope)
+            return $this->errorResponse(403,'Não é permitido assumir a corrente de outro corretor.');
         if(isset($clean['error']))return $this->errorResponse(422,$clean['error']);
 
         $db->transBegin();
@@ -86,8 +92,16 @@ class ClientesController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(404,'Cliente não encontrado.');
             }
+            $scope=$this->visitorScopeId();
+            if($scope!==null && (int)$old['dono_corrente_pessoa_id']!==$scope){
+                $db->transRollback();return $this->errorResponse(403,'Cliente de outro corretor.');
+            }
             $input=$this->jsonPayload();
+            if($scope!==null)$input['dono_corrente_pessoa_id']=$scope;
             $clean=ClienteRules::validate($db,$input,$old);
+            if($scope!==null && !isset($clean['error']) && (int)$clean['dono_corrente_pessoa_id']!==$scope){
+                $db->transRollback();return $this->errorResponse(403,'Esta corrente pertence a outro corretor.');
+            }
             if(isset($clean['error'])){
                 $db->transRollback();
                 return $this->errorResponse(422,$clean['error']);
@@ -114,7 +128,9 @@ class ClientesController extends CommercialBaseController
     {
         if ($denied=$this->authorizeOperations()) return $denied;
         $db=db_connect();
-        if (!$db->table('clientes')->where('id',(int)$id)->countAllResults()) {
+        $access=$db->table('clientes')->where('id',(int)$id);
+        if($this->visitorScopeId()!==null)$access->where('dono_corrente_pessoa_id',$this->visitorScopeId());
+        if (!$access->countAllResults()) {
             return $this->errorResponse(404,'Cliente não encontrado.');
         }
         $history=$db->table('cliente_corrente_historico h')

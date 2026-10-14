@@ -40,6 +40,7 @@ class CatalogosController extends CommercialBaseController
 
         return $this->response->setJSON([
             'origens'=>$origens, 'motivos'=>$motivos,'pessoas'=>array_values($pessoas),
+            'pessoa_logada'=>$this->visitorScopeId(),
         ])->setHeader('Cache-Control','no-store');
     }
 

@@ -9,6 +9,7 @@ const statusLabels={
   AGUARDANDO:'Aguardando', ATENDENDO:'Em atendimento',
   RETORNO:'Retorno agendado', SEM_VENDA:'Não fechou',
   PENDENCIA:'Pendência de negociação', VENDA:'Venda fechada',
+  CANCELADA:'Cancelada',
 }
 const stateOptions=[
   {value:'RETORNO',label:'Retorno agendado'},
@@ -16,7 +17,7 @@ const stateOptions=[
   {value:'PENDENCIA',label:'Pendência de negociação (sem financeiro)'},
   {value:'VENDA',label:'Venda fechada (aguarda lançamento)'},
 ]
-const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,venda:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
+const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,venda:0,canceladas:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
 
 export default function Atendimentos({initialClient=null,onClientAccepted=()=>{},navigate=()=>{},admin=false}) {
   const [catalogs,setCatalogs]=useState({origens:[],motivos:[],pessoas:[]})
@@ -41,6 +42,7 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
   const [returnDate,setReturnDate]=useState('')
   const [reason,setReason]=useState('')
   const [notes,setNotes]=useState('')
+  const [cancelReason,setCancelReason]=useState('')
   const [formError,setFormError]=useState('')
   const [saving,setSaving]=useState(false)
 
@@ -48,8 +50,8 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
   useEffect(()=>{
     if(!initialClient?.id)return
     setMode('existing');setSelectedClient(initialClient)
-    setBroker('');setSecondBroker('')
-    setNewClient(emptyClient());setFormError('');setModal({type:'arrival'})
+    setBroker(catalogs.pessoa_logada?String(catalogs.pessoa_logada):'');setSecondBroker('')
+    setNewClient({...emptyClient(),dono_corrente_pessoa_id:catalogs.pessoa_logada?String(catalogs.pessoa_logada):''});setFormError('');setModal({type:'arrival'})
     onClientAccepted()
   },[initialClient?.id])
   useEffect(()=>{
@@ -81,12 +83,12 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
   }
   function openArrival(client=null,visit=null){
     setMode('existing');setSelectedClient(client)
-    setBroker(visit?.corretor_pessoa_id?String(visit.corretor_pessoa_id):'')
+    setBroker(visit?.corretor_pessoa_id?String(visit.corretor_pessoa_id):(catalogs.pessoa_logada?String(catalogs.pessoa_logada):''))
     setSecondBroker(visit?.segundo_corretor_pessoa_id?String(visit.segundo_corretor_pessoa_id):'')
-    setNewClient(emptyClient());setFormError('');setModal({type:'arrival'})
+    setNewClient({...emptyClient(),dono_corrente_pessoa_id:catalogs.pessoa_logada?String(catalogs.pessoa_logada):''});setFormError('');setModal({type:'arrival'})
   }
   function openBrokers(visit,type='brokers'){
-    setBroker(visit?.corretor_pessoa_id?String(visit.corretor_pessoa_id):'')
+    setBroker(visit?.corretor_pessoa_id?String(visit.corretor_pessoa_id):(catalogs.pessoa_logada?String(catalogs.pessoa_logada):''))
     setSecondBroker(visit?.segundo_corretor_pessoa_id?String(visit.segundo_corretor_pessoa_id):'')
     setFormError('');setModal({type,visit})
   }
@@ -98,6 +100,9 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
   function openFinish(visit){
     setOutcome('RETORNO');setReturnDate('');setReason('');setNotes('')
     setFormError('');setModal({type:'finish',visit})
+  }
+  function openCancel(visit){
+    setCancelReason('');setFormError('');setModal({type:'cancel',visit})
   }
   async function submit(){
     setSaving(true);setFormError('')
@@ -128,6 +133,9 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
           atendente_pessoa_id:Number(attendant),
           atendente_adicional_pessoa_id:additional?Number(additional):null,
         })
+      }else if(modal.type==='cancel'){
+        if(cancelReason.trim().length<5)throw new Error('Informe o motivo com pelo menos cinco caracteres.')
+        result=await comercialPost('/api/atendimentos/'+modal.visit.id+'/cancelar',{motivo:cancelReason.trim()})
       }else{
         result=await comercialPost('/api/atendimentos/'+modal.visit.id+'/finalizar',{
           status:outcome,
@@ -218,7 +226,7 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
                 </div>
               </div>
               <div className="com-actions">
-                <button type="button" onClick={()=>openBrokers(v)}>Corretores</button>
+                {v.status!=='CANCELADA'&&<button type="button" onClick={()=>openBrokers(v)}>Corretores</button>}
                 {admin&&v.operacao_id&&<button type="button" className="primary"
                   onClick={()=>navigate(v.operacao_situacao==='VENDA'?'vendas':'pendencias',v)}>
                   {v.operacao_situacao==='VENDA'?'Ver título':'Ver pendência'}
@@ -231,17 +239,18 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
                 {v.status==='ATENDENDO'&&<button type="button" className="primary" onClick={()=>openFinish(v)}>Encerrar atendimento</button>}
                 {canResume&&<button type="button" className="primary"
                   onClick={()=>openBrokers(v,'resume')}>Retomar hoje</button>}
-                {!['AGUARDANDO','ATENDENDO'].includes(v.status)&&!canResume&&<button type="button" onClick={()=>
+                {v.status!=='CANCELADA'&&!v.operacao_id&&<button type="button" className="vd-outline" onClick={()=>openCancel(v)}>Cancelar visita</button>}
+                {!['AGUARDANDO','ATENDENDO','CANCELADA'].includes(v.status)&&!canResume&&<button type="button" onClick={()=>
                   openArrival({id:v.cliente_id,nome:v.cliente_nome,telefone:v.cliente_telefone},v)}>Nova visita</button>}
               </div>
             </article>
           })}
         </div>}
     </section>
-    <p className="com-disclaimer">Ao registrar Venda fechada ou Pendência, o administrador poderá vincular o título, pagamentos e devoluções à visita. As comissões distribuídas serão apuradas nos fechamentos.</p>
+    <p className="com-disclaimer">Uma visita lançada por engano pode ser cancelada com justificativa, desde que não possua operação financeira vinculada. Ao registrar Venda fechada ou Pendência, o administrador poderá vincular o título, pagamentos e devoluções à visita. As comissões distribuídas serão apuradas nos fechamentos.</p>
 
     {modal&&<SurfaceModal
-      title={modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar atendimento':modal.type==='finish'?'Encerrar atendimento':modal.type==='resume'?'Retomar atendimento':'Corretores do atendimento'}
+      title={modal.type==='cancel'?'Cancelar visita':modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar atendimento':modal.type==='finish'?'Encerrar atendimento':modal.type==='resume'?'Retomar atendimento':'Corretores do atendimento'}
       subtitle={modal.type==='arrival'?'Registre o cliente assim que chegar ao clube.':modal.visit?.cliente_nome}
       onClose={()=>setModal(null)} busy={saving}>
       <div className="cm-form">
@@ -275,6 +284,11 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
             Este cliente já tem atendente atribuído em uma visita anterior. O sistema mantém o responsável no retorno.
           </div>}
         </>}
+        {modal.type==='cancel'&&<label><span className="field-caption">Motivo do cancelamento *</span>
+          <textarea rows={3} minLength={5} maxLength={300} value={cancelReason}
+            onChange={e=>setCancelReason(e.target.value)} placeholder="Por que esta visita deve ser cancelada?"/>
+          <small>O histórico será mantido e não poderá ser apagado.</small>
+        </label>}
         {modal.type==='finish'&&<>
           <label><span className="field-caption">Resultado <em>*</em></span>
             <FormControl type="select" ariaLabel="Resultado do atendimento" value={outcome}
@@ -296,7 +310,7 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
         {formError&&<p className="cm-error" role="alert">{formError}</p>}
         <div className="cm-form-actions"><button className="cm-button" disabled={saving}
           onClick={()=>setModal(null)}>Cancelar</button><button className="cm-button primary" disabled={saving}
-          onClick={submit}>{saving?'Processando...':modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar':modal.type==='resume'?'Retomar':modal.type==='brokers'?'Salvar corretores':'Encerrar'}</button></div>
+          onClick={submit}>{saving?'Processando...':modal.type==='arrival'?'Registrar chegada':modal.type==='start'?'Iniciar':modal.type==='resume'?'Retomar':modal.type==='brokers'?'Salvar corretores':modal.type==='cancel'?'Confirmar cancelamento':'Encerrar'}</button></div>
       </div>
     </SurfaceModal>}
   </div>
