@@ -136,14 +136,14 @@ class FechamentosPeriodosController extends CommercialBaseController
             }
             $active=$db->table('fechamento_periodos p')
                 ->join('fechamento_periodo_pessoas m','m.fechamento_id=p.id')
-                ->where('m.pessoa_id',$child)->where('p.status !=','CONCLUIDO')
+                ->where('m.pessoa_id',$child)->whereIn('p.status',['RECEBIMENTOS','REPASSES'])
                 ->countAllResults();
             if($active){
                 $db->transRollback();
                 return $this->errorResponse(409,'Conclua os fechamentos abertos deste corretor antes de alterar sua administração.');
             }
             if($boss!==null && $db->table('fechamento_periodos')
-                ->where('responsavel_pessoa_id',$boss)->where('status !=','CONCLUIDO')->countAllResults()){
+                ->where('responsavel_pessoa_id',$boss)->whereIn('status',['RECEBIMENTOS','REPASSES'])->countAllResults()){
                 $db->transRollback();
                 return $this->errorResponse(409,'Conclua primeiro o fechamento aberto do responsável antes de alterar sua equipe.');
             }
@@ -156,14 +156,63 @@ class FechamentosPeriodosController extends CommercialBaseController
         }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'vincular corretor a responsável');}
     }
 
+    public function cancelar(int|string $id): ResponseInterface
+    {
+        $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
+        $reason=$this->cleanText($this->jsonPayload()['motivo']??null,500,true);
+        if($reason===false || mb_strlen((string)$reason)<5)
+            return $this->errorResponse(422,'Informe a justificativa com cinco caracteres ou mais.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $closing=$this->getPeriod($db,(int)$id,$actor,true);
+            if($closing instanceof ResponseInterface){$db->transRollback();return $closing;}
+            if(!in_array($closing['status'],['RECEBIMENTOS','REPASSES'],true)){
+                $db->transRollback();return $this->errorResponse(409,'Só é possível cancelar fechamento em andamento.');
+            }
+            foreach(['fechamento_periodo_repasses','fechamento_periodo_titulares','fechamento_periodo_abates'] as $table){
+                if($db->table($table)->where('fechamento_id',(int)$id)->countAllResults()){
+                    $db->transRollback();return $this->errorResponse(409,
+                        'Há pagamentos/abatimentos vinculados. Reverta todos os movimentos antes de cancelar.');
+                }
+            }
+            if($db->table('fechamento_custodia_movimentos')->where('fechamento_id',(int)$id)
+                ->where('situacao','ATIVO')->countAllResults()){
+                $db->transRollback();return $this->errorResponse(409,
+                    'Há custódia ativa. Estorne-a antes de cancelar.');
+            }
+            $sales=$db->table('fechamento_periodo_vendas')->select('operacao_id')
+                ->where('fechamento_id',(int)$id)->get()->getResultArray();
+            $entries=$db->table('fechamento_periodo_entradas')
+                ->where('fechamento_id',(int)$id)->countAllResults();
+            $audit=['motivo'=>$reason,'usuario_id'=>$actor['usuario_id'],
+                'cancelado_em'=>$this->now(),
+                'vendas'=>array_map(static fn($v)=>(int)$v['operacao_id'],$sales),
+                'entradas_preservadas'=>$entries];
+            // Solta apenas os vínculos de venda para permitir novo fechamento.
+            // As entradas rascunhadas ficam registradas para auditoria.
+            $db->table('fechamento_periodo_vendas')->where('fechamento_id',(int)$id)->delete();
+            $db->table('fechamento_periodos')->where('id',(int)$id)->update([
+                'status'=>'CANCELADO',
+                'resumo_concluido'=>json_encode(['cancelamento'=>$audit],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Fechamento cancelado. Vendas liberadas e histórico preservado.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'cancelamento de fechamento');}
+    }
+
     public function listar(): ResponseInterface
     {
         $actor=$this->acesso();if($actor instanceof ResponseInterface)return $actor;
         $db=db_connect();
-        $query=$db->table('fechamento_periodos f')->select('f.id,f.responsavel_pessoa_id,f.inicio,f.fim,f.status,f.criado_em,f.concluido_em,r.nome AS responsavel_nome')
+        $query=$db->table('fechamento_periodos f')->select('f.id,f.responsavel_pessoa_id,f.inicio,f.fim,f.status,f.criado_em,f.concluido_em,f.resumo_concluido,r.nome AS responsavel_nome')
             ->join('pessoas r','r.id=f.responsavel_pessoa_id');
         if(!$actor['admin'])$query->where('f.responsavel_pessoa_id',$actor['pessoa_id']);
         $rows=$query->orderBy('f.id','DESC')->limit(150)->get()->getResultArray();
+        foreach($rows as &$row){
+            $audit=$row['status']==='CANCELADO'?json_decode((string)$row['resumo_concluido'],true):null;
+            $row['cancelamento']=$audit['cancelamento']??null;
+            unset($row['resumo_concluido']);
+        }unset($row);
         return $this->response->setJSON(['fechamentos'=>$rows])->setHeader('Cache-Control','no-store');
     }
 
@@ -188,7 +237,7 @@ class FechamentosPeriodosController extends CommercialBaseController
             sort($members,SORT_NUMERIC);
             foreach($members as $id)$db->query('SELECT id FROM pessoas WHERE id=? FOR UPDATE',[$id])->getRowArray();
             $old=$db->table('fechamento_periodos')
-                ->where('responsavel_pessoa_id',$root)
+                ->where('responsavel_pessoa_id',$root)->where('status !=','CANCELADO')
                 ->where('inicio <=',$end)->where('fim >=',$start)->get()->getRowArray();
             if($old){
                 $db->transRollback();

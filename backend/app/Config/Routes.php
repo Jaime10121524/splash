@@ -109,6 +109,7 @@ $routes->group('api', static function ($routes): void {
     $routes->post('fechamentos-periodos/vincular','Api\FechamentosPeriodosController::vincular',['filter'=>'csrf']);
     $routes->get('fechamentos-periodos','Api\FechamentosPeriodosController::listar');
     $routes->post('fechamentos-periodos','Api\FechamentosPeriodosController::abrir',['filter'=>'csrf']);
+    $routes->post('fechamentos-periodos/(:num)/cancelar','Api\FechamentosPeriodosController::cancelar/$1',['filter'=>'csrf']);
     $routes->get('fechamentos-periodos/(:num)','Api\FechamentosPeriodosController::detalhe/$1');
     $routes->get('fechamentos-periodos/(:num)/auditoria-rateios','Api\\FechamentosPeriodosController::auditoriaRateios/$1');
     $routes->post('fechamentos-periodos/(:num)/receber','Api\FechamentosPeriodosController::receber/$1',['filter'=>'csrf']);

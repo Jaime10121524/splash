@@ -73,6 +73,7 @@ export default function FechamentosPeriodos({role='admin'}){
   const [link,setLink]=useState({child:'',boss:''})
   const [salesReviewed,setSalesReviewed]=useState(false)
   const [showAudit,setShowAudit]=useState(false)
+  const [cancelReason,setCancelReason]=useState('')
 
   const accounts=scope?.responsaveis||[]
   const selectable=accounts.filter(p=>p.pode_fechar)
@@ -115,7 +116,10 @@ export default function FechamentosPeriodos({role='admin'}){
     try{
       const result=await comercialPost(url,payload)
       setNotice(result.message)
-      if(after==='new'){
+      if(after==='cancel'){
+        setCurrent(null);setSalesReviewed(false);setShowAudit(false)
+        await fetchLists()
+      }else if(after==='new'){
         setSalesReviewed(false);setShowAudit(false)
         await fetchLists();await fetchDetail(result.id)
       }else if(after==='groups'){
@@ -208,6 +212,11 @@ export default function FechamentosPeriodos({role='admin'}){
       responsavel_pessoa_id:link.boss?Number(link.boss):null,
     },'groups')
   }
+  function saveCancel(e){
+    e.preventDefault()
+    if(cancelReason.trim().length<5)return setError('Informe o motivo do cancelamento.')
+    action('/api/fechamentos-periodos/'+current.id+'/cancelar',{motivo:cancelReason.trim()},'cancel')
+  }
   function printReport(){window.print()}
   const closeModal=()=>!busy&&setModal(null)
   const amountPaid=current?.resumo?.recebido_clube||'0.00'
@@ -269,13 +278,18 @@ export default function FechamentosPeriodos({role='admin'}){
             <span className="com-count">{groupedHistory.length} registros</span></div>
           <div className="fpw-history">{groupedHistory.length===0?<div className="com-empty">Nenhum fechamento encontrado.</div>:
             groupedHistory.map(x=><button className="fpw-history-row" type="button" key={x.id}
-              onClick={()=>view(x.id)}>
+              disabled={x.status==='CANCELADO'} onClick={()=>view(x.id)}>
               <span><strong>#{x.id} · {x.responsavel_nome}</strong>
                 <small>{dateBR(x.inicio)} a {dateBR(x.fim)}</small></span>
-              <span className={x.status==='CONCLUIDO'?'fpw-state done':'fpw-state'}>{x.status==='CONCLUIDO'?'Concluído':'Em andamento'}</span>
+              <span className={x.status==='CONCLUIDO'?'fpw-state done':'fpw-state'}>{x.status==='CONCLUIDO'?'Concluído':x.status==='CANCELADO'?'Cancelado':'Em andamento'}</span>
+              {x.cancelamento?.motivo&&<small>Motivo: {x.cancelamento.motivo}</small>}
             </button>)}</div>
         </section>
       </>:<>
+        {current.status!=='CONCLUIDO'&&<div className="fpw-head-actions">
+          <button type="button" className="vd-outline" disabled={busy}
+            onClick={()=>{setCancelReason('');setModal('cancelar')}}>Cancelar fechamento</button>
+        </div>}
         <div className="fpw-period-head">
           <div><h2>Fechamento #{current.id} — {current.responsavel_nome}</h2>
             <small>{dateBR(current.inicio)} a {dateBR(current.fim)} · {current.quantidade_vendas} venda(s)</small></div>
@@ -453,8 +467,19 @@ export default function FechamentosPeriodos({role='admin'}){
     {modal&&<SurfaceModal eyebrow="SPLASH / FECHAMENTOS"
       title={modal==='entrada'?'Recebimento do clube':modal==='abate'?'Abater empréstimo':
         modal==='pagamento'?'Pagamento ao participante':modal==='estorno'?'Estornar pagamento':
-        modal==='vinculos'?'Responsabilidade dos corretores':'Concluir fechamento'}
+        modal==='vinculos'?'Responsabilidade dos corretores':modal==='cancelar'?'Cancelar fechamento':'Concluir fechamento'}
       onClose={closeModal} busy={busy}>
+      {modal==='cancelar'&&<form className="fpw-modal-form" onSubmit={saveCancel}>
+        <p className="fpw-help">As vendas deste fechamento serão liberadas para um novo período. Cancelamentos não removem pagamentos realizados, por isso fechamentos com movimentações financeiras não podem ser cancelados diretamente.</p>
+        <label>Motivo do cancelamento *
+          <textarea required minLength={5} maxLength={500} rows={3} value={cancelReason}
+            onChange={e=>setCancelReason(e.target.value)} placeholder="Explique por que o fechamento foi cadastrado incorretamente."/>
+        </label>
+        <div className="fpw-actions">
+          <button type="button" className="vd-outline" onClick={closeModal}>Voltar</button>
+          <button type="submit" className="cm-button primary" disabled={busy}>Confirmar cancelamento</button>
+        </div>
+      </form>}
       {modal==='entrada'&&<form className="fpw-modal-form" onSubmit={saveEntry}>
         <label>De qual corretor é esta comissão? *
           <FormControl type="select" value={record.pessoa_id} onChange={v=>setRecord(s=>({...s,pessoa_id:v,valor:suggestedAmount(current?.corretores?.find(p=>String(p.pessoa_id)===v)?.a_receber_estimado)}))}
