@@ -65,7 +65,9 @@ final class NotificacoesController extends CommercialBaseController
             'ativo'=>1,'atualizado_em'=>date('Y-m-d H:i:s')];
         if($existing)$db->table('splash_push_dispositivos')->where('id',$existing['id'])->update($record);
         else $db->table('splash_push_dispositivos')->insert(['endpoint_hash'=>$hash,...$record]);
-        return $this->responseOK('Este celular receberá notificações quando o navegador permitir.');
+        $db->table('splash_notificacoes')->where('user_id',$u)
+            ->where('enviado_em',null)->update(['tentativas'=>0]);
+        return $this->responseOK('Navegador cadastrado. O envio dependerá das permissões e do serviço Push.');
     }
     public function removerDispositivo():ResponseInterface
     {
@@ -90,7 +92,9 @@ final class NotificacoesController extends CommercialBaseController
             'ativo'=>1,'atualizado_em'=>date('Y-m-d H:i:s')];
         if($current)$db->table('splash_push_nativo_dispositivos')->where('id',$current['id'])->update($save);
         else $db->table('splash_push_nativo_dispositivos')->insert(['token_hash'=>$hash,...$save]);
-        return $this->responseOK('Aplicativo Android registrado para seus avisos.');
+        $db->table('splash_notificacoes')->where('user_id',$uid)
+            ->where('enviado_em',null)->update(['tentativas'=>0]);
+        return $this->responseOK('Aplicativo Android registrado. O envio dependerá do Firebase.');
     }
 
     public function removerNativo():ResponseInterface

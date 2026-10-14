@@ -35,8 +35,12 @@ final class EnvioPushSplash
                 $subscriptions=$db->table('splash_push_dispositivos')
                     ->where('user_id',(int)$notice['user_id'])->where('ativo',1)
                     ->limit(8)->get()->getResultArray();
-                if(!$subscriptions && !$nativeAvailable)continue;
-                $success=$nativeAvailable?EnvioPushNativoSplash::enviar($notice):0;
+                $hasNative=$nativeAvailable && $db->table('splash_push_nativo_dispositivos')
+                    ->where('user_id',(int)$notice['user_id'])->where('ativo',1)
+                    ->countAllResults()>0;
+                // Sem aparelho cadastrado não constitui falha de envio.
+                if(!$subscriptions && !$hasNative)continue;
+                $success=$hasNative?EnvioPushNativoSplash::enviar($notice):0;
                 foreach(($webAvailable?$subscriptions:[]) as $sub){
                     try{
                         $data=json_decode((string)$sub['assinatura_json'],true,512,JSON_THROW_ON_ERROR);

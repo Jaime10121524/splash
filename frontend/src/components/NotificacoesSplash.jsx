@@ -75,7 +75,7 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
     try{
      await comercialPost('/api/notificacoes/nativo',{token:result.value,plataforma:'android'})
      localStorage.setItem('splash_android_push_token',result.value)
-     setNotice('Notificações Android ativadas para sua conta.')
+     setNotice('Android cadastrado. Para receber avisos, mantenha as notificações permitidas nas configurações do sistema.')
     }catch(e){setError(e.message)}
    })
    await PushNotifications.addListener('registrationError',err=>setError(err.error||'Falha no cadastro FCM.'))
@@ -112,7 +112,7 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
       userVisibleOnly:true,applicationServerKey:decodeKey(data.vapid_publica),
     })
     await comercialPost('/api/notificacoes/dispositivos',{assinatura:sub.toJSON()})
-    setNotice('Celular vinculado. Você receberá notificações do SPLASH, inclusive com o aplicativo fechado, conforme as regras do sistema operacional.')
+    setNotice('Navegador cadastrado para Web Push. A entrega depende das permissões do sistema e da hospedagem.')
     refresh()
   }catch(e){setError(e.message)}
   finally{setBusy(false)}
