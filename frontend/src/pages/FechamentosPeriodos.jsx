@@ -229,7 +229,7 @@ export default function FechamentosPeriodos({role='admin'}){
         <p>Concilie o dinheiro recebido pelo responsável do grupo, sem transferir a titularidade das comissões. Depois registre os pagamentos efetivamente realizados.</p>
       </div>
       <div className="fpw-head-actions">
-        {admin&&<button className="vd-outline" type="button" onClick={()=>setModal('vinculos')}>Responsabilidades</button>}
+        {admin&&<small className="fpw-help">Responsáveis financeiros são definidos no cadastro de Pessoas.</small>}
         {current&&<button className="vd-outline" type="button" onClick={()=>{setCurrent(null);setSalesReviewed(false);setShowAudit(false)}}>Voltar ao histórico</button>}
       </div>
     </header>

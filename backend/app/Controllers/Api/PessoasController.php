@@ -31,6 +31,9 @@ class PessoasController extends BaseController
         $db = db_connect();
         $pessoas = $db->table('pessoas')->orderBy('nome','ASC')->get()->getResultArray();
         $rows = $db->table('pessoa_papeis')->get()->getResultArray();
+        $responsabilidades=[];
+        foreach($db->table('fechamento_responsabilidades')->get()->getResultArray() as $rel)
+            $responsabilidades[(int)$rel['corretor_pessoa_id']]=(int)$rel['responsavel_pessoa_id'];
         $roleMap = [];
         foreach ($rows as $role) $roleMap[(int)$role['pessoa_id']][] = $role['papel'];
 
@@ -39,6 +42,7 @@ class PessoasController extends BaseController
             $pessoa['user_id'] = $pessoa['user_id'] === null ? null : (int)$pessoa['user_id'];
             $pessoa['ativo'] = (bool)$pessoa['ativo'];
             $pessoa['papeis'] = $roleMap[$pessoa['id']] ?? [];
+            $pessoa['responsavel_pessoa_id'] = $responsabilidades[$pessoa['id']]??null;
         }
         unset($pessoa);
 
@@ -58,14 +62,20 @@ class PessoasController extends BaseController
         try {
             $now = date('Y-m-d H:i:s');
             $roles = $clean['papeis'];
-            unset($clean['papeis']);
+            $boss=$clean['responsavel_pessoa_id'];
+            unset($clean['papeis'],$clean['responsavel_pessoa_id']);
             $db->table('pessoas')->insert([...$clean, 'criado_em'=>$now]);
             $id = (int)$db->insertID();
             if ($id < 1) throw new \RuntimeException('Pessoa não inserida.');
             $this->saveRoles($db, $id, $roles);
+            $this->saveResponsibility($db,$id,$boss);
+            $clean['responsavel_pessoa_id']=$boss;
             $this->audit($db, $id, 'CRIAR', null, [...$clean,'papeis'=>$roles]);
             $this->commit($db);
             return $this->ok('Pessoa cadastrada.', 201);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->error(409,$e->getMessage());
         } catch (Throwable $e) {
             $db->transRollback();
             return $this->unexpected($e);
@@ -88,10 +98,14 @@ class PessoasController extends BaseController
                 $db->transRollback();
                 return $this->error(404, 'Pessoa não encontrada.');
             }
+            $currentLink=$db->table('fechamento_responsabilidades')
+                ->select('responsavel_pessoa_id')->where('corretor_pessoa_id',$personId)->get()->getRowArray();
+            $old['responsavel_pessoa_id']=$currentLink?(int)$currentLink['responsavel_pessoa_id']:null;
             $old['papeis'] = array_column($db->table('pessoa_papeis')
                 ->where('pessoa_id',$personId)->get()->getResultArray(), 'papel');
             $roles = $clean['papeis'];
-            unset($clean['papeis']);
+            $boss=$clean['responsavel_pessoa_id'];
+            unset($clean['papeis'],$clean['responsavel_pessoa_id']);
 
             $user = null;
             // Não permitir inativar o administrador logado.
@@ -114,12 +128,17 @@ class PessoasController extends BaseController
             $db->table('pessoas')->where('id',$personId)
                 ->update([...$clean, 'atualizado_em'=>date('Y-m-d H:i:s')]);
             $this->saveRoles($db, $personId, $roles);
+            $this->saveResponsibility($db,$personId,$boss);
+            $clean['responsavel_pessoa_id']=$boss;
             if ($user && $clean['ativo'] === 0) {
                 $user->ban('Pessoa inativada pelo administrador SPLASH.');
             }
             $this->audit($db,$personId,'EDITAR',$old,[...$clean,'papeis'=>$roles]);
             $this->commit($db);
             return $this->ok('Pessoa atualizada. Se inativada, o acesso vinculado também foi desativado.');
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->error(409,$e->getMessage());
         } catch (Throwable $e) {
             $db->transRollback();
             return $this->unexpected($e);
@@ -133,6 +152,10 @@ class PessoasController extends BaseController
         $phone = preg_replace('/\\D+/', '', (string)($data['telefone'] ?? ''));
         $note = trim((string)($data['observacoes'] ?? ''));
         $roles = $data['papeis'] ?? null;
+        $rawBoss=$data['responsavel_pessoa_id']??null;
+        $boss=$rawBoss===null||$rawBoss===''?null:
+            filter_var($rawBoss,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        if($boss===false)return ['error'=>'Responsável financeiro inválido.'];
         if ($name === '' || mb_strlen($name)>160) return ['error'=>'Informe o nome (até 160 caracteres).'];
         if ($email !== '' && (strlen($email)>254 || !filter_var($email,FILTER_VALIDATE_EMAIL))) {
             return ['error'=>'E-mail inválido.'];
@@ -143,17 +166,54 @@ class PessoasController extends BaseController
         if (!is_array($roles) || count($roles)<1 || count($roles)>4
             || count(array_filter($roles,'is_string'))!==count($roles)
             || count($roles)!==count(array_unique($roles))
-            || array_diff($roles, ['corretor','vendedor','gerente'])!==[]) {
+            || array_diff($roles, ['corretor','vendedor','gerente','operador'])!==[]) {
             return ['error'=>'Marque pelo menos um papel válido: corretor, vendedor, gerente ou operador.'];
         }
+        if($boss!==null && !in_array('corretor',$roles,true))
+            return ['error'=>'A responsabilidade financeira se aplica somente à função Corretor.'];
         if (!array_key_exists('ativo',$data) || !is_bool($data['ativo'])) {
             return ['error'=>'Informe a situação da pessoa.'];
         }
         return [
             'nome'=>$name, 'email'=>$email ?: null,
             'telefone'=>$phone ?: null, 'observacoes'=>$note ?: null,
-            'papeis'=>array_values($roles),'ativo'=>$data['ativo'] ? 1 : 0,
+            'papeis'=>array_values($roles),'responsavel_pessoa_id'=>$boss,
+            'ativo'=>$data['ativo'] ? 1 : 0,
         ];
+    }
+
+    /**
+     * Relacionamento financeiro cadastrado na pessoa (sem alterar a titularidade).
+     * Impede circularidade, grupos em cascata e mudanças com fechamento aberto.
+     */
+    private function saveResponsibility($db,int $child,?int $boss):void
+    {
+        $row=$db->table('fechamento_responsabilidades')
+            ->where('corretor_pessoa_id',$child)->get()->getRowArray();
+        $previous=$row?(int)$row['responsavel_pessoa_id']:null;
+        if($previous===$boss)return;
+        if($boss!==null){
+            if($boss===$child)throw new \DomainException('Uma pessoa não pode ser responsável por si mesma.');
+            $manager=$db->table('pessoas')->where('id',$boss)->where('ativo',1)->get()->getRowArray();
+            if(!$manager || !$db->table('pessoa_papeis')->where('pessoa_id',$boss)
+                ->where('papel','corretor')->countAllResults())
+                throw new \DomainException('O responsável financeiro deve ser um corretor ativo.');
+            if($db->table('fechamento_responsabilidades')->where('corretor_pessoa_id',$boss)->countAllResults()
+                || $db->table('fechamento_responsabilidades')->where('responsavel_pessoa_id',$child)->countAllResults())
+                throw new \DomainException('Não é permitida responsabilidade financeira em cascata.');
+        }
+        if($db->table('fechamento_periodos p')->join('fechamento_periodo_pessoas fp',
+            'fp.fechamento_id=p.id')->where('fp.pessoa_id',$child)
+            ->whereIn('p.status',['RECEBIMENTOS','REPASSES'])->countAllResults()
+            || ($boss!==null && $db->table('fechamento_periodos')
+                ->where('responsavel_pessoa_id',$boss)
+                ->whereIn('status',['RECEBIMENTOS','REPASSES'])->countAllResults()))
+            throw new \DomainException('Conclua ou cancele o fechamento aberto antes de alterar o responsável.');
+        $db->table('fechamento_responsabilidades')->where('corretor_pessoa_id',$child)->delete();
+        if($boss!==null)$db->table('fechamento_responsabilidades')->insert([
+            'corretor_pessoa_id'=>$child,'responsavel_pessoa_id'=>$boss,
+            'criado_em'=>date('Y-m-d H:i:s'),
+        ]);
     }
 
     private function saveRoles($db,int $id,array $roles): void

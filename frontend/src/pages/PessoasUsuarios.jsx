@@ -11,7 +11,7 @@ const papelOptions = [
   { value:'operador', label:'Operador de atendimentos' },
 ]
 const userRoles = papelOptions
-const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],ativo:true})
+const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],responsavel_pessoa_id:'',ativo:true})
 const emptyLogin = () => ({username:'',email:'',password:'',group:'corretor'})
 
 // Todas as rotas passam pelo mesmo cliente HTTP usado no app e no navegador.
@@ -92,7 +92,8 @@ export default function PessoasUsuarios({tab='pessoas'}) {
   function newPerson(person=null){
     setPersonForm(person?{
       nome:person.nome,telefone:person.telefone||'',email:person.email||'',
-      observacoes:person.observacoes||'',papeis:[...person.papeis],ativo:!!person.ativo,
+      observacoes:person.observacoes||'',papeis:[...person.papeis],
+       responsavel_pessoa_id:person.responsavel_pessoa_id?String(person.responsavel_pessoa_id):'',ativo:!!person.ativo,
     }:emptyPerson())
     setFormError('')
     setModal({kind:'person',person})
@@ -216,7 +217,10 @@ export default function PessoasUsuarios({tab='pessoas'}) {
             return <article className="pu-entry" key={p.id}>
               <div className="pu-avatar">{initials(p.nome)}</div>
               <div className="pu-entry-main"><strong>{p.nome}</strong><small>{formatPhone(p.telefone)||p.email||'Sem contato informado'}</small>
-                <div className="pu-tags">{p.papeis.map(role=><Tag key={role} value={role}/>)}</div></div>
+                <div className="pu-tags">{p.papeis.map(role=><Tag key={role} value={role}/>)}</div>
+                {p.papeis.includes('corretor')&&<small>{p.responsavel_pessoa_id
+                  ?'Recebimento pelo responsável: '+(persons.find(x=>x.id===p.responsavel_pessoa_id)?.nome||'Pessoa #'+p.responsavel_pessoa_id)
+                  :'Independente — recebe do clube diretamente'}</small>}</div>
               <div className="pu-entry-status"><Status active={p.ativo}/><small>{account?'@'+account.username:'Sem acesso'}</small></div>
               <div className="pu-entry-actions">
                 <button type="button" className="pu-secondary" onClick={()=>newPerson(p)}>Editar</button>
@@ -266,6 +270,16 @@ export default function PessoasUsuarios({tab='pessoas'}) {
         <div className="pu-form-label">Funções <em>*</em></div>
         <div className="pu-role-choices">{papelOptions.map(role=><label key={role.value}><input type="checkbox"
           checked={personForm.papeis.includes(role.value)} onChange={()=>toggleRole(role.value)}/>{role.label}</label>)}</div>
+        {personForm.papeis.includes('corretor')&&<label>
+          <span className="field-caption">Responsável pelo recebimento do clube e pelos repasses</span>
+          <FormControl type="select" value={personForm.responsavel_pessoa_id||''}
+            onChange={value=>setPersonForm(f=>({...f,responsavel_pessoa_id:value}))}
+            options={[{value:'',label:'Independente — recebe diretamente do clube'},
+              ...persons.filter(p=>p.ativo&&p.papeis.includes('corretor')&&p.id!==modal.person?.id)
+                .map(p=>({value:String(p.id),label:p.nome}))]}
+            ariaLabel="Responsável financeiro"/>
+          <small>Exemplo: nas vendas da Marta, o responsável recebe o dinheiro do clube e depois paga a comissão dela. A comissão continua pertencendo à Marta.</small>
+        </label>}
         <label>Observações<textarea rows="3" maxLength={3000} value={personForm.observacoes}
           onChange={e=>setPersonForm(f=>({...f,observacoes:e.target.value}))} placeholder="Informações adicionais (opcional)"/></label>
         <label className="pu-switch"><span><strong>Ativo</strong><small>Inativar uma pessoa também bloqueia seu acesso, se houver.</small></span>
