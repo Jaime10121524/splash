@@ -59,13 +59,13 @@ class AuthGroups extends ShieldAuthGroups
             'sales.*', 'finance.*', 'expenses.*', 'closings.*', 'reports.*',
         ],
         'corretor' => [
-            'sales.own', 'finance.own', 'expenses.own', 'reports.own',
+            'visits.manage', 'clients.manage', 'sales.own', 'finance.own', 'expenses.own', 'reports.own',
         ],
         'vendedor' => [
             'sales.own', 'finance.own', 'reports.own',
         ],
         'gerente' => [
-            'sales.own', 'finance.own', 'reports.own',
+            'visits.manage', 'clients.manage', 'sales.own', 'finance.own', 'reports.own',
         ],
         'operador' => ['visits.manage', 'clients.manage'],
         'restrito' => [],

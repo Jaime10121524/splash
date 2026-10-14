@@ -28,10 +28,22 @@ abstract class CommercialBaseController extends BaseController
     {
         $user = auth('session')->user();
         if ($user === null || $user->isBanned()) return $this->errorResponse(401, 'Faça login novamente.');
-        if (!$user->inGroup('admin') && (!$user->inGroup('operador') || !$user->can('visits.manage') || !$user->can('clients.manage'))) {
-            return $this->errorResponse(403, 'Apenas administrador ou operador de atendimentos.');
+        if (!$user->inGroup('admin') && ((!$user->inGroup('operador') && !$user->inGroup('gerente') && !$user->inGroup('corretor')) || !$user->can('visits.manage') || !$user->can('clients.manage'))) {
+            return $this->errorResponse(403, 'Seu perfil não possui permissão para atendimentos.');
         }
+        if ($this->visitorScopeId() === 0) return $this->errorResponse(403,'Conta sem pessoa ativa vinculada.');
         return null;
+    }
+
+    // Corretores com autonomia veem suas visitas. Admin, operador e gestor gerenciam a operação.
+    protected function visitorScopeId(): ?int
+    {
+        $user=auth('session')->user();
+        if (!$user || !$user->inGroup('corretor') || $user->inGroup('admin')
+            || $user->inGroup('operador') || $user->inGroup('gerente')) return null;
+        $person=db_connect()->table('pessoas')->select('id')->where('user_id',(int)$user->id)
+            ->where('ativo',1)->get()->getRowArray();
+        return $person?(int)$person['id']:0;
     }
 
     protected function jsonPayload(): array

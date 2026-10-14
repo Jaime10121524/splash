@@ -61,6 +61,7 @@ final class VisitasAvisos
                 'RETOMADA'=>'Atendimento retomado','CORRETORES'=>'Corretores atualizados',
                 'VENDA'=>'Visita concluída com venda','PENDENCIA'=>'Visita concluída com pendência',
                 'RETORNO'=>'Retorno agendado','SEM_VENDA'=>'Visita sem venda',
+                'CANCELADA'=>'Visita cancelada',
             ];
             $title=($labels[$evento]??'Visita atualizada').' · #'.$visitaId;
             $message=match($evento){
@@ -71,6 +72,7 @@ final class VisitasAvisos
                 'CORRETORES'=>'Houve mudança dos corretores vinculados ao atendimento.',
                 'INICIADO'=>'O atendimento foi iniciado.',
                 'RETOMADA'=>'O atendimento foi retomado.',
+                'CANCELADA'=>'Este registro de visita foi cancelado.',
                 default=>'Um novo atendimento foi registrado.',
             };
             // Somente status operacional e motivo comercial; nunca nome, telefone ou CPF.

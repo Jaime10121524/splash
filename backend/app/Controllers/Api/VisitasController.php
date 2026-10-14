@@ -27,12 +27,17 @@ class VisitasController extends CommercialBaseController
         if ($dayEnd!==null && !$this->validateDate($dayEnd))return $this->errorResponse(422,'Data final inválida.');
         if ($dayStart && $dayEnd && $dayEnd<$dayStart) return $this->errorResponse(422,'Período inválido.');
         $filterStatus=(string)($this->request->getGet('status')??'');
-        if($filterStatus!=='' && !in_array($filterStatus,['AGUARDANDO','ATENDENDO',...self::FINAL_STATES],true)){
+        if($filterStatus!=='' && !in_array($filterStatus,['AGUARDANDO','ATENDENDO','CANCELADA',...self::FINAL_STATES],true)){
             return $this->errorResponse(422,'Status inválido.');
         }
         $db=db_connect();
-        $build=static function() use($db,$dayStart,$dayEnd,$filterStatus) {
+        $scope=$this->visitorScopeId();
+        $userId=(int)auth('session')->user()->id;
+        $build=static function() use($db,$dayStart,$dayEnd,$filterStatus,$scope,$userId) {
             $builder=$db->table('visitas v');
+            if($scope!==null)$builder->groupStart()->where('v.corretor_pessoa_id',$scope)
+                ->orWhere('v.segundo_corretor_pessoa_id',$scope)
+                ->orWhere('v.criado_por_usuario_id',$userId)->groupEnd();
             if($dayStart) $builder->where('v.chegada_em >=',$dayStart.' 00:00:00');
             if($dayEnd) $builder->where('v.chegada_em <=',$dayEnd.' 23:59:59');
             if($filterStatus!=='')$builder->where('v.status',$filterStatus);
@@ -47,6 +52,7 @@ class VisitasController extends CommercialBaseController
             SUM(CASE WHEN v.status='VENDA' THEN 1 ELSE 0 END) AS venda,
             SUM(CASE WHEN v.status='RETORNO' THEN 1 ELSE 0 END) AS retorno,
             SUM(CASE WHEN v.status='SEM_VENDA' THEN 1 ELSE 0 END) AS sem_venda,
+            SUM(CASE WHEN v.status='CANCELADA' THEN 1 ELSE 0 END) AS canceladas,
             AVG((SELECT SUM(TIMESTAMPDIFF(SECOND,s.inicio_em,s.fim_em)) FROM visita_sessoes s WHERE s.visita_id=v.id AND s.fim_em IS NOT NULL)) AS media_segundos,
             MIN((SELECT SUM(TIMESTAMPDIFF(SECOND,s.inicio_em,s.fim_em)) FROM visita_sessoes s WHERE s.visita_id=v.id AND s.fim_em IS NOT NULL)) AS mais_rapido_segundos,
             MAX((SELECT SUM(TIMESTAMPDIFF(SECOND,s.inicio_em,s.fim_em)) FROM visita_sessoes s WHERE s.visita_id=v.id AND s.fim_em IS NOT NULL)) AS mais_demorado_segundos
@@ -83,6 +89,7 @@ class VisitasController extends CommercialBaseController
                 'venda'=>(int)($stats['venda']??0),
                 'retorno'=>(int)($stats['retorno']??0),
                 'sem_venda'=>(int)($stats['sem_venda']??0),
+                'canceladas'=>(int)($stats['canceladas']??0),
                 'media_segundos'=>isset($stats['media_segundos'])?round((float)$stats['media_segundos']):null,
                 'mais_rapido_segundos'=>isset($stats['mais_rapido_segundos'])?(int)$stats['mais_rapido_segundos']:null,
                 'mais_demorado_segundos'=>isset($stats['mais_demorado_segundos'])?(int)$stats['mais_demorado_segundos']:null,
@@ -110,10 +117,15 @@ class VisitasController extends CommercialBaseController
                     $db->transRollback();
                     return $this->errorResponse(422,'Escolha um cliente ou informe os dados da chegada.');
                 }
+                $scope=$this->visitorScopeId();
+                if($scope!==null)$fresh['dono_corrente_pessoa_id']=$scope;
                 $clean=ClienteRules::validate($db,[...$fresh,'ativo'=>true]);
                 if(isset($clean['error'])){
                     $db->transRollback();
                     return $this->errorResponse(422,$clean['error']);
+                }
+                if($scope!==null && (int)$clean['dono_corrente_pessoa_id']!==$scope){
+                    $db->transRollback();return $this->errorResponse(403,'O cliente indicado pertence a outra corrente.');
                 }
                 $now=$this->nowLocal();
                 $db->table('clientes')->insert([
@@ -203,6 +215,9 @@ class VisitasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(404,'Visita não encontrada.');
             }
+            if(!$this->podeOperarVisita($visit)){
+                $db->transRollback();return $this->errorResponse(403,'Não é permitido alterar a visita de outro corretor.');
+            }
             if($visit['status']!=='AGUARDANDO'){
                 $db->transRollback();
                 return $this->errorResponse(409,'A visita não está aguardando atendimento.');
@@ -278,6 +293,9 @@ class VisitasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(404,'Visita não encontrada.');
             }
+            if(!$this->podeOperarVisita($visit)){
+                $db->transRollback();return $this->errorResponse(403,'Não é permitido alterar a visita de outro corretor.');
+            }
             if($visit['status']!=='ATENDENDO'){
                 $db->transRollback();
                 return $this->errorResponse(409,'Somente um atendimento iniciado pode ser finalizado.');
@@ -334,6 +352,9 @@ class VisitasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(404,'Atendimento não encontrado.');
             }
+            if(!$this->podeOperarVisita($visit)){
+                $db->transRollback();return $this->errorResponse(403,'Não é permitido alterar a visita de outro corretor.');
+            }
             $this->saveBrokers($db,$visit,$brokers,$this->nowLocal());
             $this->commitOrFail($db);
             \App\Libraries\VisitasAvisos::registrar((int)$id,'CORRETORES');
@@ -360,6 +381,9 @@ class VisitasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(404,'Atendimento não encontrado.');
             }
+            if(!$this->podeOperarVisita($visit)){
+                $db->transRollback();return $this->errorResponse(403,'Não é permitido alterar a visita de outro corretor.');
+            }
             $now=$this->nowLocal();
             if(substr($visit['chegada_em'],0,10)!==substr($now,0,10)
                 || !in_array($visit['status'],['RETORNO','SEM_VENDA','PENDENCIA'],true)){
@@ -383,6 +407,53 @@ class VisitasController extends CommercialBaseController
         }
     }
 
+    private function podeOperarVisita(array $visit):bool
+    {
+        $scope=$this->visitorScopeId();
+        if($scope===null)return true;
+        return $scope>0 && (
+            (int)($visit['corretor_pessoa_id']??0)===$scope ||
+            (int)($visit['segundo_corretor_pessoa_id']??0)===$scope ||
+            (int)($visit['criado_por_usuario_id']??0)===(int)auth('session')->user()->id
+        );
+    }
+
+    public function cancelar(int|string $id): ResponseInterface
+    {
+        if($denied=$this->authorizeOperations())return $denied;
+        $reason=$this->cleanText($this->jsonPayload()['motivo']??null,300,true);
+        if($reason===false || mb_strlen((string)$reason)<5)
+            return $this->errorResponse(422,'Informe motivo do cancelamento com cinco caracteres ou mais.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $visit=$db->query('SELECT * FROM visitas WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$visit){$db->transRollback();return $this->errorResponse(404,'Visita não encontrada.');}
+            if(!$this->podeOperarVisita($visit)){
+                $db->transRollback();return $this->errorResponse(403,'Visita de outro corretor.');
+            }
+            if($visit['status']==='CANCELADA'){
+                $db->transRollback();return $this->errorResponse(409,'Visita já cancelada.');
+            }
+            if($db->table('venda_operacoes')->where('visita_id',(int)$id)->countAllResults()){
+                $db->transRollback();return $this->errorResponse(409,
+                    'Existe operação financeira vinculada. Regularize-a antes de cancelar a visita.');
+            }
+            $now=$this->nowLocal();
+            $db->table('visita_sessoes')->where('visita_id',(int)$id)
+                ->where('fim_em',null)->update(['fim_em'=>$now]);
+            $old=trim((string)($visit['observacoes']??''));
+            $log='[Cancelada em '.$now.' por usuário '.(int)auth('session')->user()->id.'] '.$reason;
+            $db->table('visitas')->where('id',(int)$id)->update([
+                'status'=>'CANCELADA','fim_em'=>$now,'retorno_previsto'=>null,
+                'observacoes'=>trim($old."\n".$log),'atualizado_em'=>$now,
+            ]);
+            $this->logStatus($db,(int)$id,(string)$visit['status'],'CANCELADA',$now);
+            $this->commitOrFail($db);
+            \App\Libraries\VisitasAvisos::registrar((int)$id,'CANCELADA');
+            return $this->responseOK('Visita cancelada; histórico mantido.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'cancelamento de visita');}
+    }
+
     private function validateBrokers(array $input,$db): array
     {
         $primary=$this->optionalId($input['corretor_pessoa_id']??null);
@@ -397,6 +468,10 @@ class VisitasController extends CommercialBaseController
             if(!$person || !(bool)$person['ativo'] || !$role){
                 return ['error'=>'Selecione corretores ativos e cadastrados com a função Corretor.'];
             }
+        }
+        $scope=$this->visitorScopeId();
+        if($scope!==null && $primary!==$scope && $secondary!==$scope){
+            return ['error'=>'Corretor só pode registrar uma visita em que participa.'];
         }
         return ['corretor_pessoa_id'=>$primary,'segundo_corretor_pessoa_id'=>$secondary];
     }

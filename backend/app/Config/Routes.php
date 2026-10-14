@@ -53,6 +53,7 @@ $routes->group('api', static function ($routes): void {
     $routes->post('atendimentos/(:num)/iniciar', 'Api\VisitasController::iniciar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/finalizar', 'Api\VisitasController::finalizar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/retomar', 'Api\VisitasController::retomar/$1', ['filter'=>'csrf']);
+    $routes->post('atendimentos/(:num)/cancelar', 'Api\VisitasController::cancelar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/corretores', 'Api\VisitasController::corretores/$1', ['filter'=>'csrf']);
 
     // Carteira de títulos: renovação / upgrade geram nova venda vinculada.
