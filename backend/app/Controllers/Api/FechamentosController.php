@@ -182,11 +182,9 @@ class FechamentosController extends CommercialBaseController
         // pagamentos, inclusive os das vendas de corretores vinculados.
         // A obrigação original permanece associada à venda do corretor.
         $responsaveis=[];
-        if($includeOutgoing){
-            foreach($db->table('fechamento_responsabilidades')
-                ->select('corretor_pessoa_id,responsavel_pessoa_id')->get()->getResultArray() as $rel){
-                $responsaveis[(int)$rel['corretor_pessoa_id']]=(int)$rel['responsavel_pessoa_id'];
-            }
+        foreach($db->table('fechamento_responsabilidades')
+            ->select('corretor_pessoa_id,responsavel_pessoa_id')->get()->getResultArray() as $rel){
+            $responsaveis[(int)$rel['corretor_pessoa_id']]=(int)$rel['responsavel_pessoa_id'];
         }
         $add=function(int $personId,string $name,array $line) use(&$accounts,$onlyPersonId,$admin,$personName){
             if($onlyPersonId!==null && $personId!==$onlyPersonId)return;
@@ -218,6 +216,8 @@ class FechamentosController extends CommercialBaseController
             $key=(int)$op['id'];
             $paidOwner=$ownerByOperation[$key]['saldo']??0;
             $sourceLabel='Corretor principal — parte própria';
+            $recebedorOperacional=$responsaveis[$root]??$root;
+            $recebedorNome=$personName[$recebedorOperacional]??'Responsável financeiro';
             $meta=[
                 'operacao_id'=>$key,
                 'visita_id'=>$op['visita_id']===null?null:(int)$op['visita_id'],
@@ -228,7 +228,9 @@ class FechamentosController extends CommercialBaseController
             ];
             $add($root,(string)($op['corretor_nome']??'Corretor'),[
                 ...$meta,'tipo'=>'TITULAR','rateio_id'=>null,
-                'descricao'=>$sourceLabel,'pagador'=>'Clube / acerto do responsável',
+                'descricao'=>$sourceLabel,
+                'pagador'=>$admin?'Clube → '.$recebedorNome:
+                    ($recebedorOperacional===$root?'Clube':'Clube → responsável financeiro'),
                 'total_centavos'=>$rootTotal,'pago_centavos'=>$paidOwner,
                 'abatido_centavos'=>$abated($ownerByOperation[$key]['movimentos']??[]),
                 'movimentos'=>array_map(static function($m) use($admin,$paymentMethods){ return [
@@ -250,7 +252,9 @@ class FechamentosController extends CommercialBaseController
                         'ATENDENTE'=>'Atendimento','CORRETOR'=>'Divisão com corretor',
                         'GERENTE'=>'Gerência',default=>'Participação',
                     },
-                    'pagador'=>$admin?$a['origem_nome']:'Corretor responsável',
+                    'pagador'=>$admin
+                         ?($personName[$responsaveis[(int)$a['responsavel_pessoa_id']]??(int)$a['responsavel_pessoa_id']]??$a['origem_nome'])
+                         :'Responsável financeiro',
                     'total_centavos'=>$outstanding,'pago_centavos'=>$paid,
                     'abatido_centavos'=>$abated($history[(int)$a['id']]??[]),
                     'movimentos'=>array_map(static function($m) use($admin,$paymentMethods){ return [
