@@ -8,6 +8,7 @@ on:
       - '.github/workflows/android-apk.yml'
       - 'frontend/scripts/android/MainActivity.java'
       - 'frontend/src/**'
+      - 'frontend/capacitor.config.ts'
       - 'frontend/index.html'
 
 permissions:
