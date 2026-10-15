@@ -5,6 +5,10 @@
 .com-heading p{font-size:12px;color:var(--muted-dark);line-height:1.6}
 .com-main-button{flex-shrink:0;background:var(--brand);color:#fff;border:0;border-radius:12px;min-height:43px;padding:11px 18px;font:inherit;font-size:12px;font-weight:800;box-shadow:0 8px 21px rgba(120,97,249,.15)}
 .com-main-button:hover{background:var(--brand-dark)}
+.com-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.com-refresh-button{flex-shrink:0;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text);min-height:43px;padding:10px 15px;font:inherit;font-size:11px;font-weight:800}
+.com-refresh-button:hover:not(:disabled){color:var(--brand);border-color:var(--brand)}
+.com-refresh-button:disabled{opacity:.65;cursor:wait}
 .com-panel{overflow:hidden;border-radius:18px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow)}
 .com-panel-head{padding:23px 24px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .com-panel-head h2{font-size:16px;font-weight:800;margin:0 0 5px}
@@ -83,6 +87,9 @@
 @media(max-width:700px){
 .com-page{gap:12px}.com-heading{align-items:flex-start}.com-heading h1{font-size:26px}.com-heading p{font-size:11px}
 .com-main-button{padding:10px 12px;min-height:38px;font-size:10px}
+.com-heading-with-actions{flex-wrap:wrap}
+.com-heading-with-actions .com-header-actions{width:100%;gap:6px}
+.com-refresh-button{min-height:38px;padding:8px 10px;font-size:10px}
 .com-panel{border-radius:16px}.com-panel-head{padding:18px 15px 12px}.com-panel-head h2{font-size:14px}.com-panel-head p{font-size:10px}
 .com-count{font-size:9px}.com-toolbar,.com-filters{padding:0 15px 15px;gap:9px}
 .com-client,.com-visit,.com-config-entry{padding:14px 13px;gap:9px}

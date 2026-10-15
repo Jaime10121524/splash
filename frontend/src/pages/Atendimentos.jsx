@@ -81,6 +81,15 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
     const body=await comercialGet('/api/atendimentos?'+params.toString())
     setVisits(body.visitas||[]);setStats(body.indicadores||initialStats)
   }
+  async function atualizarAtendimentos(){
+    if(loading)return
+    setLoading(true)
+    try{
+      await Promise.all([reload(),comercialGet('/api/comercial/opcoes').then(setCatalogs)])
+      setError('')
+    }catch(e){setError(e.message)}
+    finally{setLoading(false)}
+  }
   function openArrival(client=null,visit=null){
     setMode('existing');setSelectedClient(client)
     setBroker(visit?.corretor_pessoa_id?String(visit.corretor_pessoa_id):(catalogs.pessoa_logada?String(catalogs.pessoa_logada):''))
@@ -161,10 +170,15 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
   ]
 
   return <div className="com-page">
-    <header className="com-heading"><div><span className="com-eyebrow">OPERAÇÃO / VISITAS</span>
+    <header className="com-heading com-heading-with-actions"><div><span className="com-eyebrow">OPERAÇÃO / VISITAS</span>
       <h1>Atendimentos</h1>
       <p>Da chegada ao resultado, com registro automático dos horários.</p></div>
-      <button className="com-main-button" type="button" onClick={()=>openArrival()}>＋ Registrar chegada</button>
+      <div className="com-header-actions">
+        <button className="com-refresh-button" type="button" onClick={atualizarAtendimentos} disabled={loading}>
+          {loading?'Atualizando...':'↻ Atualizar'}
+        </button>
+        <button className="com-main-button" type="button" onClick={()=>openArrival()}>＋ Registrar chegada</button>
+      </div>
     </header>
     {notice&&<div className="com-alert success" role="status">{notice}<button type="button" onClick={()=>setNotice('')}>Fechar</button></div>}
     {error&&<div className="com-alert error" role="alert">{error}<button type="button" onClick={()=>{setError('');reload().catch(e=>setError(e.message))}}>Tentar novamente</button></div>}

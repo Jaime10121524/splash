@@ -170,6 +170,15 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     await loadList()
     await loadOptions()
   }
+  async function atualizarVendas(){
+    if(loading)return
+    setLoading(true)
+    try{
+      await Promise.all([loadList(),loadOptions()])
+      setError('')
+    }catch(e){setError(e.message)}
+    finally{setLoading(false)}
+  }
   async function saveSale(event) {
     event.preventDefault()
     setFormError('')
@@ -331,6 +340,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       <p>{tab==='pendencias'?'Negociações com pagamentos e retorno, antes da emissão do título.':'Títulos vendidos, recebimentos, saldos e histórico preservado.'}</p>
     </div>
       <div className="vd-header-actions">
+        <button className="vd-outline" type="button" onClick={atualizarVendas} disabled={loading}
+          aria-label={tab==='pendencias'?'Atualizar pendências':'Atualizar vendas'}>
+          {loading?'Atualizando...':'↻ Atualizar'}
+        </button>
         <button className="vd-outline" type="button" onClick={()=>{setFormError('');setDialog({type:'settings'})}}>Configurações</button>
         <button className="com-main-button" type="button" onClick={()=>openNew()}>＋ {tab==='pendencias'?'Nova pendência':'Nova venda'}</button>
       </div>
