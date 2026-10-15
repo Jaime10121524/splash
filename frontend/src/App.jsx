@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import Planos from './pages/Planos.jsx'
 import PessoasUsuarios from './pages/PessoasUsuarios.jsx'
@@ -16,7 +16,8 @@ import MeuPerfil from './pages/MeuPerfil.jsx'
 import AlertasComerciais from './pages/AlertasComerciais.jsx'
 import NotificacoesSplash, {stopCurrentPush} from './components/NotificacoesSplash.jsx'
 import {comercialGet} from './lib/comercialApi.js'
-import {apiUrl,apiCredentials} from './lib/nativeApi.js'
+import {apiUrl,apiCredentials,isNative} from './lib/nativeApi.js'
+import {showDesktopNotice} from './lib/desktopAlerts.js'
 
 const paths = {
   grid: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
@@ -411,6 +412,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
   const [unreadCount,setUnreadCount]=useState(0)
+  const seenNotificationId=useRef(null)
   const [forgotOpen,setForgotOpen]=useState(false)
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('splash_theme') === 'dark' ? 'dark' : 'light' }
@@ -434,10 +436,25 @@ function App() {
     try { localStorage.setItem('splash_theme', theme) } catch { /* armazenamento indisponível */ }
   }, [theme])
   useEffect(()=>{
+    seenNotificationId.current=null
     if(session.status!=='in'){setUnreadCount(0);return}
     let active=true
     const poll=()=>comercialGet('/api/notificacoes')
-      .then(result=>{if(active)setUnreadCount(Number(result.nao_lidas||0))})
+      .then(result=>{
+        if(!active)return
+        setUnreadCount(Number(result.nao_lidas||0))
+        const notices=Array.isArray(result.avisos)?result.avisos:[]
+        const mostRecent=notices.reduce((max,item)=>Math.max(max,Number(item.id)||0),0)
+        const previous=seenNotificationId.current
+        // A primeira consulta apenas estabelece o ponto inicial: não reproduzir avisos antigos.
+        if(previous!==null && document.hidden && !isNative()
+            && 'Notification' in window && Notification.permission==='granted'){
+          const fresh=notices.filter(item=>!item.lido_em && Number(item.id)>previous)
+            .sort((a,b)=>Number(a.id)-Number(b.id)).slice(-3)
+          for(const item of fresh)showDesktopNotice(item).catch(()=>{})
+        }
+        seenNotificationId.current=Math.max(previous||0,mostRecent)
+      })
       .catch(()=>{})
     poll()
     const timer=setInterval(poll,30000)

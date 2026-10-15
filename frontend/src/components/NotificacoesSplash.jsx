@@ -1,5 +1,6 @@
 import {PushNotifications} from '@capacitor/push-notifications'
 import {isNative} from '../lib/nativeApi.js'
+import {prepareDesktopSound,showDesktopNotice} from '../lib/desktopAlerts.js'
 import {useEffect,useState} from 'react'
 import {comercialGet,comercialPost,dateBR} from '../lib/comercialApi.js'
 import './NotificacoesSplash.css'
@@ -43,12 +44,20 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
  const [error,setError]=useState('')
  const [notice,setNotice]=useState('')
  const [busy,setBusy]=useState(false)
+ const [webEnabled,setWebEnabled]=useState(false)
  async function refresh(){
   try{const r=await comercialGet('/api/notificacoes');setData(r);onUnreadChange(Number(r.nao_lidas||0));setError('')}
   catch(e){setError(e.message)}
  }
  useEffect(()=>{
   refresh()
+  if(!isNative() && 'Notification' in window && Notification.permission==='granted'
+     && 'serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistration('/')
+      .then(reg=>reg?.pushManager?.getSubscription())
+      .then(sub=>setWebEnabled(!!sub))
+      .catch(()=>{})
+  }
   const id=setInterval(refresh,30000)
   return ()=>clearInterval(id)
  },[])
@@ -91,6 +100,8 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
  }
  async function enable(){
   setError('');setNotice('')
+  // Ativação de áudio precisa ocorrer diretamente no clique do usuário.
+  prepareDesktopSound()
   if(!window.isSecureContext || !('Notification' in window) || !('serviceWorker' in navigator)
     || !('PushManager' in window)){
     setError('Este navegador não oferece Web Push neste contexto. Use HTTPS e instale o app quando necessário.')
@@ -112,8 +123,28 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
       userVisibleOnly:true,applicationServerKey:decodeKey(data.vapid_publica),
     })
     await comercialPost('/api/notificacoes/dispositivos',{assinatura:sub.toJSON()})
-    setNotice('Navegador cadastrado para Web Push. A entrega depende das permissões do sistema e da hospedagem.')
+    setWebEnabled(true)
+    setNotice('Notificações deste navegador ativadas. Use Testar alerta para confirmar a notificação do sistema.')
     refresh()
+  }catch(e){setError(e.message)}
+  finally{setBusy(false)}
+ }
+ async function testDesktop(){
+  setError('');setNotice('')
+  if(!('Notification' in window) || Notification.permission!=='granted'){
+   setError('Primeiro autorize as notificações deste site no navegador.')
+   return
+  }
+  prepareDesktopSound()
+  setBusy(true)
+  try{
+   const ok=await showDesktopNotice({
+     titulo:'SPLASH · Alerta de teste',
+     mensagem:'Se este aviso apareceu fora do Splash, as notificações do computador estão liberadas.',
+     categoria:'VENDA_PAGA',rota:'vendas',chave_evento:'TESTE_DESKTOP:'+Date.now(),
+   })
+   if(!ok)throw new Error('Não foi possível exibir o alerta neste navegador.')
+   setNotice('Alerta de teste solicitado ao sistema. Se não apareceu, verifique as permissões e notificações do Windows.')
   }catch(e){setError(e.message)}
   finally{setBusy(false)}
  }
@@ -155,12 +186,23 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
      {busy?'Configurando Android...':'Ativar notificações Android'}
     </button>
    :data.push_disponivel
-   ?<button type="button" className="sn-enable" onClick={enable} disabled={busy}>
-      {busy?'Configurando aparelho...':'Ativar notificações neste celular'}
-    </button>
+   ?<div className="sn-push-controls">
+      <button type="button" className="sn-enable" onClick={enable} disabled={busy}>
+       {busy?'Configurando navegador...':webEnabled?'Atualizar inscrição de notificações':'Ativar alertas neste navegador'}
+      </button>
+      {'Notification' in window && Notification.permission==='granted' &&
+       <button type="button" className="sn-test-button" onClick={testDesktop} disabled={busy}>
+        Testar alerta no computador
+       </button>}
+      {webEnabled&&<small className="sn-push-state">Navegador inscrito para alertas fora do Splash.</small>}
+     </div>
    :<div className="sn-setup-info">
       <strong>Avisos no SPLASH ativos</strong>
-      <span>Você já pode consultar as notificações aqui. Para receber alertas nativos no celular, falta configurar as chaves VAPID e o HTTPS do domínio na hospedagem.</span>
+      <span>Os avisos aparecem no sino. Para receber notificações fora do site, o servidor precisa das chaves VAPID válidas e HTTPS.</span>
+      {'Notification' in window && Notification.permission==='granted' &&
+       <button type="button" className="sn-test-button" onClick={testDesktop} disabled={busy}>
+         Testar alerta no computador
+       </button>}
     </div>}
   {notice&&<p role="status" className="sn-note">{notice}</p>}
   {error&&<p role="alert" className="sn-error">{error}</p>}

@@ -8,7 +8,8 @@ self.addEventListener('push',event=>{
  const url=raw.startsWith('/')&&!raw.startsWith('//')?raw:'/'
  event.waitUntil(self.registration.showNotification(title,{
   body,tag:data.tag||'splash',icon:'/favicon.svg',badge:'/favicon.svg',
-  data:{url},renotify:false,
+  data:{url},renotify:data.category==='VENDA_PAGA',
+  silent:false,
  }))
 })
 self.addEventListener('notificationclick',event=>{

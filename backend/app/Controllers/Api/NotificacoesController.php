@@ -16,7 +16,7 @@ final class NotificacoesController extends CommercialBaseController
     {
         $u=$this->uid();if($u instanceof ResponseInterface)return $u;
         $db=db_connect();
-        $rows=$db->table('splash_notificacoes')->select('id,categoria,titulo,mensagem,rota,valor_proprio,lido_em,criado_em')
+        $rows=$db->table('splash_notificacoes')->select('id,chave_evento,categoria,titulo,mensagem,rota,valor_proprio,lido_em,criado_em')
             ->where('user_id',$u)->orderBy('id','DESC')->limit(80)->get()->getResultArray();
         $unread=$db->table('splash_notificacoes')->where('user_id',$u)->where('lido_em',null)->countAllResults();
         return $this->response->setJSON([
