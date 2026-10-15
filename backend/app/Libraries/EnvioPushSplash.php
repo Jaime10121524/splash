@@ -66,6 +66,7 @@ final class EnvioPushSplash
                         $data=json_decode((string)$sub['assinatura_json'],true,512,JSON_THROW_ON_ERROR);
                         $payload=json_encode([
                             'title'=>$notice['titulo'],'body'=>$notice['mensagem'],
+                            'category'=>$notice['categoria'],
                             'url'=>'/?go='.rawurlencode((string)$notice['rota']),'tag'=>$notice['chave_evento'],
                         ],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
                         $result=$push->sendOneNotification(Subscription::create($data),$payload,
