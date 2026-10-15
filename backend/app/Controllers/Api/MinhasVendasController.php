@@ -18,9 +18,18 @@ final class MinhasVendasController extends CommercialBaseController
     {
         $user=auth('session')->user();
         if(!$user || $user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
-        // Consulta individual sempre filtrada pelo vínculo pessoas.user_id.
-        // Evita negar corretor/gerente/vendedor por matriz Shield desatualizada.
-        if(!$user->inGroup('corretor','vendedor','gerente')){
+        // Permissão definida na configuração atual do código. O Shield pode
+        // conservar no banco uma matriz anterior, sem 'sales.own' para corretor.
+        // A identidade e o escopo continuam obrigatoriamente vinculados à pessoa.
+        $matrix=config(\Config\AuthGroups::class)->matrix;
+        $allowed=false;
+        foreach(['corretor','vendedor','gerente'] as $group){
+            if($user->inGroup($group) && in_array('sales.own',$matrix[$group]??[],true)){
+                $allowed=true;
+                break;
+            }
+        }
+        if(!$allowed){
             return $this->errorResponse(403,'Sua conta não pode consultar vendas individuais.');
         }
         $row=db_connect()->table('pessoas')->select('id')
