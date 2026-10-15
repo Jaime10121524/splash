@@ -18,9 +18,9 @@ final class MinhasVendasController extends CommercialBaseController
     {
         $user=auth('session')->user();
         if(!$user || $user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
-        if(!$user->can('sales.own') || !(
-            $user->inGroup('corretor') || $user->inGroup('vendedor') || $user->inGroup('gerente')
-        )){
+        // Consulta individual sempre filtrada pelo vínculo pessoas.user_id.
+        // Evita negar corretor/gerente/vendedor por matriz Shield desatualizada.
+        if(!$user->inGroup('corretor','vendedor','gerente')){
             return $this->errorResponse(403,'Sua conta não pode consultar vendas individuais.');
         }
         $row=db_connect()->table('pessoas')->select('id')

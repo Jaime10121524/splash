@@ -16,8 +16,9 @@ abstract class CommercialBaseController extends BaseController
         if ($user === null || $user->isBanned()) {
             return $this->errorResponse(401, 'Faça login novamente.');
         }
-        // Clientes e visitas contêm dados pessoais, nunca retorná-los a vendedor/corretor.
-        if (! $user->inGroup('admin') || ! $user->can('visits.manage')) {
+        // Cadastros administrativos são exclusivos do grupo admin.
+        // A matriz de permissões pode estar antiga no armazenamento do Shield.
+        if (! $user->inGroup('admin')) {
             return $this->errorResponse(403, 'Acesso restrito ao administrador.');
         }
 
@@ -28,7 +29,9 @@ abstract class CommercialBaseController extends BaseController
     {
         $user = auth('session')->user();
         if ($user === null || $user->isBanned()) return $this->errorResponse(401, 'Faça login novamente.');
-        if (!$user->inGroup('admin') && ((!$user->inGroup('operador') && !$user->inGroup('gerente') && !$user->inGroup('corretor')) || !$user->can('visits.manage') || !$user->can('clients.manage'))) {
+        // O menu permite estes grupos; não dependa de uma matriz Shield antiga
+        // salva no banco. O corretor continua limitado à própria pessoa/visitas.
+        if (!$user->inGroup('admin', 'operador', 'gerente', 'corretor')) {
             return $this->errorResponse(403, 'Seu perfil não possui permissão para atendimentos.');
         }
         if ($this->visitorScopeId() === 0) return $this->errorResponse(403,'Conta sem pessoa ativa vinculada.');

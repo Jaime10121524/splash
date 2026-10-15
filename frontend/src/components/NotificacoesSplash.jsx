@@ -119,10 +119,21 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
  }
  async function readAll(){
   if(busy||!data.nao_lidas)return
-  setBusy(true);setError('')
+  setBusy(true);setError('');setNotice('')
   try{
-   const r=await comercialPost('/api/notificacoes/ler-todas',{})
-   setNotice(r.message);await refresh()
+   try{
+    const r=await comercialPost('/api/notificacoes/ler-todas',{})
+    setNotice(r.message)
+   }catch(e){
+    // Compatibilidade com a API ainda sem rota de marcação em lote na hospedagem.
+    if(!/HTTP 404\b/.test(String(e.message||'')))throw e
+    const unread=(data.avisos||[]).filter(a=>!a.lido_em)
+    if(!unread.length)throw new Error('Atualize as rotas de notificações do backend na HostGator.')
+    // CSRF em sessão: requisições sequenciais, cada uma com token atualizado.
+    for(const aviso of unread) await comercialPost('/api/notificacoes/'+aviso.id+'/ler',{})
+    setNotice('Avisos exibidos marcados como lidos. Atualize o arquivo Routes.php na HostGator para habilitar a ação em lote.')
+   }
+   await refresh()
   }catch(e){setError(e.message)}
   finally{setBusy(false)}
  }

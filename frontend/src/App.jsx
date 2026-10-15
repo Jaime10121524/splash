@@ -412,7 +412,10 @@ function App() {
   const [noticesOpen, setNoticesOpen] = useState(false)
   const [unreadCount,setUnreadCount]=useState(0)
   const [forgotOpen,setForgotOpen]=useState(false)
-  const [theme, setTheme] = useState('light')
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('splash_theme') === 'dark' ? 'dark' : 'light' }
+    catch { return 'light' }
+  })
 
   async function refresh() {
     try {
@@ -425,7 +428,11 @@ function App() {
     }
   }
   useEffect(() => { refresh() }, [])
-  useEffect(() => { document.documentElement.dataset.theme = theme; document.title = 'SPLASH · Gestão de títulos' }, [theme])
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    document.title = 'SPLASH · Gestão de títulos'
+    try { localStorage.setItem('splash_theme', theme) } catch { /* armazenamento indisponível */ }
+  }, [theme])
   useEffect(()=>{
     if(session.status!=='in'){setUnreadCount(0);return}
     let active=true

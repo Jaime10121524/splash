@@ -13,7 +13,8 @@ $routes->group('api', static function ($routes): void {
     $routes->get('alertas-comerciais/config', 'Api\\AlertasComerciaisController::consultar');
     $routes->post('alertas-comerciais/config', 'Api\\AlertasComerciaisController::salvar', ['filter'=>'csrf']);
     $routes->get('notificacoes', 'Api\\NotificacoesController::index');
-    $routes->post('notificacoes/ler-todas', 'Api\\NotificacoesController::marcarTodas', ['filter'=>'csrf']);
+    // Marcação em lote (POST); manter antes das rotas com ID.
+    $routes->post('notificacoes/ler-todas', 'Api\NotificacoesController::marcarTodas', ['filter'=>'csrf']);
     $routes->post('notificacoes/(:num)/ler', 'Api\\NotificacoesController::marcar/$1', ['filter'=>'csrf']);
     $routes->post('notificacoes/dispositivos', 'Api\\NotificacoesController::registrarDispositivo', ['filter'=>'csrf']);
     $routes->post('notificacoes/nativo', 'Api\\NotificacoesController::registrarNativo', ['filter'=>'csrf']);
