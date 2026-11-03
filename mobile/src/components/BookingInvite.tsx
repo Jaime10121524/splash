@@ -93,6 +93,58 @@ export default function BookingInvite({ booking, onClose }: {
     }
   }
 
+  async function sendWithWhatsApp() {
+    if (!card.current || !booking || sharing || !code) return;
+    setError(''); setHint('');
+    const digits = booking.telefone.replace(/\\D/g, '');
+    if (![10, 11, 12, 13].includes(digits.length)) {
+      setError('Confira o telefone com DDD cadastrado no agendamento.');
+      return;
+    }
+    const phone = digits.startsWith('55') && digits.length >= 12 ? digits : '55' + digits;
+    setSharing(true);
+    try {
+      // ShareSingle necessita de código Android nativo no APK: não roda no Expo Go.
+      // A biblioteca recebe foto + texto e tenta abrir o WhatsApp do número informado.
+      let NativeShare: (typeof import('react-native-share'))['default'];
+      try {
+        NativeShare = (await import('react-native-share')).default;
+        if (!NativeShare?.shareSingle) throw new Error('Módulo nativo indisponível.');
+      } catch {
+        setError('Para compartilhar foto e mensagem juntas, instale o APK atualizado do Splash. O Expo Go não suporta essa integração.');
+        return;
+      }
+      const [regular, business] = await Promise.all([
+        NativeShare.isPackageInstalled('com.whatsapp'),
+        NativeShare.isPackageInstalled('com.whatsapp.w4b'),
+      ]);
+      if (!regular.isInstalled && !business.isInstalled) {
+        setError('Instale o WhatsApp ou WhatsApp Business para compartilhar o voucher.');
+        return;
+      }
+      const uri = await captureRef(card.current, {
+        format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1920,
+      });
+      const options = {
+        social: regular.isInstalled ? NativeShare.Social.WHATSAPP : NativeShare.Social.WHATSAPPBUSINESS,
+        whatsAppNumber: phone,
+        url: uri,
+        type: 'image/png',
+        message: whatsAppMessage(booking, prettyDate || booking.data_visita),
+        filename: 'voucher-splash-' + booking.id,
+        forceDialog: false,
+      };
+      await NativeShare.shareSingle(options);
+      // Abertura do WhatsApp não prova entrega: envio depende da confirmação do usuário.
+      setHint('Voucher aberto no WhatsApp. Confira o número, a imagem e a legenda antes de tocar em Enviar. Em algumas versões o WhatsApp ainda pede escolher o contato.');
+    } catch (e) {
+      setError('O WhatsApp não conseguiu preparar foto e texto juntos neste aparelho. ' +
+        (e instanceof Error ? e.message : 'Tente a opção de compartilhar PNG.'));
+    } finally {
+      setSharing(false);
+    }
+  }
+
   async function share(withCaption: boolean) {
     if (!card.current || !booking || sharing || !code) return;
     setSharing(true);
@@ -204,11 +256,11 @@ export default function BookingInvite({ booking, onClose }: {
       </ScrollView>
       {error !== '' && <Text style={styles.error}>{error}</Text>}
       {hint !== '' && <Text style={styles.hint} accessibilityRole="text">{hint}</Text>}
-      <Pressable onPress={() => { void share(true); }} disabled={!booking || sharing}
+      <Pressable onPress={() => { void sendWithWhatsApp(); }} disabled={!booking || sharing}
         style={[styles.whatsapp, sharing && styles.disabled]} accessibilityRole="button">
         {sharing ? <ActivityIndicator color="#FFFFFF" /> : <>
           <SymbolView name={{ios:'message.fill',android:'chat'}} size={20} tintColor="#FFFFFF"/>
-          <Text style={styles.shareText}>Compartilhar foto + copiar mensagem</Text>
+          <Text style={styles.shareText}>WhatsApp: foto + mensagem</Text>
         </>}
       </Pressable>
       <Pressable onPress={() => { void share(false); }} disabled={!booking || sharing}
@@ -221,7 +273,8 @@ export default function BookingInvite({ booking, onClose }: {
         <Text style={styles.textOnlyLabel}>Abrir conversa do cliente (somente texto)</Text>
       </Pressable>
       <Text style={styles.footer}>
-        Escolha o contato no WhatsApp, cole a legenda copiada e confirme o envio da foto com o texto.
+        No APK, o Splash prepara a imagem e a legenda para o WhatsApp do número cadastrado.
+        O envio ainda precisa ser confirmado no WhatsApp; não é automático.
       </Text>
     </SafeAreaView>
   </Modal>;
