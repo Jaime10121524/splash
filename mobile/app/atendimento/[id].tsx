@@ -24,7 +24,7 @@ const outcomes = [
   { value: 'PENDENCIA', label: 'Negociação', icon: 'pending_actions' },
   { value: 'SEM_VENDA', label: 'Não fechou', icon: 'cancel' },
   { value: 'VENDA', label: 'Venda fechada', icon: 'check_circle' },
-];
+] as const;
 
 type FormMode = 'start' | 'finish' | null;
 type SheetField = 'main' | 'secondary' | 'reason' | null;
