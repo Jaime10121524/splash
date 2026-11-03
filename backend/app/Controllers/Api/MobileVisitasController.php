@@ -268,7 +268,14 @@ final class MobileVisitasController extends BaseController
         $events = $db->table('visita_status_historico')
             ->select('status_anterior,status_novo,criado_em')
             ->where('visita_id', $visitId)->orderBy('id', 'ASC')->limit(70)->get()->getResultArray();
-        return $this->response->setJSON(['visita' => $visit, 'historico' => $events])
+        $changes = $db->table('visita_atendente_trocas t')
+            ->select('t.criado_em,t.atendente_anterior_pessoa_id,t.atendente_novo_pessoa_id,
+                p.nome AS anterior_nome,n.nome AS novo_nome')
+            ->join('pessoas p', 'p.id=t.atendente_anterior_pessoa_id', 'left')
+            ->join('pessoas n', 'n.id=t.atendente_novo_pessoa_id', 'left')
+            ->where('t.visita_id', $visitId)->orderBy('t.id', 'ASC')->limit(70)
+            ->get()->getResultArray();
+        return $this->response->setJSON(['visita' => $visit, 'historico' => $events, 'trocas_atendente' => $changes])
             ->setHeader('Cache-Control', 'no-store');
     }
 
@@ -537,6 +544,16 @@ final class MobileVisitasController extends BaseController
         $visitId = $this->validId($id);
         if ($visitId === null) return $this->error(404, 'Atendimento não encontrado.');
 
+        $data = $this->request->getJSON(true);
+        if (! is_array($data) || ! in_array($data['modo_atendente'] ?? null, ['mesmo', 'outro'], true)) {
+            return $this->error(422, 'Escolha se deseja retomar com o mesmo atendente ou outro.');
+        }
+        $mode = (string) $data['modo_atendente'];
+        $requested = $mode === 'outro' ? $this->validId($data['atendente_pessoa_id'] ?? null) : null;
+        if ($mode === 'outro' && $requested === null) {
+            return $this->error(422, 'Selecione o novo atendente.');
+        }
+
         $db = db_connect();
         $user = auth('tokens')->user();
         $db->transBegin();
@@ -570,18 +587,70 @@ final class MobileVisitasController extends BaseController
                 $db->transRollback();
                 return $this->error(409, 'O cliente já possui outro atendimento em andamento.');
             }
+
+            $previousMain = $visit['atendente_pessoa_id'] === null
+                ? null : (int) $visit['atendente_pessoa_id'];
+            $previousSecondary = $visit['atendente_adicional_pessoa_id'] === null
+                ? null : (int) $visit['atendente_adicional_pessoa_id'];
+            $main = $mode === 'mesmo' ? $previousMain : $requested;
+            $secondary = $mode === 'mesmo' ? $previousSecondary : null;
+            if ($main === null) {
+                $db->transRollback();
+                return $this->error(422, 'Não há atendente anterior. Selecione Outro atendente.');
+            }
+            if ($mode === 'outro' && $main === $previousMain) {
+                $db->transRollback();
+                return $this->error(422, 'Selecione um atendente diferente do anterior.');
+            }
+            if (! $this->personWithRole($db, $main, ['vendedor', 'corretor'])
+                || ($secondary !== null && ! $this->personWithRole($db, $secondary, ['vendedor', 'corretor']))) {
+                $db->transRollback();
+                return $this->error(422, 'O atendente precisa estar ativo e possuir função Vendedor ou Corretor.');
+            }
+            if ($main === $secondary) {
+                $db->transRollback();
+                return $this->error(422, 'O atendente adicional deve ser diferente do responsável.');
+            }
+
+            // A decisão é atômica: retoma a MESMA visita, reabre o histórico e
+            // inicia a próxima sessão com o atendente escolhido.
             $db->table('visitas')->where('id', $visitId)->update([
-                'status' => 'AGUARDANDO', 'fim_em' => null,
-                'retorno_previsto' => null, 'motivo_nao_venda_id' => null,
+                'status' => 'ATENDENDO',
+                'atendente_pessoa_id' => $main,
+                'atendente_adicional_pessoa_id' => $secondary,
+                'inicio_em' => $now,
+                'fim_em' => null,
+                'retorno_previsto' => null,
+                'motivo_nao_venda_id' => null,
                 'atualizado_em' => $now,
             ]);
+            $db->table('visita_sessoes')->insert([
+                'visita_id' => $visitId, 'inicio_em' => $now, 'fim_em' => null,
+                'criado_por_usuario_id' => (int) $user->id,
+            ]);
             $this->event($db, $visitId, (string) $visit['status'], 'AGUARDANDO', (int) $user->id, $now);
+            $this->event($db, $visitId, 'AGUARDANDO', 'ATENDENDO', (int) $user->id, $now);
+
+            if ($mode === 'outro') {
+                $db->table('visita_atendente_trocas')->insert([
+                    'visita_id' => $visitId,
+                    'atendente_anterior_pessoa_id' => $previousMain,
+                    'atendente_novo_pessoa_id' => $main,
+                    'adicional_anterior_pessoa_id' => $previousSecondary,
+                    'adicional_novo_pessoa_id' => null,
+                    'usuario_id' => (int) $user->id,
+                    'criado_em' => $now,
+                ]);
+            }
             if ($db->transStatus() === false) throw new \RuntimeException('Falha ao retomar atendimento.');
             $db->transCommit();
             $this->notice($visitId, 'RETOMADA');
-            return $this->ok('Atendimento retomado. Histórico preservado.');
+            return $this->ok($mode === 'outro'
+                ? 'Visita retomada com outro atendente. Nova sessão iniciada e troca registrada no histórico.'
+                : 'Visita retomada com o mesmo atendente. Atendimento em andamento.');
         } catch (Throwable $e) {
             return $this->fail($e, 'retomar', $db);
         }
     }
+
 }
