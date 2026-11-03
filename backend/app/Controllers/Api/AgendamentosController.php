@@ -220,6 +220,43 @@ final class AgendamentosController extends BaseController
         } catch(Throwable $e) { return $this->dbError($e,'cadastrar'); }
     }
 
+
+    /** Edita data e quantidade somente antes do comparecimento. Mantém o QR. */
+    public function update(int|string $id): ResponseInterface
+    {
+        $actor=$this->check();
+        if ($actor instanceof ResponseInterface) return $actor;
+        $bookingId=$this->parseId($id);
+        $data=$this->request->getJSON(true);
+        if ($bookingId===null || !is_array($data)) return $this->deny(422,'Informe o agendamento.');
+        $date=(string)($data['data_visita']??'');
+        $amount=$this->parseId($data['quantidade_pessoas']??null);
+        $today=\CodeIgniter\I18n\Time::now(config('App')->appTimezone)->toDateString();
+        if (!$this->validDate($date) || $date<$today || $amount===null || $amount>100) {
+            return $this->deny(422,'Informe data de hoje em diante e de 1 a 100 pessoas.');
+        }
+        $db=db_connect();$db->transBegin();
+        try {
+            $book=$db->query('SELECT * FROM agendamentos WHERE id=? FOR UPDATE',[$bookingId])->getRowArray();
+            if (!$book || !$this->visible($book,$actor)) {
+                $db->transRollback();return $this->deny(404,'Agendamento não encontrado.');
+            }
+            if ($book['situacao']!=='AGENDADO' || $book['visita_id']!==null) {
+                $db->transRollback();return $this->deny(409,'Não é possível editar visita recebida ou cancelada.');
+            }
+            $db->table('agendamentos')->where('id',$bookingId)->update([
+                'data_visita'=>$date,'quantidade_pessoas'=>$amount,
+                'atualizado_em'=>\CodeIgniter\I18n\Time::now(config('App')->appTimezone)->toDateTimeString(),
+            ]);
+            if ($db->transStatus()===false) throw new \RuntimeException('Falha ao editar agendamento.');
+            $db->transCommit();
+            return $this->response->setJSON([
+                'message'=>'Agendamento atualizado. O QR permanece o mesmo; envie o voucher atualizado.',
+                'agendamento_id'=>$bookingId,'data_visita'=>$date,'quantidade_pessoas'=>$amount,
+            ])->setHeader('Cache-Control','no-store');
+        } catch(Throwable $e) { return $this->dbError($e,'editar',$db); }
+    }
+
     public function validateQr(): ResponseInterface
     {
         $actor=$this->check();
