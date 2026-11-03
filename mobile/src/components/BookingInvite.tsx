@@ -136,7 +136,7 @@ export default function BookingInvite({ booking, onClose }: {
         filename: 'voucher-splash-' + booking.id,
         forceDialog: false,
       };
-      await NativeShare.shareSingle(options);
+      await NativeShare.shareSingle(options as Parameters<typeof NativeShare.shareSingle>[0]);
       // Abertura do WhatsApp não prova entrega: envio depende da confirmação do usuário.
       setHint('Voucher aberto no WhatsApp. Confira o número, a imagem e a legenda antes de tocar em Enviar. Em algumas versões o WhatsApp ainda pede escolher o contato.');
     } catch (e) {
