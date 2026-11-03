@@ -55,7 +55,9 @@ final class MobileController extends BaseController
 
         $ip = $this->request->getIPAddress();
         $key = 'splash-native-login-' . sha1($ip . strtolower($username));
-        if (! service('throttler')->check($key, 5, MINUTE)) {
+        // Também limita por IP: variar nomes de usuário não contorna o bloqueio.
+        if (! service('throttler')->check('splash-native-ip-' . sha1($ip), 10, MINUTE)
+            || ! service('throttler')->check($key, 5, MINUTE)) {
             return $this->error(429, 'Muitas tentativas. Tente novamente em alguns instantes.');
         }
 
