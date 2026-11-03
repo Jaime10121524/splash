@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { comercialGet, comercialPost, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
-import { baixarConvite } from '../lib/agendamentoQr.js'
+import { baixarConvite, linkWhatsAppAgendamento } from '../lib/agendamentoQr.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
 import { SurfaceModal } from '../components/ComercialForms.jsx'
 import './Agendamentos.css'
@@ -18,6 +18,7 @@ export default function Agendamentos({navigate=()=>{}}) {
   const [q,setQ]=useState('')
   const [catalogs,setCatalogs]=useState({pessoas:[],pessoa_logada:null})
   const [form,setForm]=useState(initialForm)
+  const [editing,setEditing]=useState(null)
   const [modal,setModal]=useState(null)
   const [loading,setLoading]=useState(true)
   const [busy,setBusy]=useState(false)
@@ -76,6 +77,29 @@ export default function Agendamentos({navigate=()=>{}}) {
       await baixarConvite(data)
     }catch(err){setError(err.message)}
     finally{setBusy(false)}
+  }
+
+  async function saveEdit(e){
+    e.preventDefault()
+    if(!editing)return
+    setBusy(true);setError('')
+    try{
+      const data={
+        data_visita:editing.data_visita,
+        quantidade_pessoas:Number(editing.quantidade_pessoas),
+      }
+      const r=await comercialPost('/api/agendamentos/'+editing.id+'/editar',data)
+      const updated={...editing,...data}
+      setModal(null);setEditing(null);setNotice(r.message)
+      await reload()
+      await baixarConvite(updated)
+    }catch(err){setError(err.message)}
+    finally{setBusy(false)}
+  }
+
+  function openWhatsApp(booking){
+    try{window.open(linkWhatsAppAgendamento(booking),'_blank','noopener,noreferrer')}
+    catch(err){setError(err.message)}
   }
 
   async function inspect(qr){
@@ -164,7 +188,9 @@ export default function Agendamentos({navigate=()=>{}}) {
           </span>
           <div className="agenda-actions">
             <button disabled={busy} onClick={()=>baixarConvite(a).catch(e=>setError(e.message))}>Voucher PNG</button>
+            <button disabled={busy} onClick={()=>openWhatsApp(a)}>WhatsApp (mensagem)</button>
             {a.situacao==='AGENDADO'&&<>
+              <button disabled={busy} onClick={()=>{setEditing({...a,quantidade_pessoas:String(a.quantidade_pessoas)});setError('');setModal({type:'edit'})}}>Editar</button>
               <button className="accent" onClick={()=>inspect('SPLASH:AG:1:'+a.qr_token)}>Registrar chegada</button>
               <button disabled={busy} onClick={()=>cancel(a.id)}>Cancelar</button>
             </>}
@@ -189,6 +215,28 @@ export default function Agendamentos({navigate=()=>{}}) {
         <label>Observações (opcional)<textarea maxLength={500} value={form.observacoes} onChange={e=>set('observacoes',e.target.value)} /></label>
         <div className="agenda-form-actions"><button type="button" onClick={()=>setModal(null)}>Cancelar</button>
           <button className="agenda-primary" disabled={busy}>{busy?'Salvando...':'Salvar e gerar convite'}</button></div>
+      </form>
+    </SurfaceModal>}
+
+    {modal?.type==='edit'&&editing&&<SurfaceModal title="Editar agendamento"
+      subtitle={'Agendamento nº '+editing.id+' · '+editing.nome_completo}
+      busy={busy} onClose={()=>{setModal(null);setEditing(null)}}>
+      <form className="agenda-form" onSubmit={saveEdit}>
+        <div className="agenda-cols">
+          <label>Data da visita *
+            <input required type="date" min={localDateISO()} value={editing.data_visita}
+              onChange={e=>setEditing(v=>({...v,data_visita:e.target.value}))}/>
+          </label>
+          <label>Nº de pessoas *
+            <input required type="number" min="1" max="100" value={editing.quantidade_pessoas}
+              onChange={e=>setEditing(v=>({...v,quantidade_pessoas:e.target.value}))}/>
+          </label>
+        </div>
+        <p className="agenda-hint">O QR Code não muda. Ao salvar, o voucher atualizado será gerado novamente.</p>
+        <div className="agenda-form-actions">
+          <button type="button" onClick={()=>{setModal(null);setEditing(null)}}>Cancelar</button>
+          <button className="agenda-primary" disabled={busy}>{busy?'Salvando...':'Salvar e gerar voucher'}</button>
+        </div>
       </form>
     </SurfaceModal>}
 
