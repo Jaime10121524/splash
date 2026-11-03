@@ -20,9 +20,12 @@ export default function Clientes({navigate}) {
   const [formError,setFormError]=useState('')
   const [history,setHistory]=useState([])
   const [saving,setSaving]=useState(false)
+  const [bonuses,setBonuses]=useState([])
+  const [confirmBonus,setConfirmBonus]=useState(null)
 
   useEffect(()=>{
     comercialGet('/api/comercial/opcoes').then(setCatalogs).catch(e=>setError(e.message))
+    comercialGet('/api/bonificacoes').then(r=>setBonuses(r.bonificacoes||[])).catch(()=>{})
   },[])
   useEffect(()=>{
     const timeout=setTimeout(()=>{setQuery(search);setPage(1)},250)
@@ -68,6 +71,18 @@ export default function Clientes({navigate}) {
     }catch(e){setFormError(e.message)}
     finally{setSaving(false)}
   }
+  async function payBonus(){
+    if(!confirmBonus)return
+    setSaving(true);setError('')
+    try {
+      const result=await comercialPost('/api/bonificacoes/'+confirmBonus.id+'/pagar',{})
+      setNotice(result.message)
+      const r=await comercialGet('/api/bonificacoes')
+      setBonuses(r.bonificacoes||[])
+      setConfirmBonus(null)
+    }catch(e){setError(e.message)}finally{setSaving(false)}
+  }
+  const money=value=>Number(value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
   const pages=Math.max(1,Math.ceil(total/25))
   return <div className="com-page">
     <header className="com-heading"><div><span className="com-eyebrow">OPERAÇÃO / CLIENTES</span>
@@ -115,6 +130,40 @@ export default function Clientes({navigate}) {
         <button disabled={page>=pages} onClick={()=>setPage(v=>Math.min(pages,v+1))}>Próxima</button>
       </div>}
     </section>
+    <section className="com-panel" style={{marginTop:20}}>
+      <div className="com-panel-head"><div><h2>Bonificações de indicação</h2>
+        <p>O pagamento aprovado gera despesa na conta financeira responsável, sem duplicar valores.</p></div>
+        <span className="com-count">{bonuses.filter(b=>b.situacao==='PENDENTE').length} pendente(s)</span>
+      </div>
+      {!bonuses.length?<div className="com-empty">Nenhuma bonificação registrada.</div>:
+        <div className="com-client-list">{bonuses.slice(0,50).map(b=><article key={b.id} className="com-client">
+          <div className="com-client-main">
+            <strong>Indicador: {b.indicador_nome}</strong>
+            <small>Indicou {b.indicado_nome} · Conta: {b.conta_nome}</small>
+            <div className="com-client-detail"><span>{money(b.valor)}</span>
+              <span>{b.situacao==='PAGA'?'Pago em '+dateBR(b.data_pagamento):'Aguardando confirmação de pagamento'}</span>
+            </div>
+          </div>
+          <span className={'com-pill '+(b.situacao==='PAGA'?'good':'muted')}>{b.situacao}</span>
+          {catalogs.pode_confirmar_bonificacao&&b.situacao==='PENDENTE'&&
+            <button type="button" className="com-main-button" disabled={saving}
+              onClick={()=>setConfirmBonus(b)}>Confirmar pagamento</button>}
+        </article>)}</div>}
+    </section>
+    {confirmBonus&&<SurfaceModal title="Registrar bonificação paga"
+      subtitle={'Indicador: '+confirmBonus.indicador_nome} busy={saving}
+      onClose={()=>setConfirmBonus(null)}>
+      <div className="cm-form">
+        <p>Confirme apenas se este valor já foi entregue ao indicador. Será registrada uma despesa real de
+          <strong> {money(confirmBonus.valor)}</strong> na conta de <strong>{confirmBonus.conta_nome}</strong>.</p>
+        <div className="cm-form-actions">
+          <button type="button" className="cm-button" disabled={saving} onClick={()=>setConfirmBonus(null)}>Voltar</button>
+          <button type="button" className="cm-button primary" disabled={saving} onClick={payBonus}>
+            {saving?'Salvando...':'Confirmar pagamento'}
+          </button>
+        </div>
+      </div>
+    </SurfaceModal>}
     {modal&&<SurfaceModal title={modal?.kind==='history'?'Histórico da corrente':modal==='new'?'Novo cliente':'Editar cliente'}
       subtitle={modal?.kind==='history'?modal.client.nome:'Dados do associado e responsável pela corrente.'}
       busy={saving} onClose={()=>setModal(null)}>
