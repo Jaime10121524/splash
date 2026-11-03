@@ -30,7 +30,10 @@ $routes->group('api', static function ($routes): void {
             $routes->post('agendamentos/(:num)/cancelar', 'Api\AgendamentosController::cancel/$1');
             // Operações nativas mantêm o filtro Shield tokens:mobile.
             $routes->get('atendimento-opcoes', 'Api\MobileVisitasController::options');
-            $routes->get('clientes', 'Api\MobileVisitasController::clients');
+            $routes->get('clientes', 'Api\MobileClientesController::index');
+            $routes->post('clientes', 'Api\MobileClientesController::create');
+            $routes->get('clientes/(:num)', 'Api\MobileClientesController::show/$1');
+            $routes->post('clientes/(:num)/editar', 'Api\MobileClientesController::update/$1');
             $routes->get('cliente-visita-retomavel', 'Api\MobileVisitasController::resumableClientVisit');
             $routes->post('atendimentos/chegada', 'Api\MobileVisitasController::arrival');
             $routes->get('atendimentos/(:num)', 'Api\MobileVisitasController::show/$1');
