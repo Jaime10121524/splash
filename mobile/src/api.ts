@@ -124,6 +124,11 @@ export async function apiRequest<T>(path: string, options: {
     if (!response.ok) {
       const detail = typeof data.message === 'string' ? data.message : 'Erro HTTP ' + response.status + ' no backend.';
       if (response.status >= 500) {
+        // Mensagem de implantação conhecida e controlada pelo próprio backend:
+        // pode ser exibida sem revelar detalhes internos nem stack trace.
+        if (response.status === 503 && detail.startsWith('Agendamentos ainda não está instalado')) {
+          throw new ApiError(detail, response.status);
+        }
         throw new ApiError('O servidor Splash falhou (HTTP ' + response.status + '). Confira o terminal do PHP.', response.status);
       }
       throw new ApiError(detail, response.status);
