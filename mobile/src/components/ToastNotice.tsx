@@ -14,6 +14,8 @@ export default function ToastNotice({
   kind?: 'info' | 'success' | 'error';
 }) {
   const progress=useRef(new Animated.Value(1)).current;
+  const dismiss=useRef(onDismiss);
+  dismiss.current=onDismiss;
   useEffect(()=>{
     if (!message) return;
     progress.stopAnimation();
@@ -21,9 +23,9 @@ export default function ToastNotice({
     const anim=Animated.timing(progress,{
       toValue:0,duration,useNativeDriver:false,
     });
-    anim.start(({finished})=>{if(finished)onDismiss();});
+    anim.start(({finished})=>{if(finished)dismiss.current();});
     return ()=>anim.stop();
-  },[message,duration,onDismiss,progress]);
+  },[message,duration,progress]);
   if (!message) return null;
   return <View style={styles.position} pointerEvents="box-none">
     <View style={styles.toast} accessibilityRole="alert">
