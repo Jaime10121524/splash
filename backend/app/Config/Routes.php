@@ -23,6 +23,7 @@ $routes->group('api', static function ($routes): void {
             $routes->get('bonificacoes', 'Api\BonificacoesController::index');
             $routes->post('bonificacoes/(:num)/pagar', 'Api\BonificacoesController::pagar/$1');
             $routes->post('agendamentos', 'Api\AgendamentosController::create');
+            $routes->post('agendamentos/(:num)/editar', 'Api\AgendamentosController::update/$1');
             $routes->post('agendamentos/validar-qr', 'Api\AgendamentosController::validateQr');
             $routes->post('agendamentos/(:num)/checkin', 'Api\AgendamentosController::checkin/$1');
             $routes->post('agendamentos/(:num)/cancelar', 'Api\AgendamentosController::cancel/$1');
@@ -82,6 +83,7 @@ $routes->group('api', static function ($routes): void {
     $routes->get('bonificacoes', 'Api\BonificacoesController::index');
     $routes->post('bonificacoes/(:num)/pagar', 'Api\BonificacoesController::pagar/$1', ['filter'=>'csrf']);
     $routes->post('agendamentos', 'Api\AgendamentosController::create', ['filter'=>'csrf']);
+    $routes->post('agendamentos/(:num)/editar', 'Api\AgendamentosController::update/$1', ['filter'=>'csrf']);
     $routes->post('agendamentos/validar-qr', 'Api\AgendamentosController::validateQr', ['filter'=>'csrf']);
     $routes->post('agendamentos/(:num)/checkin', 'Api\AgendamentosController::checkin/$1', ['filter'=>'csrf']);
     $routes->post('agendamentos/(:num)/cancelar', 'Api\AgendamentosController::cancel/$1', ['filter'=>'csrf']);
