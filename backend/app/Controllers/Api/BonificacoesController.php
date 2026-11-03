@@ -22,10 +22,12 @@ final class BonificacoesController extends BaseController
         $user=str_starts_with(strtolower($this->request->getHeaderLine('Authorization')),'bearer ')
             ? auth('tokens')->user() : auth('session')->user();
         if (!$user || $user->isBanned()) return $this->error(401,'Entre novamente.');
-        if (!$user->inGroup('admin','corretor','gerente','operador')) return $this->error(403,'Sem permissão.');
         $admin=$user->inGroup('admin');
+        if (!$admin && (!$user->inGroup('corretor') || !$user->can('finance.own'))) {
+            return $this->error(403,'Sem permissão para consultar saldos e bonificações.');
+        }
         $scope=null;
-        if (!$admin && $user->inGroup('corretor') && !$user->inGroup('gerente','operador')) {
+        if (!$admin) {
             $person=db_connect()->table('pessoas')->select('id')
                 ->where('user_id',(int)$user->id)->where('ativo',1)->get()->getRowArray();
             if (!$person) return $this->error(403,'Pessoa não vinculada.');
