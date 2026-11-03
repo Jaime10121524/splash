@@ -29,7 +29,8 @@
     "react-native-view-shot": "6.1.1",
     "expo-linear-gradient": "~58.0.3",
     "react-dom": "19.3.0",
-    "react-native-share": "^12.3.1"
+    "react-native-share": "^12.3.1",
+    "expo-build-properties": "~58.0.12"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
