@@ -339,17 +339,17 @@ final class AgendamentosController extends BaseController
                 // unir pessoas diferentes apenas porque compartilham um telefone.
                 $matches=$db->table('clientes')->select('id,nome,dono_corrente_pessoa_id')
                     ->where('telefone',$book['telefone'])->get()->getResultArray();
-                if ($matches) {
-                    $exact=array_values(array_filter($matches,static fn($row)=>
-                        mb_strtolower(trim($row['nome']))===mb_strtolower(trim($book['nome_completo']))));
-                    if (count($matches)!==1 || count($exact)!==1
-                        || ($actor['scope']!==null
-                            && (int)$exact[0]['dono_corrente_pessoa_id']!==$actor['scope'])) {
-                        $db->transRollback();return $this->deny(409,
-                            'Já existe cliente com esse telefone. Selecione o cadastro correto antes de confirmar.');
-                    }
+                // Número telefônico não é identidade: pode ser compartilhado
+                // por parentes ou ter sido reciclado. Reutilizar somente se
+                // existir UM cadastro com nome também idêntico e acesso permitido.
+                // Caso contrário, cria outro cliente com o mesmo telefone.
+                $exact=array_values(array_filter($matches,static fn($row)=>
+                    mb_strtolower(trim($row['nome']))===mb_strtolower(trim($book['nome_completo']))));
+                if (count($exact)===1 && ($actor['scope']===null
+                    || (int)$exact[0]['dono_corrente_pessoa_id']===$actor['scope'])) {
                     $clientId=(int)$exact[0]['id'];
-                } else {
+                }
+                if ($clientId===null) {
                     $origin=$db->table('lead_origens')->where('nome','Agendamento')->get()->getRowArray();
                     if (!$origin) throw new \RuntimeException('Origem Agendamento não cadastrada.');
                     $clean=ClienteRules::validate($db,[
