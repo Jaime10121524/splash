@@ -245,31 +245,39 @@ final class AgendamentosController extends BaseController
         $bookingId=$this->parseId($id);
         $data=$this->request->getJSON(true);
         if ($bookingId===null || !is_array($data)) return $this->deny(422,'Informe a visita do agendamento.');
-        $broker=$this->parseId($data['corretor_pessoa_id']??null);
+        // Chegada simples não exige escolher atendente nem alterar corretor.
+        // Se não houver corretor enviado, preserva o captador original do QR.
+        $brokerProvided=($data['corretor_pessoa_id']??null)!==null;
+        $broker=$brokerProvided?$this->parseId($data['corretor_pessoa_id']):null;
         $second=($data['segundo_corretor_pessoa_id']??null)===null ? null
             : $this->parseId($data['segundo_corretor_pessoa_id']);
-        $attendant=$this->parseId($data['atendente_pessoa_id']??null);
+        $attendantProvided=($data['atendente_pessoa_id']??null)!==null;
+        $attendant=$attendantProvided?$this->parseId($data['atendente_pessoa_id']):null;
         $clientChosen=($data['cliente_id']??null)===null?null:$this->parseId($data['cliente_id']);
-        if (!$broker || !$attendant || ($second!==null && $broker===$second)
-            || ($data['segundo_corretor_pessoa_id']??null)!==null && $second===null
-            || ($data['cliente_id']??null)!==null && $clientChosen===null) {
-            return $this->deny(422,'Confira corretor, segundo corretor, atendente e cliente.');
+        if (($brokerProvided && $broker===null)
+            || ($second!==null && $broker!==null && $broker===$second)
+            || (($data['segundo_corretor_pessoa_id']??null)!==null && $second===null)
+            || ($attendantProvided && $attendant===null)
+            || (($data['cliente_id']??null)!==null && $clientChosen===null)) {
+            return $this->deny(422,'Confira os participantes e o cadastro do cliente.');
         }
 
         $db=db_connect();
-        if (!$this->personRole($db,$broker,['corretor'])
-            || ($second!==null && !$this->personRole($db,$second,['corretor']))
-            || !$this->personRole($db,$attendant,['vendedor','corretor'])) {
-            return $this->deny(422,'Selecione corretores e atendente ativos, com as funções corretas.');
-        }
-        if ($actor['scope']!==null && $broker!==$actor['scope'] && $second!==$actor['scope']) {
-            return $this->deny(403,'Um dos corretores precisa ser o seu perfil.');
-        }
         $db->transBegin();
         try {
             $book=$db->query('SELECT * FROM agendamentos WHERE id=? FOR UPDATE',[$bookingId])->getRowArray();
             if (!$book || !$this->visible($book,$actor)) {
                 $db->transRollback();return $this->deny(404,'Agendamento não encontrado.');
+            }
+            $broker=$broker??(int)$book['captador_pessoa_id'];
+            if ($broker===$second
+                || !$this->personRole($db,$broker,['corretor'])
+                || ($second!==null && !$this->personRole($db,$second,['corretor']))
+                || ($attendant!==null && !$this->personRole($db,$attendant,['vendedor','corretor']))) {
+                $db->transRollback();return $this->deny(422,'Escolha corretores e atendente ativos.');
+            }
+            if ($actor['scope']!==null && $broker!==$actor['scope'] && $second!==$actor['scope']) {
+                $db->transRollback();return $this->deny(403,'Um dos corretores precisa ser o seu perfil.');
             }
             if ($book['situacao']!=='AGENDADO' || $book['visita_id']!==null) {
                 $db->transRollback();return $this->deny(409,'Este QR Code já foi utilizado ou o agendamento foi cancelado.');
