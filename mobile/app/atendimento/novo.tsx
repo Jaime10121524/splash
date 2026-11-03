@@ -11,6 +11,7 @@ import { apiRequest, MobileClient, MobileVisitOptions } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
+import { editMaskedPhoneBR, maskPhoneBR, phoneDigits } from '../../src/phone';
 import { colors } from '../../src/theme';
 
 type BrokerField = 'main' | 'second' | 'origin' | 'owner' | null;
@@ -97,7 +98,7 @@ export default function NewVisitScreen() {
       return;
     }
     if (clientMode === 'new') {
-      const digits = newPhone.replace(/\D/g, '');
+      const digits = phoneDigits(newPhone);
       if (!newName.trim() || newName.trim().length > 160) {
         setError('Informe o nome do cliente, com até 160 caracteres.');
         return;
@@ -123,7 +124,7 @@ export default function NewVisitScreen() {
       const clientData = clientMode === 'existing'
         ? { cliente_id: selected!.id }
         : { novo_cliente: {
-            nome: newName.trim(), telefone: newPhone.replace(/\D/g, ''),
+            nome: newName.trim(), telefone: phoneDigits(newPhone),
             cpf: newCpf.replace(/\D/g, ''), email: newEmail.trim(),
             origem_id: originId, indicador_cliente_id: indicator?.id ?? null,
             dono_corrente_pessoa_id: owner,
@@ -214,7 +215,7 @@ export default function NewVisitScreen() {
           </View>
           {!isNew && (selected ? <View style={styles.selectedClient}>
             <View style={styles.clientAvatar}><Text style={styles.avatarText}>{selected.nome.slice(0, 1).toUpperCase()}</Text></View>
-            <View style={styles.clientInfo}><Text style={styles.clientName}>{selected.nome}</Text><Text style={styles.clientSub}>{selected.telefone || 'Sem telefone informado'}</Text></View>
+            <View style={styles.clientInfo}><Text style={styles.clientName}>{selected.nome}</Text><Text style={styles.clientSub}>{selected.telefone ? maskPhoneBR(selected.telefone) : 'Sem telefone informado'}</Text></View>
             <Pressable onPress={() => { setSelected(null); setQuery(''); }} accessibilityLabel="Trocar cliente">
               <SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel' }} size={21} tintColor={colors.muted} />
             </Pressable>
@@ -233,7 +234,7 @@ export default function NewVisitScreen() {
               onPress={() => { Keyboard.dismiss(); setSelected(client); setClients([]); Haptics.selectionAsync().catch(() => {}); }}
               style={styles.clientResult}>
               <View style={styles.clientAvatar}><Text style={styles.avatarText}>{client.nome.slice(0, 1).toUpperCase()}</Text></View>
-              <View style={styles.clientInfo}><Text style={styles.clientName}>{client.nome}</Text><Text style={styles.clientSub}>{client.telefone || 'Sem telefone'}</Text></View>
+              <View style={styles.clientInfo}><Text style={styles.clientName}>{client.nome}</Text><Text style={styles.clientSub}>{client.telefone ? maskPhoneBR(client.telefone) : 'Sem telefone'}</Text></View>
               <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right' }} size={20} tintColor={colors.muted} />
             </Pressable>)}
           </>)}
@@ -243,9 +244,11 @@ export default function NewVisitScreen() {
               placeholder="Nome do cliente" placeholderTextColor="#A09BB4"
               autoCapitalize="words" maxLength={160} accessibilityLabel="Nome completo do novo cliente" />
             <Text style={[styles.fieldLabel, styles.fieldSpace]}>WhatsApp / telefone com DDD *</Text>
-            <TextInput style={styles.newInput} value={newPhone} onChangeText={setNewPhone}
+            <TextInput style={styles.newInput} value={newPhone}
+              onChangeText={value => setNewPhone(previous => editMaskedPhoneBR(previous, value))}
               placeholder="(21) 99999-9999" placeholderTextColor="#A09BB4"
-              keyboardType="phone-pad" maxLength={20} accessibilityLabel="Telefone do novo cliente" />
+              keyboardType="phone-pad" maxLength={15} accessibilityLabel="Telefone do novo cliente"
+              textContentType="telephoneNumber" />
             <Text style={[styles.fieldLabel, styles.fieldSpace]}>Origem do lead *</Text>
             <Pressable onPress={() => { Keyboard.dismiss(); setSheet('origin'); }}
               style={styles.selectBox} accessibilityRole="button">
