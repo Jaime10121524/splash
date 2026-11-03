@@ -6,6 +6,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Libraries\ClienteRules;
+use App\Libraries\BonificacaoIndicacao;
 use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\I18n\Time;
 use Throwable;
@@ -383,6 +384,11 @@ final class MobileVisitasController extends BaseController
                     'usuario_id' => (int) $user->id,
                     'criado_em' => $createdAt,
                 ]);
+                $bonificacao = BonificacaoIndicacao::registrar($db, $clientId, $clean, $newClient, $user);
+                if (isset($bonificacao['error'])) {
+                    $db->transRollback();
+                    return $this->error(422, $bonificacao['error']);
+                }
             } else {
                 $client = $db->query('SELECT id,dono_corrente_pessoa_id,ativo FROM clientes WHERE id=? FOR UPDATE', [$clientId])->getRowArray();
                 if (! $client || !(bool) $client['ativo']) {
