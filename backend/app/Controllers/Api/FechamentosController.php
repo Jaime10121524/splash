@@ -955,6 +955,14 @@ class FechamentosController extends CommercialBaseController
      * Não gera pagamento e só libera edição antes de qualquer movimentação
      * financeira da comissão.
      */
+    protected function rateioActorId(): int
+    {
+        $mobile=str_contains((string)$this->request->getUri()->getPath(),'/api/mobile/');
+        $user=auth($mobile?'tokens':'session')->user();
+        if(!$user || $user->isBanned())throw new \RuntimeException('Sessão inválida.');
+        return (int)$user->id;
+    }
+
     public function rateiosVenda(int|string $id): ResponseInterface
     {
         if($denied=$this->authorizeAdmin())return $denied;
@@ -1082,7 +1090,7 @@ class FechamentosController extends CommercialBaseController
             foreach($clean as $item){
                 $db->table('comissao_rateios')->insert([
                     'operacao_id'=>(int)$id,...$item,
-                    'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                    'criado_por_usuario_id'=>$this->rateioActorId(),
                     'criado_em'=>$now,
                 ]);
             }
@@ -1092,7 +1100,7 @@ class FechamentosController extends CommercialBaseController
                 'operacao_id'=>(int)$id,
                 'dados_antes'=>json_encode($old,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'dados_depois'=>json_encode($clean,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
-                'justificativa'=>$reason,'usuario_id'=>(int)auth('session')->user()->id,
+                'justificativa'=>$reason,'usuario_id'=>$this->rateioActorId(),
                 'criado_em'=>$now,
             ]);
             $this->commitOrFail($db);
