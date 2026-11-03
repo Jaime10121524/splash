@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Libraries\ClienteRules;
 use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\I18n\Time;
 use Throwable;
@@ -192,10 +193,21 @@ final class MobileVisitasController extends BaseController
         foreach ($reasons as &$reason) $reason['id'] = (int) $reason['id'];
         unset($reason);
 
+        $origins = $db->table('lead_origens')
+            ->select('id,nome,permite_indicador')
+            ->where('ativo', 1)->orderBy('nome', 'ASC')
+            ->get()->getResultArray();
+        foreach ($origins as &$origin) {
+            $origin['id'] = (int) $origin['id'];
+            $origin['permite_indicador'] = (bool) $origin['permite_indicador'];
+        }
+        unset($origin);
+
         return $this->response->setJSON([
             'corretores' => array_values($brokers),
             'atendentes' => array_values($attendants),
             'motivos' => $reasons,
+            'origens' => $origins,
             'minha_pessoa_id' => $this->scope($user),
         ])->setHeader('Cache-Control', 'no-store');
     }
@@ -267,22 +279,61 @@ final class MobileVisitasController extends BaseController
         $input = $this->request->getJSON(true);
         if (! is_array($input)) return $this->error(422, 'Informe os dados da chegada.');
         $clientId = $this->validId($input['cliente_id'] ?? null);
-        if ($clientId === null) return $this->error(422, 'Escolha um cliente cadastrado.');
+        $newClient = $input['novo_cliente'] ?? null;
+        if (($clientId === null && ! is_array($newClient))
+            || ($clientId !== null && array_key_exists('novo_cliente', $input))) {
+            return $this->error(422, 'Escolha um cliente existente ou preencha os dados do novo cliente.');
+        }
         $db = db_connect();
         $brokers = $this->brokers($db, $input, $user);
         if (isset($brokers['error'])) return $this->error(422, $brokers['error']);
 
         $db->transBegin();
         try {
-            $client = $db->query('SELECT id,dono_corrente_pessoa_id,ativo FROM clientes WHERE id=? FOR UPDATE', [$clientId])->getRowArray();
-            if (! $client || !(bool) $client['ativo']) {
-                $db->transRollback();
-                return $this->error(422, 'O cliente deve estar ativo.');
-            }
             $scope = $this->scope($user);
-            if ($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope) {
-                $db->transRollback();
-                return $this->error(403, 'Cliente fora da sua corrente.');
+            if (is_array($newClient)) {
+                // Mesmo validador e regras de corrente utilizados pelo cadastro web.
+                // Nunca confiar em um usuário, status ou dono de corrente enviado pelo celular
+                // quando a conta está limitada a uma corrente.
+                $ownerId = $scope !== null
+                    ? $scope
+                    : ($this->validId($newClient['dono_corrente_pessoa_id'] ?? null)
+                        ?? (int) $brokers['corretor_pessoa_id']);
+                $newClient['dono_corrente_pessoa_id'] = $ownerId;
+                $clean = ClienteRules::validate($db, [...$newClient, 'ativo' => true]);
+                if (isset($clean['error'])) {
+                    $db->transRollback();
+                    return $this->error(422, $clean['error']);
+                }
+                if ($scope !== null && (int) $clean['dono_corrente_pessoa_id'] !== $scope) {
+                    $db->transRollback();
+                    return $this->error(403, 'Cliente indicado pertence a outra corrente.');
+                }
+                $createdAt = $this->now();
+                $db->table('clientes')->insert([
+                    ...$clean, 'criado_por_usuario_id' => (int) $user->id,
+                    'criado_em' => $createdAt,
+                ]);
+                $clientId = (int) $db->insertID();
+                if ($clientId < 1) throw new \RuntimeException('Falha ao cadastrar cliente.');
+                $db->table('cliente_corrente_historico')->insert([
+                    'cliente_id' => $clientId,
+                    'dono_anterior_pessoa_id' => null,
+                    'dono_novo_pessoa_id' => (int) $clean['dono_corrente_pessoa_id'],
+                    'origem' => $clean['indicador_cliente_id'] ? 'INDICACAO' : 'CADASTRO',
+                    'usuario_id' => (int) $user->id,
+                    'criado_em' => $createdAt,
+                ]);
+            } else {
+                $client = $db->query('SELECT id,dono_corrente_pessoa_id,ativo FROM clientes WHERE id=? FOR UPDATE', [$clientId])->getRowArray();
+                if (! $client || !(bool) $client['ativo']) {
+                    $db->transRollback();
+                    return $this->error(422, 'O cliente deve estar ativo.');
+                }
+                if ($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope) {
+                    $db->transRollback();
+                    return $this->error(403, 'Cliente fora da sua corrente.');
+                }
             }
             $busy = $db->table('visitas')->where('cliente_id', $clientId)
                 ->whereIn('status', ['AGUARDANDO', 'ATENDENDO'])->countAllResults();
@@ -314,7 +365,7 @@ final class MobileVisitasController extends BaseController
                 $db->transCommit();
                 $this->notice((int) $sameDay['id'], 'RETOMADA');
                 return $this->ok('Visita de hoje retomada sem duplicar o atendimento.',
-                    ['visita_id' => (int) $sameDay['id'], 'retomada' => true]);
+                    ['visita_id' => (int) $sameDay['id'], 'cliente_id' => $clientId, 'retomada' => true]);
             }
             $last = $db->table('visitas')
                 ->select('atendente_pessoa_id,atendente_adicional_pessoa_id')
@@ -338,7 +389,7 @@ final class MobileVisitasController extends BaseController
             $db->transCommit();
             $this->notice($visitId, 'CHEGADA');
             return $this->ok('Chegada registrada. Horário marcado automaticamente.',
-                ['visita_id' => $visitId], 201);
+                ['visita_id' => $visitId, 'cliente_id' => $clientId, 'cliente_cadastrado' => is_array($newClient)], 201);
         } catch (Throwable $e) {
             return $this->fail($e, 'chegada', $db);
         }
