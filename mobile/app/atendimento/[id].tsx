@@ -201,14 +201,13 @@ export default function AtendimentoDetailScreen() {
     void applyAction('finish');
   }
 
-  async function resumeWithAttendant(mode: 'mesmo' | 'outro', newId: number | null) {
+  async function resumeWithAttendant(mode: 'mesmo', _newId: null) {
     if (!token) throw new Error('Sessão inválida. Entre novamente.');
     const response = await apiRequest<{ message: string }>('mobile/atendimentos/' + id + '/retomar', {
       method: 'POST',
       token,
       body: {
         modo_atendente: mode,
-        ...(mode === 'outro' ? { atendente_pessoa_id: newId } : {}),
       },
     });
     setResumeOpen(false);
