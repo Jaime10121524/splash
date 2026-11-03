@@ -70,19 +70,19 @@ Android: pressionar "a" com emulador configurado ou usar uma build de desenvolvi
 - "POST /api/mobile/atendimentos/{id}/iniciar": inicia sessão e histórico, exigindo atendente válido.
 - "POST /api/mobile/atendimentos/{id}/finalizar": valida resultado, motivo/retorno, grava histórico e encerra sessão.
 - "GET /api/mobile/cliente-visita-retomavel?cliente_id={id}": verifica, dentro das permissões do usuário, se já existe visita finalizada hoje, antes de registrar chegada.
-- "POST /api/mobile/atendimentos/{id}/retomar": recebe `modo_atendente=mesmo|outro` e, quando diferente, `atendente_pessoa_id`. Retoma a MESMA visita e inicia uma nova sessão com o atendente escolhido na mesma transação, validando perfil e status; aceita corretores opcionais da tela de chegada e registra a alteração em `visita_atendente_trocas`.
-- Na chegada de cliente existente, se houver visita encerrada hoje, pergunta antes de confirmar se será o mesmo atendente ou outro. Cancelar não altera o atendimento.
-- Uma troca de atendente é permitida apenas mediante escolha explícita na retomada do mesmo dia; retornos em outros dias mantêm a regra do sistema web.
+- "POST /api/mobile/atendimentos/{id}/retomar": recebe `modo_atendente=mesmo` e confirma o **mesmo atendente** já gravado na visita. Retoma a MESMA visita e inicia uma nova sessão em uma transação, sem receber nem permitir outro atendente; preserva tempos anteriores e histórico de status. Pode receber corretores da tela de chegada sem alterar a corrente do cliente.
+- Na chegada de cliente existente, se houver visita encerrada hoje, o app pergunta apenas **Retomar com o mesmo atendente?**, exibindo o nome anterior. Cancelar não altera o atendimento.
+- Não existe opção de trocar atendente na retomada do aplicativo. A API rejeita solicitações de troca, mesmo que venham de versões antigas ou requisições manuais.
 - Confirmação e sucesso das operações de atendimento usam modal visual Splash em vez de `Alert.alert` Android.
 - Nenhum endpoint financeiro foi liberado ao token mobile.
 - O token não deve ser usado na API de sessão web. Nenhuma rota móvel é liberada sem o filtro Shield "tokens:mobile".
 - O frontend trata 403 como falta de permissão, não como uma lista de dados inventados.
-- O app não grava sem rede. Ações de visitas são verificadas no backend com o token Shield, e a retomada com troca de atendente é auditada no banco.
+- O app não grava sem rede. Ações de visitas são verificadas no backend com token Shield; a retomada do mesmo atendente registra uma nova sessão e eventos de status.
 
 ## Homologação obrigatória antes de merge
 
 1. Conferir "php spark routes" e os filtros "tokens:mobile", inclusive tentativa sem token, token inválido e token revogado.
-2. Executar `php spark migrate` antes de testar/usar a nova API mobile. A migration `2026-11-03-000001_AuditarTrocaAtendenteRetomadaMobile.php` cria `visita_atendente_trocas` para auditoria. Fazer backup do banco antes de migrar.
+2. Este ajuste de retomada **não exige uma nova migração**. A tabela opcional `visita_atendente_trocas`, criada por uma versão anterior do protótipo, é lida apenas se já existir. Não rode migrações desnecessárias só para testar a retomada.
 3. Verificar login, sessão restaurada após reinício, logout e expiração do token no Android real.
 4. Conferir as permissões usando administrador, corretor com pessoa vinculada, corretor sem vínculo e vendedor.
 5. Verificar isolamento de visitas entre corretores, telefones e dados de cliente.
