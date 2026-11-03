@@ -18,6 +18,12 @@ $routes->group('api', static function ($routes): void {
             $routes->get('me', 'Api\MobileController::me');
             $routes->post('logout', 'Api\MobileController::logout');
             $routes->get('atendimentos', 'Api\MobileController::atendimentos');
+            // Agendamentos e QR: acesso exclusivo com token Shield mobile.
+            $routes->get('agendamentos', 'Api\AgendamentosController::index');
+            $routes->post('agendamentos', 'Api\AgendamentosController::create');
+            $routes->post('agendamentos/validar-qr', 'Api\AgendamentosController::validateQr');
+            $routes->post('agendamentos/(:num)/checkin', 'Api\AgendamentosController::checkin/$1');
+            $routes->post('agendamentos/(:num)/cancelar', 'Api\AgendamentosController::cancel/$1');
             // Operações nativas mantêm o filtro Shield tokens:mobile.
             $routes->get('atendimento-opcoes', 'Api\MobileVisitasController::options');
             $routes->get('clientes', 'Api\MobileVisitasController::clients');
@@ -67,6 +73,11 @@ $routes->group('api', static function ($routes): void {
     $routes->post('comercial/origens/(:num)/editar', 'Api\CatalogosController::editarOrigem/$1', ['filter'=>'csrf']);
     $routes->post('comercial/motivos', 'Api\CatalogosController::criarMotivo', ['filter'=>'csrf']);
     $routes->post('comercial/motivos/(:num)/editar', 'Api\CatalogosController::editarMotivo/$1', ['filter'=>'csrf']);
+    $routes->get('agendamentos', 'Api\AgendamentosController::index');
+    $routes->post('agendamentos', 'Api\AgendamentosController::create', ['filter'=>'csrf']);
+    $routes->post('agendamentos/validar-qr', 'Api\AgendamentosController::validateQr', ['filter'=>'csrf']);
+    $routes->post('agendamentos/(:num)/checkin', 'Api\AgendamentosController::checkin/$1', ['filter'=>'csrf']);
+    $routes->post('agendamentos/(:num)/cancelar', 'Api\AgendamentosController::cancel/$1', ['filter'=>'csrf']);
     $routes->get('clientes', 'Api\ClientesController::index');
     $routes->post('clientes', 'Api\ClientesController::create', ['filter'=>'csrf']);
     $routes->post('clientes/(:num)/editar', 'Api\ClientesController::update/$1', ['filter'=>'csrf']);
