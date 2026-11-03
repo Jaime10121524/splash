@@ -104,6 +104,7 @@ final class MobileVisitasController extends BaseController
 
     private function validId($id): ?int
     {
+        if (! is_int($id) && ! is_string($id)) return null;
         $value = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         return $value === false ? null : (int) $value;
     }
@@ -295,6 +296,10 @@ final class MobileVisitasController extends BaseController
                 ->where('chegada_em <=', substr($now, 0, 10) . ' 23:59:59')
                 ->orderBy('id', 'DESC')->get(1)->getRowArray();
             if ($sameDay && in_array($sameDay['status'], ['SEM_VENDA', 'RETORNO', 'PENDENCIA'], true)) {
+                if ($db->table('venda_operacoes')->where('visita_id', (int) $sameDay['id'])->countAllResults()) {
+                    $db->transRollback();
+                    return $this->error(409, 'Esta visita possui uma operação de venda vinculada.');
+                }
                 if (! $this->allowed($sameDay, $user)) {
                     $db->transRollback();
                     return $this->error(403, 'Não é permitido retomar visita de outro corretor.');
