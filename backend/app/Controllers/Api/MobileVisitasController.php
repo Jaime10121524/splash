@@ -297,7 +297,7 @@ final class MobileVisitasController extends BaseController
                 c.cpf AS cliente_cpf,c.email AS cliente_email,c.data_nascimento AS cliente_nascimento,
                 p.nome AS atendente_nome,a.nome AS adicional_nome,cp.nome AS corretor_nome,
                 sp.nome AS segundo_corretor_nome,m.descricao AS motivo_nome,
-                op.situacao AS operacao_situacao')
+                op.situacao AS operacao_situacao,op.id AS operacao_id')
             ->join('clientes c', 'c.id=v.cliente_id')
             ->join('pessoas p', 'p.id=v.atendente_pessoa_id', 'left')
             ->join('pessoas a', 'a.id=v.atendente_adicional_pessoa_id', 'left')
