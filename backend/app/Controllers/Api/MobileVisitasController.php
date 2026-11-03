@@ -315,13 +315,18 @@ final class MobileVisitasController extends BaseController
         $events = $db->table('visita_status_historico')
             ->select('status_anterior,status_novo,criado_em')
             ->where('visita_id', $visitId)->orderBy('id', 'ASC')->limit(70)->get()->getResultArray();
-        $changes = $db->table('visita_atendente_trocas t')
-            ->select('t.criado_em,t.atendente_anterior_pessoa_id,t.atendente_novo_pessoa_id,
-                p.nome AS anterior_nome,n.nome AS novo_nome')
-            ->join('pessoas p', 'p.id=t.atendente_anterior_pessoa_id', 'left')
-            ->join('pessoas n', 'n.id=t.atendente_novo_pessoa_id', 'left')
-            ->where('t.visita_id', $visitId)->orderBy('t.id', 'ASC')->limit(70)
-            ->get()->getResultArray();
+        // A tabela de auditoria de troca é de uma versão anterior do protótipo.
+        // Quem ainda não executou a migração consegue consultar as visitas normalmente.
+        $changes = [];
+        if ($db->tableExists('visita_atendente_trocas')) {
+            $changes = $db->table('visita_atendente_trocas t')
+                ->select('t.criado_em,t.atendente_anterior_pessoa_id,t.atendente_novo_pessoa_id,
+                    p.nome AS anterior_nome,n.nome AS novo_nome')
+                ->join('pessoas p', 'p.id=t.atendente_anterior_pessoa_id', 'left')
+                ->join('pessoas n', 'n.id=t.atendente_novo_pessoa_id', 'left')
+                ->where('t.visita_id', $visitId)->orderBy('t.id', 'ASC')->limit(70)
+                ->get()->getResultArray();
+        }
         return $this->response->setJSON(['visita' => $visit, 'historico' => $events, 'trocas_atendente' => $changes])
             ->setHeader('Cache-Control', 'no-store');
     }
@@ -402,7 +407,7 @@ final class MobileVisitasController extends BaseController
                 ->orderBy('id', 'DESC')->get(1)->getRowArray();
             if ($sameDay && in_array($sameDay['status'], ['SEM_VENDA', 'RETORNO', 'PENDENCIA'], true)) {
                 $db->transRollback();
-                return $this->error(409, 'Há uma visita encerrada hoje. Escolha como deseja retomá-la antes de registrar nova chegada.');
+                return $this->error(409, 'Há uma visita encerrada hoje. Retome-a antes de registrar uma nova chegada.');
             }
             $last = $db->table('visitas')
                 ->select('atendente_pessoa_id,atendente_adicional_pessoa_id')
