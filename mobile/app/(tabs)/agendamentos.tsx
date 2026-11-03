@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Keyboard, Pressable, RefreshControl, ScrollView,
-  StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
+  RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, router } from 'expo-router';
@@ -42,6 +42,10 @@ export default function AgendamentosScreen() {
   const { token } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const lockedScan = useRef(false);
+  const formScroll = useRef<ScrollView>(null);
+  const scrollFormToBottom = () => {
+    setTimeout(() => formScroll.current?.scrollToEnd({ animated: true }), 220);
+  };
   const [mode, setMode] = useState<ScreenMode>('list');
   const [rows, setRows] = useState<Booking[]>([]);
   const [stats, setStats] = useState<Metrics | null>(null);
@@ -58,7 +62,7 @@ export default function AgendamentosScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [date, setDate] = useState(dateBR(todayPlus(0)));
-  const [people, setPeople] = useState('2');
+  const [people, setPeople] = useState('1');
   const [captor, setCaptor] = useState<number | null>(null);
 
   const [current, setCurrent] = useState<Booking | null>(null);
@@ -73,14 +77,37 @@ export default function AgendamentosScreen() {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [a, b] = await Promise.all([
+      // A agenda depende de migração própria. Mesmo que falhe, a lista de
+      // corretores do módulo de visitas deve continuar disponível no formulário.
+      const [bookingResult, peopleResult] = await Promise.allSettled([
         apiRequest<{ agendamentos: Booking[]; indicadores: Metrics }>('mobile/agendamentos', { token }),
         apiRequest<MobileVisitOptions>('mobile/atendimento-opcoes', { token }),
       ]);
-      setRows(a.agendamentos); setStats(a.indicadores); setOptions(b); setError('');
-      setCaptor(c => c ?? b.minha_pessoa_id);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Falha ao consultar agendamentos.'); }
-    finally { setLoading(false); }
+      if (bookingResult.status === 'fulfilled') {
+        setRows(bookingResult.value.agendamentos);
+        setStats(bookingResult.value.indicadores);
+      } else {
+        setRows([]);
+        setStats(null);
+      }
+      if (peopleResult.status === 'fulfilled') {
+        const data = peopleResult.value;
+        setOptions(data);
+        setCaptor(current => current ?? data.minha_pessoa_id
+          ?? (data.corretores.length === 1 ? data.corretores[0].id : null));
+      } else {
+        setOptions(null);
+      }
+      const failures = [
+        bookingResult.status === 'rejected' ?
+          (bookingResult.reason instanceof Error ? bookingResult.reason.message : 'Erro ao consultar agenda.') : '',
+        peopleResult.status === 'rejected' ?
+          (peopleResult.reason instanceof Error ? peopleResult.reason.message : 'Erro ao carregar corretores.') : '',
+      ].filter(Boolean);
+      setError(failures.join(' '));
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
 
@@ -135,7 +162,7 @@ export default function AgendamentosScreen() {
         quantidade_pessoas: Number(people), captador_pessoa_id: captor, situacao: 'AGENDADO',
       };
       await refresh();setMode('list');setInvite(newBooking);
-      setName('');setPhone('');setDate(dateBR(todayPlus(0)));setPeople('2');
+      setName('');setPhone('');setDate(dateBR(todayPlus(0)));setPeople('1');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e) { setError(e instanceof Error ? e.message : 'Erro ao agendar.'); }
     finally { setBusy(false); }
@@ -186,7 +213,7 @@ export default function AgendamentosScreen() {
     || String(r.id).includes(search.trim())
     || (phoneDigits(search).length >= 3 && r.telefone.includes(phoneDigits(search))));
   const select = (caption: string, value: string, action: () => void) =>
-    <Pressable onPress={action} accessibilityRole="button" style={styles.selector}>
+    <Pressable onPress={() => { Keyboard.dismiss(); action(); }} accessibilityRole="button" style={styles.selector}>
       <View style={{flex:1}}><Text style={styles.caption}>{caption}</Text>
         <Text style={styles.selectValue}>{value||'Selecionar'}</Text></View>
       <SymbolView name={{ios:'chevron.up.chevron.down',android:'unfold_more'}} tintColor={colors.brandDark} size={19}/>
@@ -198,7 +225,13 @@ export default function AgendamentosScreen() {
         style={styles.back} accessibilityLabel="Voltar">
         <SymbolView name={{ios:'xmark',android:'close'}} tintColor={colors.ink} size={21}/>
       </Pressable>}</View>
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}
+    <KeyboardAvoidingView style={styles.scrollArea}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}>
+    <ScrollView ref={formScroll} style={styles.scrollArea}
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      contentContainerStyle={styles.content}
       refreshControl={mode==='list'?<RefreshControl refreshing={loading} onRefresh={()=>{setLoading(true);void refresh();}} tintColor={colors.brand} />:undefined}>
       {error!==''&&<View style={styles.feedback}><Text style={styles.feedbackText}>{error}</Text>
         <Pressable onPress={()=>setError('')} accessibilityLabel="Fechar aviso"><SymbolView name={{ios:'xmark',android:'close'}} size={17} tintColor="#9B663B"/></Pressable>
@@ -265,6 +298,7 @@ export default function AgendamentosScreen() {
             placeholder="(21) 99999-9999" placeholderTextColor={colors.muted}/>
           <Text style={styles.label}>Data da visita *</Text>
           <TextInput style={styles.input} value={date} onChangeText={setDate}
+            onFocus={scrollFormToBottom}
             keyboardType="numbers-and-punctuation" maxLength={10}
             placeholder="DD/MM/AAAA" placeholderTextColor={colors.muted}/>
           <View style={styles.dateButtons}>
@@ -273,9 +307,27 @@ export default function AgendamentosScreen() {
             <Pressable onPress={()=>setDate(dateBR(todayPlus(7)))}><Text style={styles.quickText}>+7 dias</Text></Pressable>
           </View>
           <Text style={styles.label}>Quantidade de pessoas *</Text>
-          <TextInput style={styles.input} value={people} onChangeText={setPeople}
-            keyboardType="number-pad" maxLength={3}/>
+          <View style={styles.counter} accessibilityLabel="Quantidade de pessoas">
+            <Pressable accessibilityRole="button" accessibilityLabel="Diminuir quantidade de pessoas"
+              disabled={Number(people) <= 1} style={[styles.counterButton,Number(people)<=1&&styles.counterDisabled]}
+              onPress={() => setPeople(value => String(Math.max(1, Number(value) - 1)))}>
+              <SymbolView name={{ios:'minus',android:'remove'}} tintColor={colors.brandDark} size={20}/>
+            </Pressable>
+            <View style={styles.counterCenter}>
+              <Text style={styles.counterValue}>{people}</Text>
+              <Text style={styles.counterCaption}>{Number(people) === 1 ? 'pessoa' : 'pessoas'}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Aumentar quantidade de pessoas"
+              disabled={Number(people)>=100} style={[styles.counterButton,Number(people)>=100&&styles.counterDisabled]}
+              onPress={() => setPeople(value => String(Math.min(100, Number(value) + 1)))}>
+              <SymbolView name={{ios:'plus',android:'add'}} tintColor={colors.brandDark} size={20}/>
+            </Pressable>
+          </View>
+          {loading && <ActivityIndicator color={colors.brand} />}
           {select('Corretor que captou *',brokers.find(v=>v.id===captor)?.nome||'',()=>setPicker('captor'))}
+          {!loading&&brokers.length===0&&<Text style={styles.brokerHint}>
+            Não há corretores ativos disponíveis. Confira o cadastro de Pessoas e suas funções no sistema do PC.
+          </Text>}
         </View>
         <Pressable style={[styles.primary,styles.save,busy&&styles.disabled]} disabled={busy} onPress={()=>{void create();}}>
           {busy?<ActivityIndicator color="#FFFFFF"/>:<Text style={styles.primaryText}>Salvar e gerar convite QR</Text>}
@@ -305,6 +357,7 @@ export default function AgendamentosScreen() {
           <View style={styles.clientLookup}>
             <Text style={styles.label}>Vincular cliente existente (opcional)</Text>
             <TextInput style={styles.input} value={clientQuery} onChangeText={setClientQuery}
+              onFocus={scrollFormToBottom}
               placeholder="Nome ou telefone" placeholderTextColor={colors.muted}/>
             <Pressable onPress={()=>{void searchClients();}} style={styles.searchClient}><Text style={styles.quickText}>Localizar cliente</Text></Pressable>
             {clients.length>0&&select('Cadastro do cliente',
@@ -318,6 +371,7 @@ export default function AgendamentosScreen() {
         </Pressable>
       </>}
     </ScrollView>
+    </KeyboardAvoidingView>
     <ChoiceSheet open={picker!==null}
       title={picker==='captor'?'Corretor que captou':picker==='broker'?'Corretor responsável'
         :picker==='second'?'Segundo corretor':picker==='attendant'?'Atendente':'Cliente'}
@@ -349,10 +403,11 @@ export default function AgendamentosScreen() {
 
 const styles=StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
+  scrollArea:{flex:1},
   top:{paddingHorizontal:19,paddingTop:18,paddingBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
   topTitle:{color:colors.ink,fontWeight:'900',fontSize:23},
   back:{width:37,height:37,backgroundColor:'#FFFFFF',borderRadius:12,alignItems:'center',justifyContent:'center'},
-  content:{paddingHorizontal:19,paddingBottom:36},
+  content:{paddingHorizontal:19,paddingBottom:105,flexGrow:1},
   feedback:{backgroundColor:'#FFF2EA',padding:13,borderRadius:14,marginBottom:12,flexDirection:'row',gap:10,alignItems:'center'},
   feedbackText:{color:'#9B663B',flex:1,fontSize:12,lineHeight:18},
   notice:{backgroundColor:colors.pale,padding:12,borderRadius:12,marginBottom:9},
@@ -395,6 +450,15 @@ const styles=StyleSheet.create({
   caption:{color:colors.muted,fontSize:10,fontWeight:'700'},
   selectValue:{color:colors.ink,fontWeight:'800',marginTop:6,fontSize:13},
   dateButtons:{flexDirection:'row',gap:16,marginTop:3},
+  counter:{minHeight:62,flexDirection:'row',alignItems:'center',gap:9,
+    borderRadius:16,borderWidth:1,borderColor:colors.line,padding:6,backgroundColor:'#FAF9FF'},
+  counterButton:{width:49,height:49,borderRadius:13,backgroundColor:colors.pale,
+    alignItems:'center',justifyContent:'center'},
+  counterDisabled:{opacity:0.35},
+  counterCenter:{flex:1,alignItems:'center',justifyContent:'center'},
+  counterValue:{color:colors.ink,fontSize:22,fontWeight:'900'},
+  counterCaption:{color:colors.muted,fontSize:10,fontWeight:'700'},
+  brokerHint:{fontSize:12,color:'#A06343',lineHeight:19,marginTop:6},
   quickText:{color:colors.brandDark,fontSize:12,fontWeight:'800'},
   save:{marginTop:17},
   disabled:{opacity:.6},
