@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { Visit, displayDate, displayTime } from '../api';
 import { colors, shadows } from '../theme';
@@ -23,10 +23,11 @@ const stateColors: Record<string, { background: string; text: string }> = {
   CANCELADA: { background: '#FDE9ED', text: '#B14155' },
 };
 
-export default function VisitCard({ visit, compact = false }: { visit: Visit; compact?: boolean }) {
+export default function VisitCard({ visit, compact = false, onPress }: { visit: Visit; compact?: boolean; onPress?: () => void }) {
   const state = stateColors[visit.status] ?? { background: '#EFF2F6', text: colors.muted };
   return (
-    <View style={[styles.card, compact && styles.compact]}>
+    <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined}
+      style={({ pressed }) => [styles.card, compact && styles.compact, pressed && styles.pressed]}>
       <View style={styles.header}>
         <View style={styles.avatar}><Text style={styles.avatarText}>{(visit.cliente_nome || '?').trim().slice(0, 1).toUpperCase()}</Text></View>
         <View style={styles.identity}>
@@ -44,13 +45,14 @@ export default function VisitCard({ visit, compact = false }: { visit: Visit; co
         </View>
       </View>
       {!compact && visit.atendente_nome ? <Text style={styles.agent} numberOfLines={1}>Atendente: {visit.atendente_nome}</Text> : null}
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, padding: 17, borderRadius: 21, marginBottom: 12, ...shadows.card },
   compact: { marginBottom: 10 },
+  pressed: { opacity: 0.83, transform: [{ scale: 0.993 }] },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 43, height: 43, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
   avatarText: { color: colors.brandDark, fontSize: 17, fontWeight: '800' },
