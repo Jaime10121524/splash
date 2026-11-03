@@ -41,6 +41,7 @@ class CatalogosController extends CommercialBaseController
         return $this->response->setJSON([
             'origens'=>$origens, 'motivos'=>$motivos,'pessoas'=>array_values($pessoas),
             'pessoa_logada'=>$this->visitorScopeId(),
+            'pode_confirmar_bonificacao'=>auth('session')->user()?->inGroup('admin')??false,
         ])->setHeader('Cache-Control','no-store');
     }
 
