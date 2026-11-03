@@ -180,8 +180,10 @@ export default function AgendamentosScreen() {
   const title = mode === 'create' ? 'Nova visita agendada'
     : mode === 'scan' ? 'Ler convite QR'
     : mode === 'confirm' ? 'Confirmar chegada' : 'Agendamentos';
-  const list = rows.filter(r=>!search || r.nome_completo.toLowerCase().includes(search.toLowerCase())
-    || String(r.id).includes(search) || r.telefone.includes(phoneDigits(search)));
+  const list = rows.filter(r => !search.trim()
+    || r.nome_completo.toLowerCase().includes(search.trim().toLowerCase())
+    || String(r.id).includes(search.trim())
+    || (phoneDigits(search).length >= 3 && r.telefone.includes(phoneDigits(search))));
   const select = (caption: string, value: string, action: () => void) =>
     <Pressable onPress={action} accessibilityRole="button" style={styles.selector}>
       <View style={{flex:1}}><Text style={styles.caption}>{caption}</Text>
