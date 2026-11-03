@@ -1,0 +1,33 @@
+name: Splash React Native — validação
+
+on:
+  pull_request:
+    paths:
+      - "mobile/**"
+      - "backend/app/Controllers/Api/MobileController.php"
+      - "backend/app/Config/Routes.php"
+      - ".github/workflows/native-mobile-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependências mobile
+        run: npm install --no-audit --no-fund
+        working-directory: mobile
+      - name: Verificar TypeScript
+        run: npm run typecheck
+        working-directory: mobile
+  lint-php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar sintaxe das rotas e da API mobile
+        run: |
+          php -l backend/app/Config/Routes.php
+          php -l backend/app/Controllers/Api/MobileController.php
