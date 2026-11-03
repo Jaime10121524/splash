@@ -67,6 +67,7 @@ export default function Agendamentos({navigate=()=>{}}) {
       const data={
         id:r.agendamento_id,qr_token:r.qr_payload?.split(':').pop(),
         ...form,telefone:cleanPhone(form.telefone),
+        captador_nome:brokers.find(p=>p.value===String(form.captador_pessoa_id))?.label||'',
       }
       setModal(null);setNotice(r.message);setForm({
         ...initialForm, data_visita:localDateISO(),captador_pessoa_id:catalogs.pessoa_logada?String(catalogs.pessoa_logada):'',
@@ -114,7 +115,6 @@ export default function Agendamentos({navigate=()=>{}}) {
       })
       setModal(null);setFound(null);setScan('')
       setNotice(r.message);await reload()
-      navigate('atendimentos')
     }catch(err){setError(err.message)}
     finally{setBusy(false)}
   }
@@ -144,8 +144,8 @@ export default function Agendamentos({navigate=()=>{}}) {
     </div>
 
     <section className="agenda-panel">
-      <div className="agenda-headrow"><div><h2>Agenda e leads</h2><p>Consulte, entregue o convite ou faça o check-in com QR Code.</p></div>
-        <button className="agenda-scan" onClick={()=>{setError('');setScan('');setModal({type:'scan'})}}>▣ Ler QR Code</button>
+      <div className="agenda-headrow"><div><h2>Agenda e leads</h2><p>Consulte, entregue o voucher ou registre a chegada por QR Code.</p></div>
+        <button className="agenda-scan" onClick={()=>{setError('');setScan('');setModal({type:'scan'})}}>▣ Registrar chegada</button>
       </div>
       <input type="search" className="agenda-search" value={q} onChange={e=>setQ(e.target.value)}
         placeholder="Buscar por nome, telefone ou número do agendamento..." />
@@ -163,9 +163,9 @@ export default function Agendamentos({navigate=()=>{}}) {
             {a.situacao==='COMPARECEU'?'Compareceu':a.situacao==='CANCELADO'?'Cancelado':a.data_visita<localDateISO()?'Não compareceu':'Agendado'}
           </span>
           <div className="agenda-actions">
-            <button disabled={busy} onClick={()=>baixarConvite(a).catch(e=>setError(e.message))}>Convite PNG</button>
+            <button disabled={busy} onClick={()=>baixarConvite(a).catch(e=>setError(e.message))}>Voucher PNG</button>
             {a.situacao==='AGENDADO'&&<>
-              <button className="accent" onClick={()=>inspect('SPLASH:AG:1:'+a.qr_token)}>Check-in</button>
+              <button className="accent" onClick={()=>inspect('SPLASH:AG:1:'+a.qr_token)}>Registrar chegada</button>
               <button disabled={busy} onClick={()=>cancel(a.id)}>Cancelar</button>
             </>}
             {a.visita_id&&<button onClick={()=>navigate('atendimentos')}>Ver visitas</button>}
@@ -192,7 +192,7 @@ export default function Agendamentos({navigate=()=>{}}) {
       </form>
     </SurfaceModal>}
 
-    {modal?.type==='scan'&&<SurfaceModal title="Ler QR Code" subtitle="Use o leitor USB ou cole o conteúdo do QR Code."
+    {modal?.type==='scan'&&<SurfaceModal title="Registrar chegada por QR" subtitle="Use o leitor USB ou cole o conteúdo do QR Code."
       busy={busy} onClose={()=>setModal(null)}>
       <form className="agenda-form" onSubmit={e=>{e.preventDefault();inspect(scan)}}>
         <label>Código do agendamento<input autoFocus required value={scan} onChange={e=>setScan(e.target.value)}
@@ -211,7 +211,7 @@ export default function Agendamentos({navigate=()=>{}}) {
           <small>Corretor que cadastrou: {found.captador_nome}</small>
         </div>
         {found.situacao!=='AGENDADO'?<p className="agenda-warning">Esse agendamento já foi utilizado ou cancelado.</p>:<>
-          <p className="agenda-hint">Confirme o corretor que receberá o cliente. É possível manter quem cadastrou ou escolher outros dois participantes.</p>
+          <p className="agenda-hint">O QR registra somente a chegada. O atendimento ficará aguardando até ser iniciado separadamente. Confirme corretor(es) e atendente.</p>
           <label>Corretor responsável *<select required value={broker} onChange={e=>setBroker(e.target.value)}>
             <option value="">Selecionar</option>{brokers.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
           </select></label>
@@ -233,7 +233,7 @@ export default function Agendamentos({navigate=()=>{}}) {
           </div>
           <div className="agenda-form-actions"><button type="button" onClick={()=>setModal(null)}>Voltar</button>
             <button className="agenda-primary" disabled={busy||!broker||!attendant||second===broker}>
-              {busy?'Confirmando...':'Confirmar e iniciar atendimento'}</button></div>
+              {busy?'Confirmando...':'Registrar chegada'}</button></div>
         </>}
       </form>
     </SurfaceModal>}
