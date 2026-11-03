@@ -20,8 +20,6 @@ $routes->group('api', static function ($routes): void {
             $routes->get('atendimentos', 'Api\MobileController::atendimentos');
             // Agendamentos e QR: acesso exclusivo com token Shield mobile.
             $routes->get('agendamentos', 'Api\AgendamentosController::index');
-    $routes->get('bonificacoes', 'Api\BonificacoesController::index');
-    $routes->post('bonificacoes/(:num)/pagar', 'Api\BonificacoesController::pagar/$1', ['filter'=>'csrf']);
             $routes->get('bonificacoes', 'Api\BonificacoesController::index');
             $routes->post('bonificacoes/(:num)/pagar', 'Api\BonificacoesController::pagar/$1');
             $routes->post('agendamentos', 'Api\AgendamentosController::create');
