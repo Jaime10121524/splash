@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator, FlatList, Pressable, RefreshControl,
   StyleSheet, Text, TextInput, View,
@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import { router, useFocusEffect } from 'expo-router';
 import { ApiError, VisitData, Visit, apiRequest } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import VisitCard from '../../src/components/VisitCard';
@@ -44,7 +45,7 @@ export default function AtendimentosScreen() {
     } finally { setLoading(false); setRefreshing(false); }
   }, [token, periodo]);
 
-  useEffect(() => { setLoading(true); load(); }, [load]);
+  useFocusEffect(useCallback(() => { setLoading(true); void load(); }, [load]));
   const results = useMemo(() => visitas.filter(v =>
     (!status || v.status === status) &&
     (!query.trim() || v.cliente_nome.toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR')) ||
@@ -60,11 +61,18 @@ export default function AtendimentosScreen() {
       keyExtractor={item => String(item.id)}
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.brand} />}
-      renderItem={({ item }) => <VisitCard visit={item} />}
+      renderItem={({ item }) => <VisitCard visit={item}
+        onPress={() => router.push({ pathname: '/atendimento/[id]', params: { id: String(item.id) } })} />}
       ListHeaderComponent={<View>
         <Text style={styles.eyebrow}>ROTINA COMERCIAL</Text>
         <Text style={styles.title}>Atendimentos</Text>
         <Text style={styles.subtitle}>Acompanhe as visitas sem complicação.</Text>
+        <Pressable style={styles.newVisitButton} accessibilityRole="button"
+          onPress={() => router.push('/atendimento/novo')}>
+          <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle' }} size={20} tintColor="#FFFFFF" />
+          <Text style={styles.newVisitText}>Registrar chegada</Text>
+          <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" />
+        </Pressable>
         <View style={styles.searchRow}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search' }} size={20} tintColor={colors.muted} />
           <TextInput
@@ -113,6 +121,8 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.brandDark, fontSize: 10, letterSpacing: 1.3, fontWeight: '900' },
   title: { color: colors.ink, fontSize: 28, marginTop: 7, fontWeight: '900', letterSpacing: -0.6 },
   subtitle: { color: colors.muted, marginTop: 7, fontSize: 13 },
+  newVisitButton: { marginTop: 20, minHeight: 51, backgroundColor: colors.brand, borderRadius: 17, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11 },
+  newVisitText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', flex: 1 },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, borderColor: colors.line, backgroundColor: '#FFFFFF', borderWidth: 1, marginTop: 24, paddingHorizontal: 15, height: 53 },
   search: { flex: 1, color: colors.ink, fontSize: 13, height: '100%' },
   periods: { backgroundColor: '#E9EDF4', padding: 4, flexDirection: 'row', borderRadius: 14, marginTop: 15, marginBottom: 14 },
