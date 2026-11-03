@@ -36,7 +36,9 @@ const money=(value:string)=>{
 };
 
 export default function ClientEditor() {
-  const {id:rawId}=useLocalSearchParams<{id:string}>();
+  const {id:rawId,vendaVisita:rawVisit}=useLocalSearchParams<{id:string;vendaVisita?:string}>();
+  const saleVisitId=Number(Array.isArray(rawVisit)?rawVisit[0]:rawVisit);
+  const continueToSale=Number.isSafeInteger(saleVisitId)&&saleVisitId>0;
   const id=Array.isArray(rawId)?rawId[0]:rawId;
   const isNew=id==='novo';
   const parsed=Number(id);
@@ -238,9 +240,17 @@ export default function ClientEditor() {
     <ClientPickerModal visible={indicatorOpen} token={token} title="Quem indicou o cliente?"
       omitId={isNew?undefined:parsed} onChoose={setIndicator} onClose={()=>setIndicatorOpen(false)}/>
     <ActionModal visible={!!success} variant="success" title={success}
-      description="As informações foram registradas na carteira de clientes."
-      primaryLabel="Voltar para clientes" secondaryLabel={null}
-      onPrimary={()=>{setSuccess('');router.back();}}/>
+      description={continueToSale
+        ? 'Dados do cliente salvos. Agora vamos cadastrar o título, os pagamentos e conferir as comissões.'
+        : 'As informações foram registradas na carteira de clientes.'}
+      primaryLabel={continueToSale?'Continuar para cadastrar a venda':'Voltar para clientes'}
+      secondaryLabel={null}
+      onPrimary={()=>{
+        setSuccess('');
+        if(continueToSale)router.replace({pathname:'/venda/[id]',
+          params:{id:'novo',visita:String(saleVisitId)}});
+        else router.back();
+      }}/>
   </SafeAreaView>;
 }
 const styles=StyleSheet.create({
