@@ -3,7 +3,11 @@
  * A API deve receber somente os números, removendo a máscara.
  */
 export function phoneDigits(value: string): string {
-  return value.replace(/\D/g, '').slice(0, 11);
+  const digits = value.replace(/\D/g, '');
+  // Aceitar também números colados com prefixo internacional +55.
+  const brazilian = digits.startsWith('55') && (digits.length === 12 || digits.length === 13)
+    ? digits.slice(2) : digits;
+  return brazilian.slice(0, 11);
 }
 
 export function maskPhoneBR(value: string): string {
