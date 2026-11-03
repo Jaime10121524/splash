@@ -20,17 +20,15 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
   const [connection, setConnection] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [formActive, setFormActive] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     });
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
-    return () => { show.remove(); hide.remove(); };
+    return () => { show.remove(); };
   }, []);
 
   if (ready && user) return <Redirect href="/(tabs)" />;
@@ -65,10 +63,10 @@ export default function LoginScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView ref={scrollRef}
           style={styles.flex}
-          contentContainerStyle={[styles.body, keyboardVisible && styles.bodyKeyboard]}
+          contentContainerStyle={[styles.body, formActive && styles.bodyKeyboard]}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
           automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
-          {!keyboardVisible && <>
+          {!formActive && <>
           <View style={styles.mark}><Text style={styles.markText}>s</Text><View style={styles.markDot} /></View>
           <Text style={styles.brand}>splash<Text style={{ color: colors.brand }}>.</Text></Text>
           <View style={styles.badge}><View style={styles.badgeDot} /><Text style={styles.badgeText}>SEU ESPAÇO DE TRABALHO</Text></View>
@@ -76,7 +74,7 @@ export default function LoginScreen() {
           <Text style={styles.intro}>Suas visitas e atendimentos organizados, sem complicação.</Text>
           </>}
 
-          <View style={[styles.panel, keyboardVisible && styles.panelKeyboard]}>
+          <View style={[styles.panel, formActive && styles.panelKeyboard]}>
             <Text style={styles.panelTitle}>Bem-vindo de volta</Text>
             <Text style={styles.panelSubtitle}>Entre com o mesmo acesso do Splash.</Text>
             <Text style={styles.label}>Usuário</Text>
@@ -85,6 +83,7 @@ export default function LoginScreen() {
               placeholder="Seu usuário" placeholderTextColor="#9BA8B8"
               autoCapitalize="none" autoCorrect={false} returnKeyType="next"
               accessibilityLabel="Usuário" autoComplete="username"
+              onFocus={() => setFormActive(true)}
               onSubmitEditing={() => passwordRef.current?.focus()} blurOnSubmit={false}
             />
             <Text style={styles.label}>Senha</Text>
@@ -93,6 +92,7 @@ export default function LoginScreen() {
                 style={[styles.field, styles.passwordInput]} value={password} onChangeText={setPassword}
                 placeholder="Sua senha" placeholderTextColor="#9BA8B8"
                 secureTextEntry={!showPassword} onSubmitEditing={submit}
+                onFocus={() => setFormActive(true)}
                 returnKeyType="go" accessibilityLabel="Senha" autoComplete="current-password"
               />
               <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eye} accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>
@@ -113,7 +113,7 @@ export default function LoginScreen() {
             </Pressable>}
             {!!connection && <Text style={styles.connectionResult}>{connection}</Text>}
           </View>
-          {!keyboardVisible && <Text style={styles.footer}>SPLASH · APLICATIVO NATIVO</Text>}
+          {!formActive && <Text style={styles.footer}>SPLASH · APLICATIVO NATIVO</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
