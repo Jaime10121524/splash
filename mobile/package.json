@@ -23,6 +23,7 @@
     "react-native-screens": "~4.30.1",
     "expo-camera": "~58.0.12",
     "expo-sharing": "~58.0.20",
+    "expo-clipboard": "~58.0.4",
     "react-native-qrcode-svg": "6.3.27",
     "react-native-svg": "15.16.0",
     "react-native-view-shot": "6.1.1",
