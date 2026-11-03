@@ -113,8 +113,18 @@ final class AgendamentosController extends BaseController
         $actor=$this->check();
         if ($actor instanceof ResponseInterface) return $actor;
         $db=db_connect();
+        if (!$db->tableExists('agendamentos')) {
+            return $this->deny(503, 'Agendamentos ainda não está instalado neste banco. Faça backup e execute as migrações pendentes.');
+        }
         $search=trim((string)($this->request->getGet('q')??''));
         if (mb_strlen($search)>100) return $this->deny(422,'Pesquisa muito longa.');
+        $periodStart=trim((string)($this->request->getGet('inicio')??''));
+        $periodEnd=trim((string)($this->request->getGet('fim')??''));
+        if (($periodStart!=='' && !$this->validDate($periodStart))
+            || ($periodEnd!=='' && !$this->validDate($periodEnd))
+            || ($periodStart!=='' && $periodEnd!=='' && $periodStart>$periodEnd)) {
+            return $this->deny(422, 'Informe um período válido para consultar os agendamentos.');
+        }
         // Indicadores são agregados sobre TODO o filtro, não apenas os 150
         // registros renderizados. A operação vinculada tem prioridade sobre
         // o status histórico da visita.
