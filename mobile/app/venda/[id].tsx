@@ -74,6 +74,7 @@ export default function VendaMobile(){
   const [titleNumber,setTitleNumber]=useState(''),[discount,setDiscount]=useState('0,00');
   const [date,setDate]=useState(nowBR),[startDate,setStartDate]=useState(nowBR);
   const [methodId,setMethodId]=useState<number|null>(null),[amount,setAmount]=useState('');
+  const [planned,setPlanned]=useState<{forma_id:number;valor:string}[]>([]);
   const [holder,setHolder]=useState<'CORRETOR'|'EMPRESA'>('CORRETOR');
   const [editingRateio,setEditingRateio]=useState(false),[editingGross,setEditingGross]=useState(false);
   const [grossValue,setGrossValue]=useState(''),[reason,setReason]=useState('');
@@ -134,14 +135,27 @@ export default function VendaMobile(){
       detentor:method?.codigo==='PIX'?'CORRETOR':method?.credito?'EMPRESA':holder};
   }
 
+  function addPlanned(){
+    const n=cents(amount);
+    const sum=planned.reduce((v,p)=>v+(cents(p.valor)||0),0);
+    if(!methodId||!n||!total||sum+n>total){
+      setError('Selecione forma, valor positivo e não ultrapasse o valor do título.');return;
+    }
+    setPlanned(old=>[...old,{forma_id:methodId,valor:decimal(n)}]);
+    setAmount('');setPreview(null);setError('');
+  }
+
   async function simulate(){
     if(!visit||!planId||total===null||total<=0||!iso(date)){setError('Informe plano, valor e data válidos.');return;}
-    const paid=cents(amount);
-    if(methodId&&(!paid||paid>total)){setError('Informe o valor do pagamento para a simulação.');return;}
+    const entered=cents(amount);
+    if(amount.trim()&&(!methodId||!entered)){setError('Confira a forma e o valor digitados.');return;}
+    const payments=[...planned,...(methodId&&entered?[{forma_id:methodId,valor:decimal(entered)}]:[])];
+    const sum=payments.reduce((n,p)=>n+(cents(p.valor)||0),0);
+    if(sum>total){setError('Os valores informados ultrapassam o título.');return;}
     await action(async()=>{
       const result=await apiRequest<Preview>('mobile/vendas/previa',{method:'POST',token,
         body:{visita_id:visit.id,plano_versao_id:planId,desconto_corretor:decimal(discountValue||0),
-          data_venda:iso(date),gerente_pessoa_id:managerId,pagamentos:methodId&&paid?[makePayment(paid)]:[]}});
+          data_venda:iso(date),gerente_pessoa_id:managerId,pagamentos:payments}});
       setPreview(result);setNotice('Simulação atualizada. Nenhum pagamento foi registrado.');
     });
   }
@@ -162,7 +176,9 @@ export default function VendaMobile(){
         atendente_pessoa_id:visit.atendente_pessoa_id,atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id,
       }});
       setOpId(res.operacao_id);await refresh(res.operacao_id,!!opts?.pode_corrigir_comissao);
-      setAmount(decimal(total));setStep('pagamento');
+      if(planned.length){setMethodId(planned[0].forma_id);setAmount(planned[0].valor);}
+      else setAmount(decimal(total));
+      setStep('pagamento');
       setNotice('Título registrado. Agora informe como o cliente pagou.');
     });
   }
@@ -174,8 +190,15 @@ export default function VendaMobile(){
     await action(async()=>{
       await apiRequest('mobile/vendas/'+opId+'/receber',{method:'POST',token,body:makePayment(paid)});
       await refresh(opId,!!opts?.pode_corrigir_comissao);
-      setAmount('');setStep('comissao');
-      setNotice('Recebimento salvo e comissionamento atualizado pelo servidor.');
+      if(planned.length&&planned[0].forma_id===methodId&&cents(planned[0].valor)===paid){
+        setPlanned(old=>old.slice(1));
+        if(planned.length>1){setMethodId(planned[1].forma_id);setAmount(planned[1].valor);}
+        else setAmount('');
+      }else setAmount('');
+      setStep(balance-paid===0?'comissao':'pagamento');
+      setNotice(balance-paid===0
+        ?'Título quitado! Comissão e participações apuradas pelo servidor.'
+        :'Pagamento registrado. Lance a próxima forma para concluir a quitação.');
     });
   }
 
@@ -271,7 +294,15 @@ export default function VendaMobile(){
               onPress={()=>setChoice({field:'method'})}/>
             <Input label="Valor previsto (R$)" value={amount} onChange={setAmount} numeric
               placeholder={total===null?'0,00':money(decimal(total))}/>
-            <Btn text={busy?'Calculando...':'Calcular prévia'} muted disabled={busy} onPress={()=>{void simulate();}}/>
+            <Btn text="+ Adicionar forma ao planejamento" muted onPress={addPlanned}/>
+            {planned.map((p,i)=><View style={s.row} key={i}>
+              <Text style={s.helper}>{opts?.formas.find(f=>f.id===p.forma_id)?.nome||'Forma'} · {money(p.valor)}</Text>
+              <Pressable onPress={()=>{setPlanned(old=>old.filter((_,j)=>i!==j));setPreview(null);}}>
+                <Text style={s.remove}>Remover</Text>
+              </Pressable>
+            </View>)}
+            <Text style={s.helper}>Você pode combinar PIX, dinheiro e cartão. Os valores serão apresentados novamente para confirmar cada recebimento.</Text>
+            <Btn text={busy?'Calculando...':'Calcular prévia de comissões'} muted disabled={busy} onPress={()=>{void simulate();}}/>
             {preview&&<View style={s.panel}><Text style={s.section}>Prévia · Não registrada</Text>
               <Text style={s.helper}>Pago: {money(preview.pagamentos)} | Saldo: {money(preview.saldo)}</Text>
               {opts?.pode_corrigir_comissao?<Text style={s.lineTitle}>Comissão bruta: {preview.comissao_bruta===null?'A apurar':money(preview.comissao_bruta)}</Text>:null}
