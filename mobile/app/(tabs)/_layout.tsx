@@ -1,11 +1,13 @@
 import { Tabs, Redirect } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { useAuth } from '../../src/AuthContext';
 import { colors } from '../../src/theme';
 
 export default function TabsLayout() {
   const { user, ready } = useAuth();
+  const insets = useSafeAreaInsets();
   if (ready && !user) return <Redirect href="/login" />;
   return (
     <Tabs screenOptions={{
@@ -13,9 +15,16 @@ export default function TabsLayout() {
       tabBarHideOnKeyboard: true,
       tabBarActiveTintColor: colors.brandDark,
       tabBarInactiveTintColor: '#948AAE',
-      tabBarStyle: { borderTopWidth: 0, backgroundColor: '#FFFFFF', paddingTop: 7,
-        minHeight: 70, elevation: 10, overflow: 'visible' },
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
+      // Reserva a área da barra de gestos/navegação Android. O texto do menu
+      // fica acima dela inclusive com edge-to-edge ativo.
+      tabBarStyle: {
+        height: 67 + insets.bottom,
+        paddingTop: 5, paddingBottom: insets.bottom + 5,
+        borderTopWidth: 0, backgroundColor: '#FFFFFF', elevation: 6,
+        overflow: 'visible',
+      },
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginTop: 3 },
+      tabBarItemStyle: { paddingTop: 3 },
     }}>
       <Tabs.Screen name="index" options={{
         title: 'Início',
@@ -27,11 +36,20 @@ export default function TabsLayout() {
       }} />
       <Tabs.Screen name="escanear" options={{
         title: 'Escanear',
-        tabBarIcon: () => <View style={styles.scanCircle}>
-          <SymbolView name={{ ios: 'qrcode.viewfinder', android: 'qr_code_scanner' }}
-            size={31} tintColor="#FFFFFF" />
-        </View>,
-        tabBarLabel: () => <Text style={styles.scanLabel}>Escanear</Text>,
+        // Ícone e legenda ficam em um único botão, com espaços independentes;
+        // evita legenda sobre o círculo e sombra deslocada no Android.
+        tabBarButton: props => <Pressable
+          onPress={props.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={props.accessibilityLabel || 'Escanear QR Code'}
+          accessibilityState={props.accessibilityState}
+          style={styles.scanSlot}>
+          <View style={styles.scanCircle}>
+            <SymbolView name={{ ios: 'qrcode.viewfinder', android: 'qr_code_scanner' }}
+              size={29} tintColor="#FFFFFF" />
+          </View>
+          <Text style={styles.scanLabel}>Escanear</Text>
+        </Pressable>,
       }} />
       <Tabs.Screen name="atendimentos" options={{
         title: 'Atendimentos',
@@ -47,12 +65,19 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  scanCircle: {
-    width: 68, height: 68, borderRadius: 34, borderWidth: 5,
-    borderColor: '#FFFFFF', backgroundColor: colors.brandDark,
-    alignItems: 'center', justifyContent: 'center',
-    marginTop: -27, shadowColor: colors.navy, shadowOpacity: .32,
-    shadowOffset: { width: 0, height: 6 }, shadowRadius: 11, elevation: 10,
+  scanSlot: {
+    flex: 1, alignItems: 'center', justifyContent: 'flex-start',
+    overflow: 'visible',
   },
-  scanLabel: { fontSize: 10, fontWeight: '900', color: colors.brandDark, marginTop: -6 },
+  scanCircle: {
+    width: 60, height: 60, borderRadius: 30, borderWidth: 4,
+    borderColor: '#FFFFFF', backgroundColor: colors.brandDark,
+    alignItems: 'center', justifyContent: 'center', marginTop: -19,
+    shadowColor: colors.navy, shadowOpacity: .18,
+    shadowOffset: { width: 0, height: 2 }, shadowRadius: 3, elevation: 3,
+  },
+  scanLabel: {
+    fontSize: 10, lineHeight: 13, fontWeight: '900',
+    color: colors.brandDark, marginTop: 3, includeFontPadding: false,
+  },
 });
