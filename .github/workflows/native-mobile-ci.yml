@@ -5,6 +5,7 @@ on:
     paths:
       - "mobile/**"
       - "backend/app/Controllers/Api/MobileController.php"
+      - "backend/app/Controllers/Api/MobileVisitasController.php"
       - "backend/app/Config/Routes.php"
       - ".github/workflows/native-mobile-ci.yml"
   workflow_dispatch:
@@ -36,3 +37,4 @@ jobs:
         run: |
           php -l backend/app/Config/Routes.php
           php -l backend/app/Controllers/Api/MobileController.php
+          php -l backend/app/Controllers/Api/MobileVisitasController.php
