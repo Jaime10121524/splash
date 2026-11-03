@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable,
+  ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable,
   RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -12,6 +12,7 @@ import {
 } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet, { Choice } from '../../src/components/ChoiceSheet';
+import ActionModal from '../../src/components/ActionModal';
 import { colors, shadows } from '../../src/theme';
 
 const statusNames: Record<string, string> = {
@@ -75,7 +76,8 @@ export default function AtendimentoDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [confirming, setConfirming] = useState<'finish' | 'resume' | null>(null);
+  const [success, setSuccess] = useState<{ title: string; description: string } | null>(null);
   const [mode, setMode] = useState<FormMode>(null);
   const [sheet, setSheet] = useState<SheetField>(null);
   const [mainAttendant, setMainAttendant] = useState<number | null>(null);
@@ -127,7 +129,7 @@ export default function AtendimentoDetailScreen() {
   function selectMode(value: FormMode) {
     setMode(value);
     setError('');
-    setNotice('');
+    setSuccess(null);
     setOutcome('RETORNO');
     setReason(null);
     setReturnDate('');
@@ -161,9 +163,13 @@ export default function AtendimentoDetailScreen() {
         ({ start: 'iniciar', finish: 'finalizar', resume: 'retomar' }[action]), {
         method: 'POST', token, body: payload,
       });
-      setNotice(result.message);
       setMode(null);
       await load();
+      setSuccess({
+        title: action === 'start' ? 'Atendimento iniciado!'
+          : action === 'resume' ? 'Visita retomada!' : 'Resultado registrado!',
+        description: result.message,
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível salvar. Tente novamente.');
@@ -174,21 +180,28 @@ export default function AtendimentoDetailScreen() {
   }
 
   function confirmFinish() {
-    const title = outcome === 'VENDA' ? 'Confirmar venda fechada?' : 'Finalizar atendimento?';
-    const message = outcome === 'VENDA'
-      ? 'Isso registra apenas o resultado comercial. O título e os valores ainda devem ser lançados no módulo de Vendas.'
-      : 'O resultado será registrado no histórico e o horário de término será marcado.';
-    Alert.alert(title, message, [
-      { text: 'Voltar', style: 'cancel' },
-      { text: 'Confirmar', onPress: () => { void applyAction('finish'); } },
-    ]);
+    if (outcome === 'RETORNO' && !parseReturnDate(returnDate)) {
+      setError('Informe uma data de retorno válida, no formato DD/MM/AAAA.');
+      return;
+    }
+    if (outcome === 'SEM_VENDA' && !reason) {
+      setError('Selecione o motivo de não fechamento.');
+      return;
+    }
+    setError('');
+    setConfirming('finish');
   }
 
   function confirmResume() {
-    Alert.alert('Retomar atendimento?', 'A visita de hoje voltará para Aguardando, preservando o histórico.', [
-      { text: 'Voltar', style: 'cancel' },
-      { text: 'Retomar', onPress: () => { void applyAction('resume'); } },
-    ]);
+    setConfirming('resume');
+  }
+
+  function submitConfirmed() {
+    const action = confirming;
+    setConfirming(null);
+    if (action === 'finish' || action === 'resume') {
+      void applyAction(action);
+    }
   }
 
   async function openWhatsApp() {
@@ -228,12 +241,7 @@ export default function AtendimentoDetailScreen() {
               <SymbolView name={{ ios: 'xmark', android: 'close' }} size={17} tintColor="#A75D39" />
             </Pressable>
           </View>}
-          {!!notice && <View style={styles.success}>
-            <SymbolView name={{ ios: 'checkmark.circle.fill', android: 'check_circle' }} size={19} tintColor="#32765D" />
-            <Text style={styles.successText}>{notice}</Text>
-          </View>}
-
-          {visit && <View>
+           {visit && <View>
             <View style={styles.hero}>
               <View style={styles.heroOrbit} />
               <Text style={styles.heroEyebrow}>ATENDIMENTO Nº {visit.id}</Text>
@@ -368,6 +376,22 @@ export default function AtendimentoDetailScreen() {
           if (sheet === 'reason') setReason(value);
         }}
       />
+      <ActionModal visible={confirming !== null} variant="confirm"
+        title={confirming === 'resume' ? 'Retomar esta visita?' :
+          outcome === 'VENDA' ? 'Confirmar venda fechada?' : 'Finalizar atendimento?'}
+        description={confirming === 'resume'
+          ? 'O atendimento de hoje voltará para Aguardando, com o histórico preservado.'
+          : outcome === 'VENDA'
+            ? 'Vamos registrar o resultado comercial. O título e os valores financeiros devem ser lançados separadamente no módulo Vendas.'
+            : 'O resultado será salvo no histórico da visita e o horário de encerramento será registrado pelo servidor.'}
+        primaryLabel={confirming === 'resume' ? 'Sim, retomar' : 'Sim, finalizar'}
+        secondaryLabel="Voltar" onPrimary={submitConfirmed}
+        onSecondary={() => setConfirming(null)} busy={saving} />
+      <ActionModal visible={success !== null} variant="success"
+        title={success?.title || 'Operação concluída'}
+        description={success?.description || ''}
+        primaryLabel="Entendi" secondaryLabel={null}
+        onPrimary={() => setSuccess(null)} />
     </SafeAreaView>
   );
 }
