@@ -125,8 +125,10 @@ export default function BookingInvite({ booking, onClose }: {
       const uri = await captureRef(card.current, {
         format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1920,
       });
+      const social = (regular.isInstalled ? NativeShare.Social.WHATSAPP
+        : NativeShare.Social.WHATSAPPBUSINESS) as Parameters<typeof NativeShare.shareSingle>[0]['social'];
       const options = {
-        social: regular.isInstalled ? NativeShare.Social.WHATSAPP : NativeShare.Social.WHATSAPPBUSINESS,
+        social,
         whatsAppNumber: phone,
         url: uri,
         type: 'image/png',
