@@ -1,6 +1,6 @@
 import { type ComponentRef, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Dimensions, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
@@ -43,6 +43,25 @@ const rules = [
   'Sujeito à programação e funcionamento do clube',
 ];
 
+function whatsAppMessage(booking: Booking, prettyDate: string): string {
+  return [
+    'Olá, *' + booking.nome_completo + '*! 💜🌿',
+    '',
+    'Sua visita ao *SPLASH PARK FAZENDINHA* está confirmada! 🎉',
+    '📅 *Data:* ' + prettyDate,
+    '👨‍👩‍👧‍👦 *Pessoas:* ' + booking.quantidade_pessoas,
+    '🤝 *Corretor responsável:* ' + (booking.captador_nome || 'Equipe Splash'),
+    '',
+    '☕ Café de boas-vindas para quem chega até as 10h.',
+    '🌳 Tour pelo clube e utilização da área rural após o atendimento.',
+    '🕗 *Recepção:* das 08h às 18h.',
+    '📍 *Endereço:* Estrada do Frutuoso, 315, Santa Cruz, Rio de Janeiro - RJ.',
+    '',
+    '🎟️ Apresente o voucher com QR Code na recepção. A entrada no parque aquático não está incluída antes da associação.',
+    'Esperamos você! 💜',
+  ].join('\n');
+}
+
 export default function BookingInvite({ booking, onClose }: {
   booking: Booking | null;
   onClose: () => void;
@@ -53,6 +72,24 @@ export default function BookingInvite({ booking, onClose }: {
   const date = booking?.data_visita?.split('-') ?? [];
   const prettyDate = date.length === 3 ? date[2] + '/' + date[1] + '/' + date[0] : booking?.data_visita;
   const code = booking?.qr_token ? 'SPLASH:AG:1:' + booking.qr_token : '';
+
+  async function openWhatsApp() {
+    if (!booking) return;
+    setError('');
+    const digits = booking.telefone.replace(/\D/g, '');
+    if (![10, 11, 12, 13].includes(digits.length)) {
+      setError('Telefone do agendamento inválido para abrir o WhatsApp.');
+      return;
+    }
+    const phone = digits.startsWith('55') && digits.length >= 12 ? digits : '55' + digits;
+    const url = 'https://wa.me/' + phone + '?text=' +
+      encodeURIComponent(whatsAppMessage(booking, prettyDate || booking.data_visita));
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setError('Não foi possível abrir o WhatsApp. Confira se ele está disponível.');
+    }
+  }
 
   async function share() {
     if (!card.current || !booking || sharing || !code) return;
@@ -154,6 +191,11 @@ export default function BookingInvite({ booking, onClose }: {
         </View>}
       </ScrollView>
       {error !== '' && <Text style={styles.error}>{error}</Text>}
+      <Pressable onPress={() => { void openWhatsApp(); }} disabled={!booking || sharing}
+        style={[styles.whatsapp, sharing && styles.disabled]} accessibilityRole="button">
+        <SymbolView name={{ios:'message.fill',android:'chat'}} size={20} tintColor="#FFFFFF"/>
+        <Text style={styles.shareText}>WhatsApp · abrir conversa com mensagem</Text>
+      </Pressable>
       <Pressable onPress={() => { void share(); }} disabled={!booking || sharing}
         style={[styles.share, sharing && styles.disabled]} accessibilityRole="button">
         {sharing ? <ActivityIndicator color="#FFFFFF" /> : <>
@@ -161,7 +203,10 @@ export default function BookingInvite({ booking, onClose }: {
           <Text style={styles.shareText}>Compartilhar voucher em PNG</Text>
         </>}
       </Pressable>
-      <Text style={styles.footer}>Válido somente na data indicada. Entrada no parque aquático não inclusa.</Text>
+      <Text style={styles.footer}>
+        A mensagem fica pronta na conversa; confirme o envio no WhatsApp.
+        Para anexar o PNG, use Compartilhar e escolha a conversa do cliente.
+      </Text>
     </SafeAreaView>
   </Modal>;
 }
@@ -202,6 +247,8 @@ const styles = StyleSheet.create({
   address: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, borderTopWidth: 1, borderTopColor: '#E5DFFF', paddingTop: 5 },
   addressHeading: { fontSize: 8, fontWeight: '900', color: colors.brandDark, marginTop: 1 },
   addressText: { fontSize: 8.8, fontWeight: '800', lineHeight: 11, color: colors.navy, flex: 1 },
+  whatsapp: { backgroundColor: '#177E53', minHeight: 50, borderRadius: 15, marginHorizontal: 5,
+    flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
   share: { backgroundColor: colors.brand, minHeight: 55, borderRadius: 17, marginHorizontal: 5,
     flexDirection: 'row', gap: 11, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
