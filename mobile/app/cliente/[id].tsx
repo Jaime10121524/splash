@@ -30,7 +30,7 @@ function isoDate(d:string){
   return dt.getUTCFullYear()===y && dt.getUTCMonth()===m-1 && dt.getUTCDate()===day
     ?p[2]+'-'+p[1]+'-'+p[0]:'';
 }
-const money=value=>{
+const money=(value:string)=>{
   const s=value.trim().replace(/\./g,'').replace(',','.');
   return /^\d+(?:\.\d{1,2})?$/.test(s)?s:null;
 };
