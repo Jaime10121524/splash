@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
@@ -21,8 +21,8 @@ export default function LoginScreen() {
   const [checking, setChecking] = useState(false);
   const [connection, setConnection] = useState('');
   const [formActive, setFormActive] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => {
