@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable,
+  ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -10,14 +10,28 @@ import * as Haptics from 'expo-haptics';
 import { apiRequest, MobileClient, MobileVisitOptions } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet from '../../src/components/ChoiceSheet';
+import ActionModal from '../../src/components/ActionModal';
 import { colors } from '../../src/theme';
 
-type BrokerField = 'main' | 'second' | null;
+type BrokerField = 'main' | 'second' | 'origin' | 'owner' | null;
 
 export default function NewVisitScreen() {
   const { token } = useAuth();
   const [options, setOptions] = useState<MobileVisitOptions | null>(null);
   const [selected, setSelected] = useState<MobileClient | null>(null);
+  const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing');
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newCpf, setNewCpf] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [extraFields, setExtraFields] = useState(false);
+  const [originId, setOriginId] = useState<number | null>(null);
+  const [ownerId, setOwnerId] = useState<number | null>(null);
+  const [indicator, setIndicator] = useState<MobileClient | null>(null);
+  const [indicatorQuery, setIndicatorQuery] = useState('');
+  const [indicatorResults, setIndicatorResults] = useState<MobileClient[]>([]);
+  const [indicatorSearching, setIndicatorSearching] = useState(false);
+  const [registeredVisit, setRegisteredVisit] = useState<{ id: number; title: string; description: string } | null>(null);
   const [clients, setClients] = useState<MobileClient[]>([]);
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -36,6 +50,7 @@ export default function NewVisitScreen() {
         if (!mounted) return;
         setOptions(value);
         setMain(value.minha_pessoa_id);
+        setOwnerId(value.minha_pessoa_id);
       })
       .catch(e => { if (mounted) setError(e instanceof Error ? e.message : 'Não foi possível carregar os corretores.'); })
       .finally(() => { if (mounted) setLoading(false); });
@@ -43,7 +58,7 @@ export default function NewVisitScreen() {
   }, [token]);
 
   useEffect(() => {
-    if (!token || query.trim().length < 2 || selected) {
+    if (!token || clientMode !== 'existing' || query.trim().length < 2 || selected) {
       setClients([]); setSearching(false); return;
     }
     let active = true;
@@ -55,33 +70,83 @@ export default function NewVisitScreen() {
         .finally(() => { if (active) setSearching(false); });
     }, 350);
     return () => { active = false; clearTimeout(job); };
-  }, [token, query, selected]);
+  }, [token, query, selected, clientMode]);
+
+  useEffect(() => {
+    if (!token || clientMode !== 'new' || indicator || indicatorQuery.trim().length < 2) {
+      setIndicatorResults([]); setIndicatorSearching(false); return;
+    }
+    let active = true;
+    setIndicatorSearching(true);
+    const job = setTimeout(() => {
+      apiRequest<{ clientes: MobileClient[] }>('mobile/clientes?q=' + encodeURIComponent(indicatorQuery.trim()), { token })
+        .then(result => { if (active) setIndicatorResults(result.clientes); })
+        .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Não foi possível pesquisar quem indicou.'); })
+        .finally(() => { if (active) setIndicatorSearching(false); });
+    }, 350);
+    return () => { active = false; clearTimeout(job); };
+  }, [token, clientMode, indicator, indicatorQuery]);
 
   async function register() {
-    if (saving || !selected || !main || !token) {
-      setError('Escolha um cliente e o corretor responsável.');
+    if (saving || !main || !token) {
+      setError('Escolha o corretor responsável.');
       return;
+    }
+    if (clientMode === 'existing' && !selected) {
+      setError('Selecione um cliente cadastrado ou escolha Novo cliente.');
+      return;
+    }
+    if (clientMode === 'new') {
+      const digits = newPhone.replace(/\D/g, '');
+      if (!newName.trim() || newName.trim().length > 160) {
+        setError('Informe o nome do cliente, com até 160 caracteres.');
+        return;
+      }
+      if (![10, 11].includes(digits.length)) {
+        setError('Informe um telefone com DDD válido.');
+        return;
+      }
+      if (!originId) {
+        setError('Selecione a origem do lead.');
+        return;
+      }
     }
     if (second === main) {
       setError('O segundo corretor deve ser diferente do primeiro.');
       return;
     }
+    const owner = options?.minha_pessoa_id ?? ownerId ?? main;
     setSaving(true);
     setError('');
+    Keyboard.dismiss();
     try {
-      const result = await apiRequest<{ message: string; visita_id: number; retomada?: boolean }>(
+      const clientData = clientMode === 'existing'
+        ? { cliente_id: selected!.id }
+        : { novo_cliente: {
+            nome: newName.trim(), telefone: newPhone.replace(/\D/g, ''),
+            cpf: newCpf.replace(/\D/g, ''), email: newEmail.trim(),
+            origem_id: originId, indicador_cliente_id: indicator?.id ?? null,
+            dono_corrente_pessoa_id: owner,
+          } };
+      const result = await apiRequest<{ message: string; visita_id: number; retomada?: boolean; cliente_cadastrado?: boolean }>(
         'mobile/atendimentos/chegada', {
-          method: 'POST',
-          token,
-          body: { cliente_id: selected.id, corretor_pessoa_id: main, segundo_corretor_pessoa_id: second },
+          method: 'POST', token,
+          body: {
+            ...clientData, corretor_pessoa_id: main,
+            segundo_corretor_pessoa_id: second,
+          },
         },
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(result.retomada ? 'Visita retomada' : 'Chegada registrada', result.message, [
-        { text: 'Abrir atendimento', onPress: () => router.replace({
-          pathname: '/atendimento/[id]', params: { id: String(result.visita_id) },
-        }) },
-      ]);
+      setRegisteredVisit({
+        id: result.visita_id,
+        title: result.retomada ? 'Visita retomada!' : 'Chegada registrada!',
+        description: clientMode === 'new'
+          ? newName.trim() + ' foi cadastrado e a chegada registrada com sucesso.'
+          : (result.retomada
+            ? 'A visita de hoje foi reaberta, sem duplicar o atendimento.'
+            : 'O cliente já está na lista de atendimentos, com o horário registrado.'),
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível registrar a chegada.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -93,6 +158,10 @@ export default function NewVisitScreen() {
   const brokers = (options?.corretores ?? []).map(p => ({ id: p.id, label: p.nome }));
   const mainName = options?.corretores.find(p => p.id === main)?.nome;
   const secondName = options?.corretores.find(p => p.id === second)?.nome;
+  const origin = options?.origens.find(o => o.id === originId);
+  const effectiveOwner = options?.minha_pessoa_id ?? ownerId ?? main;
+  const ownerName = options?.atendentes.find(p => p.id === effectiveOwner)?.nome ?? '';
+  const isNew = clientMode === 'new';
 
   return <SafeAreaView style={styles.root} edges={['top']}>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -113,7 +182,7 @@ export default function NewVisitScreen() {
             <SymbolView name={{ ios: 'person.crop.circle.badge.plus', android: 'person_add' }} size={25} tintColor="#FFFFFF" />
           </View>
           <Text style={styles.heroTitle}>Tudo começa{'\n'}com uma chegada.</Text>
-          <Text style={styles.heroSub}>Escolha um cliente cadastrado e o corretor da visita.</Text>
+          <Text style={styles.heroSub}>Encontre o cliente ou faça um cadastro rápido, sem sair da chegada.</Text>
         </View>
 
         {!!error && <View style={styles.feedback}>
@@ -129,7 +198,21 @@ export default function NewVisitScreen() {
             <Text style={styles.stepNumber}>01</Text>
             <Text style={styles.sectionTitle}>Cliente da visita</Text>
           </View>
-          {selected ? <View style={styles.selectedClient}>
+          <View style={styles.modeSwitch}>
+            <Pressable accessibilityRole="button" onPress={() => { setClientMode('existing'); setError(''); }}
+              style={[styles.modeItem, !isNew && styles.modeActive]}>
+              <SymbolView name={{ ios: 'magnifyingglass', android: 'search' }} size={17}
+                tintColor={!isNew ? colors.brandDark : colors.muted} />
+              <Text style={[styles.modeText, !isNew && styles.modeTextActive]}>Já cadastrado</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => { setClientMode('new'); setError(''); setSelected(null); }}
+              style={[styles.modeItem, isNew && styles.modeActive]}>
+              <SymbolView name={{ ios: 'person.badge.plus', android: 'person_add' }} size={17}
+                tintColor={isNew ? colors.brandDark : colors.muted} />
+              <Text style={[styles.modeText, isNew && styles.modeTextActive]}>Novo cliente</Text>
+            </Pressable>
+          </View>
+          {!isNew && (selected ? <View style={styles.selectedClient}>
             <View style={styles.clientAvatar}><Text style={styles.avatarText}>{selected.nome.slice(0, 1).toUpperCase()}</Text></View>
             <View style={styles.clientInfo}><Text style={styles.clientName}>{selected.nome}</Text><Text style={styles.clientSub}>{selected.telefone || 'Sem telefone informado'}</Text></View>
             <Pressable onPress={() => { setSelected(null); setQuery(''); }} accessibilityLabel="Trocar cliente">
@@ -153,7 +236,70 @@ export default function NewVisitScreen() {
               <View style={styles.clientInfo}><Text style={styles.clientName}>{client.nome}</Text><Text style={styles.clientSub}>{client.telefone || 'Sem telefone'}</Text></View>
               <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right' }} size={20} tintColor={colors.muted} />
             </Pressable>)}
-          </>}
+          </>)}
+          {isNew && <View style={styles.newFields}>
+            <Text style={styles.fieldLabel}>Nome completo *</Text>
+            <TextInput style={styles.newInput} value={newName} onChangeText={setNewName}
+              placeholder="Nome do cliente" placeholderTextColor="#A09BB4"
+              autoCapitalize="words" maxLength={160} accessibilityLabel="Nome completo do novo cliente" />
+            <Text style={[styles.fieldLabel, styles.fieldSpace]}>WhatsApp / telefone com DDD *</Text>
+            <TextInput style={styles.newInput} value={newPhone} onChangeText={setNewPhone}
+              placeholder="(21) 99999-9999" placeholderTextColor="#A09BB4"
+              keyboardType="phone-pad" maxLength={20} accessibilityLabel="Telefone do novo cliente" />
+            <Text style={[styles.fieldLabel, styles.fieldSpace]}>Origem do lead *</Text>
+            <Pressable onPress={() => { Keyboard.dismiss(); setSheet('origin'); }}
+              style={styles.selectBox} accessibilityRole="button">
+              <Text style={[styles.selectValue, !origin && styles.placeholder]}>{origin?.nome || 'Selecionar origem'}</Text>
+              <SymbolView name={{ ios: 'chevron.up.chevron.down', android: 'unfold_more' }} size={18} tintColor={colors.brandDark} />
+            </Pressable>
+            {origin?.permite_indicador && <View style={styles.fieldSpace}>
+              <Text style={styles.fieldLabel}>Quem indicou? (opcional)</Text>
+              {indicator ? <View style={styles.selectedClient}>
+                <View style={styles.clientInfo}><Text style={styles.clientName}>{indicator.nome}</Text>
+                  <Text style={styles.clientSub}>A corrente será herdada deste cliente</Text></View>
+                <Pressable onPress={() => { setIndicator(null); setIndicatorQuery(''); }} accessibilityLabel="Remover indicação">
+                  <SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel' }} size={21} tintColor={colors.muted} />
+                </Pressable>
+              </View> : <>
+                <View style={styles.searchBox}>
+                  <SymbolView name={{ ios: 'magnifyingglass', android: 'search' }} size={19} tintColor={colors.brandDark} />
+                  <TextInput style={styles.searchInput} placeholder="Pesquisar indicador"
+                    placeholderTextColor="#A09BB4" value={indicatorQuery} onChangeText={setIndicatorQuery} />
+                  {indicatorSearching && <ActivityIndicator size="small" color={colors.brand} />}
+                </View>
+                {indicatorResults.map(item => <Pressable key={item.id} style={styles.clientResult}
+                  onPress={() => { Keyboard.dismiss(); setIndicator(item); setIndicatorResults([]); }}>
+                  <Text style={styles.clientName}>{item.nome}</Text>
+                  <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right' }} size={18} tintColor={colors.muted} />
+                </Pressable>)}
+              </>}
+            </View>}
+            {!indicator && <View style={styles.fieldSpace}>
+              <Text style={styles.fieldLabel}>Dono da corrente *</Text>
+              {options?.minha_pessoa_id != null ? <View style={styles.ownerFixed}>
+                <SymbolView name={{ ios: 'person.crop.circle', android: 'account_circle' }} size={19} tintColor={colors.brandDark} />
+                <Text style={styles.ownerText}>{ownerName || 'Sua corrente'}</Text>
+              </View> : <Pressable style={styles.selectBox} onPress={() => { Keyboard.dismiss(); setSheet('owner'); }}
+                accessibilityRole="button">
+                <Text style={[styles.selectValue, !ownerName && styles.placeholder]}>{ownerName || 'Selecionar responsável'}</Text>
+                <SymbolView name={{ ios: 'chevron.up.chevron.down', android: 'unfold_more' }} size={18} tintColor={colors.brandDark} />
+              </Pressable>}
+            </View>}
+            <Pressable onPress={() => setExtraFields(!extraFields)} style={styles.moreButton} accessibilityRole="button">
+              <SymbolView name={{ ios: extraFields ? 'minus.circle' : 'plus.circle', android: extraFields ? 'remove_circle_outline' : 'add_circle_outline' }}
+                size={17} tintColor={colors.brandDark} />
+              <Text style={styles.moreText}>{extraFields ? 'Ocultar dados opcionais' : 'Adicionar CPF e e-mail (opcional)'}</Text>
+            </Pressable>
+            {extraFields && <View>
+              <Text style={styles.fieldLabel}>CPF (opcional)</Text>
+              <TextInput style={styles.newInput} keyboardType="numeric" value={newCpf}
+                onChangeText={setNewCpf} maxLength={14} placeholder="Somente números" placeholderTextColor="#A09BB4" />
+              <Text style={[styles.fieldLabel, styles.fieldSpace]}>E-mail (opcional)</Text>
+              <TextInput style={styles.newInput} keyboardType="email-address" autoCapitalize="none" value={newEmail}
+                onChangeText={setNewEmail} maxLength={254} placeholder="cliente@exemplo.com" placeholderTextColor="#A09BB4" />
+            </View>}
+            <Text style={styles.hint}>O cadastro e a chegada são gravados juntos. Se houver erro, nenhum dos dois será confirmado.</Text>
+          </View>}
         </View>
 
         <View style={styles.section}>
@@ -175,23 +321,50 @@ export default function NewVisitScreen() {
           </>}
         </View>
 
-        <Pressable style={[styles.primary, (saving || loading || !main || !selected) && styles.disabled]}
-          disabled={saving || loading || !main || !selected} onPress={() => { void register(); }}>
+        <Pressable style={[styles.primary, (saving || loading || !main || (!isNew && !selected)) && styles.disabled]}
+          disabled={saving || loading || !main || (!isNew && !selected)} onPress={() => { void register(); }}>
           {saving ? <ActivityIndicator color="#FFFFFF" /> : <>
             <Text style={styles.primaryText}>Confirmar chegada</Text>
             <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" />
           </>}
         </Pressable>
-        <Text style={styles.note}>O horário é registrado automaticamente e as permissões são conferidas no servidor. Esta etapa utiliza clientes já cadastrados.</Text>
+        <Text style={styles.note}>O horário e as permissões são confirmados no servidor. O cliente novo fica disponível também no Splash web.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
     <ChoiceSheet open={sheet !== null}
-      title={sheet === 'main' ? 'Corretor responsável' : 'Segundo corretor'}
-      choices={brokers} selected={sheet === 'main' ? main : second} allowEmpty={sheet === 'second'}
+      title={sheet === 'main' ? 'Corretor responsável' : sheet === 'second' ? 'Segundo corretor'
+        : sheet === 'origin' ? 'Origem do lead' : 'Dono da corrente'}
+      choices={sheet === 'origin'
+        ? (options?.origens || []).map(o => ({ id: o.id, label: o.nome }))
+        : sheet === 'owner'
+          ? (options?.atendentes || []).map(o => ({ id: o.id, label: o.nome }))
+          : brokers}
+      selected={sheet === 'main' ? main : sheet === 'second' ? second
+        : sheet === 'origin' ? originId : ownerId}
+      allowEmpty={sheet === 'second'}
       onClose={() => setSheet(null)} onChoose={value => {
-        if (sheet === 'main') setMain(value);
+        if (sheet === 'main') {
+          if (ownerId === null || ownerId === main) setOwnerId(value);
+          setMain(value);
+        }
         if (sheet === 'second') setSecond(value);
+        if (sheet === 'owner') setOwnerId(value);
+        if (sheet === 'origin') {
+          setOriginId(value);
+          setIndicator(null); setIndicatorQuery('');
+        }
       }} />
+    <ActionModal visible={registeredVisit !== null} variant="success"
+      title={registeredVisit?.title || 'Chegada registrada!'}
+      description={registeredVisit?.description || ''}
+      primaryLabel="Abrir atendimento" secondaryLabel="Voltar para atendimentos"
+      onPrimary={() => {
+        const id = registeredVisit?.id;
+        if (!id) return;
+        setRegisteredVisit(null);
+        router.replace({ pathname: '/atendimento/[id]', params: { id: String(id) } });
+      }}
+      onSecondary={() => { setRegisteredVisit(null); router.back(); }} />
   </SafeAreaView>;
 }
 
@@ -225,6 +398,20 @@ const styles = StyleSheet.create({
   clientName: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   clientSub: { color: colors.muted, fontSize: 11, marginTop: 4 },
   fieldLabel: { color: colors.ink, fontWeight: '800', fontSize: 12, marginBottom: 8 },
+  fieldSpace: { marginTop: 16 },
+  newFields: { marginTop: 6 },
+  newInput: { height: 52, borderWidth: 1, borderColor: colors.line, borderRadius: 15, paddingHorizontal: 15,
+    color: colors.ink, fontSize: 14, backgroundColor: '#FAF9FF' },
+  modeSwitch: { flexDirection: 'row', gap: 5, backgroundColor: colors.background, borderRadius: 15, padding: 5, marginBottom: 20 },
+  modeItem: { flex: 1, minHeight: 45, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  modeActive: { backgroundColor: '#FFFFFF', elevation: 2, shadowColor: '#1B2540', shadowOpacity: .06, shadowRadius: 5 },
+  modeText: { color: colors.muted, fontSize: 12, fontWeight: '800' },
+  modeTextActive: { color: colors.brandDark },
+  ownerFixed: { minHeight: 52, backgroundColor: colors.pale, borderRadius: 14, paddingHorizontal: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 10 },
+  ownerText: { color: colors.brandDark, fontSize: 13, fontWeight: '800', flex: 1 },
+  moreButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 46, marginTop: 9 },
+  moreText: { color: colors.brandDark, fontSize: 12, fontWeight: '700' },
   selectBox: { minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: 15, paddingHorizontal: 15, flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: '#FAF9FF' },
   selectValue: { flex: 1, color: colors.ink, fontSize: 13, fontWeight: '700' },
   placeholder: { color: colors.muted, fontWeight: '500' },
