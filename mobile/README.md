@@ -9,7 +9,7 @@ Primeira entrega independente do frontend web e do aplicativo Capacitor. O aplic
 - Interface mobile criada em React Native: login, início, lista de atendimentos e perfil.
 - Atendimentos consultados com as mesmas regras de visibilidade do corretor ou da gestão.
 - Abas inferiores, gestos de atualização, busca rápida, filtros de status, carregamento e estados vazios.
-- Etapa 2: detalhes de visitas, linha do tempo, registro de chegada para clientes existentes, início, resultado e retomada quando permitida.
+- Etapa 2: detalhes de visitas, linha do tempo, registro de chegada para clientes existentes ou **cadastro rápido integrado**, início, resultado e retomada quando permitida.
 - Registros passam pela API com token, validação de perfil, escopo do corretor, bloqueios de status e histórico auditável.
 - A marca utiliza exatamente as cores do web: roxo #7861F9, escuro #624CDE e claro #EFEAFF.
 - O encerramento como VENDA registra somente o resultado comercial; títulos, parcelas e comissões continuam exclusivos do módulo de Vendas.
@@ -66,10 +66,11 @@ Android: pressionar "a" com emulador configurado ou usar uma build de desenvolvi
 - "GET /api/mobile/atendimentos/{id}": detalhes, status e histórico de uma visita escopada.
 - "GET /api/mobile/atendimento-opcoes": atendentes e corretores ativos e motivos de não fechamento.
 - "GET /api/mobile/clientes?q={consulta}": localiza até 25 clientes ativos, respeitando a corrente do corretor.
-- "POST /api/mobile/atendimentos/chegada": cria ou retoma visita existente hoje, com transação, horário do servidor e regras de corretor.
+- "POST /api/mobile/atendimentos/chegada": aceita `cliente_id` **ou** `novo_cliente` (`nome`, `telefone`, `origem_id`, `dono_corrente_pessoa_id`, CPF/e-mail opcionais, indicação opcional). O cliente é validado com `ClienteRules`, e cliente + corrente + visita são salvos na mesma transação. Preserva o escopo de corretor e bloqueia duplicidade de visitas ativas.
 - "POST /api/mobile/atendimentos/{id}/iniciar": inicia sessão e histórico, exigindo atendente válido.
 - "POST /api/mobile/atendimentos/{id}/finalizar": valida resultado, motivo/retorno, grava histórico e encerra sessão.
 - "POST /api/mobile/atendimentos/{id}/retomar": reabre visita encerrada hoje quando permitido.
+- Confirmação e sucesso das operações de atendimento usam modal visual Splash em vez de `Alert.alert` Android.
 - Nenhum endpoint financeiro foi liberado ao token mobile.
 - O token não deve ser usado na API de sessão web. Nenhuma rota móvel é liberada sem o filtro Shield "tokens:mobile".
 - O frontend trata 403 como falta de permissão, não como uma lista de dados inventados.
@@ -85,4 +86,4 @@ Android: pressionar "a" com emulador configurado ou usar uma build de desenvolvi
 6. Testar no servidor HTTPS (incluindo HostGator), no modo escuro do aparelho e com teclado aberto.
 7. Validar TypeScript e testar compilação Android. Não considerar este PR um APK pronto.
 
-Próximas entregas: cadastro completo de clientes pelo app, vendas, notificações nativas, financeiro e fluxos por perfil. Registrar chegada nesta etapa exige cliente já cadastrado.
+Próximas entregas: cadastro completo/edição de clientes pelo app, vendas, notificações nativas, financeiro e fluxos por perfil. O cadastro rápido na chegada coleta somente os campos necessários e alguns opcionais.
