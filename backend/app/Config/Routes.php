@@ -12,6 +12,7 @@ $routes->group('api', static function ($routes): void {
     // React Native: autenticação stateless com token Shield; não altera a sessão SPA.
     // Escopo "mobile" é obrigatório em cada endpoint protegido.
     $routes->group('mobile', static function ($routes): void {
+        $routes->get('ping', 'Api\MobileController::ping');
         $routes->post('login', 'Api\MobileController::login');
         $routes->group('', ['filter' => 'tokens:mobile'], static function ($routes): void {
             $routes->get('me', 'Api\MobileController::me');
