@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
   RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
@@ -42,7 +42,7 @@ export default function AgendamentosScreen() {
   const { token } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const lockedScan = useRef(false);
-  const formScroll = useRef<ScrollView>(null);
+  const formScroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const scrollFormToBottom = () => {
     setTimeout(() => formScroll.current?.scrollToEnd({ animated: true }), 220);
   };
