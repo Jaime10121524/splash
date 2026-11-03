@@ -120,3 +120,31 @@ export async function baixarConvite(agenda) {
   link.href=uri;link.download='splash-park-fazendinha-voucher-'+agenda.id+'.png'
   document.body.appendChild(link);link.click();link.remove()
 }
+
+
+// wa.me abre o contato correto com texto pronto; o envio exige ação do usuário.
+// A imagem PNG é compartilhada separadamente pelo app/WhatsApp.
+export function linkWhatsAppAgendamento(agenda) {
+  const digits=String(agenda.telefone||'').replace(/\D/g,'')
+  if (![10,11,12,13].includes(digits.length)) throw new Error('WhatsApp do cliente inválido.')
+  const phone=digits.startsWith('55') && digits.length>=12 ? digits : '55'+digits
+  const day=String(agenda.data_visita||'').split('-')
+  const date=day.length===3 ? day[2]+'/'+day[1]+'/'+day[0] : String(agenda.data_visita||'')
+  const message=[
+    'Olá, *'+agenda.nome_completo+'*! 💜🌿',
+    '',
+    'Sua visita ao *SPLASH PARK FAZENDINHA* está confirmada! 🎉',
+    '📅 *Data:* '+date,
+    '👨‍👩‍👧‍👦 *Pessoas:* '+agenda.quantidade_pessoas,
+    '🤝 *Corretor responsável:* '+(agenda.captador_nome||'Equipe Splash'),
+    '',
+    '☕ Café de boas-vindas para quem chega até as 10h.',
+    '🌳 Tour pelo clube e utilização da área rural após o atendimento.',
+    '🕗 *Recepção:* das 08h às 18h.',
+    '📍 *Endereço:* Estrada do Frutuoso, 315, Santa Cruz, Rio de Janeiro - RJ.',
+    '',
+    '🎟️ Apresente o voucher com QR Code na recepção. O parque aquático não está incluso antes da associação.',
+    'Esperamos você! 💜',
+  ].join('\n')
+  return 'https://wa.me/'+phone+'?text='+encodeURIComponent(message)
+}
