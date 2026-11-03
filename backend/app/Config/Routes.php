@@ -18,6 +18,14 @@ $routes->group('api', static function ($routes): void {
             $routes->get('me', 'Api\MobileController::me');
             $routes->post('logout', 'Api\MobileController::logout');
             $routes->get('atendimentos', 'Api\MobileController::atendimentos');
+            // Operações nativas mantêm o filtro Shield tokens:mobile.
+            $routes->get('atendimento-opcoes', 'Api\MobileVisitasController::options');
+            $routes->get('clientes', 'Api\MobileVisitasController::clients');
+            $routes->post('atendimentos/chegada', 'Api\MobileVisitasController::arrival');
+            $routes->get('atendimentos/(:num)', 'Api\MobileVisitasController::show/$1');
+            $routes->post('atendimentos/(:num)/iniciar', 'Api\MobileVisitasController::start/$1');
+            $routes->post('atendimentos/(:num)/finalizar', 'Api\MobileVisitasController::finish/$1');
+            $routes->post('atendimentos/(:num)/retomar', 'Api\MobileVisitasController::resume/$1');
         });
     });
     $routes->post('session/login', 'Api\\SessionController::login', ['filter' => 'csrf']);
