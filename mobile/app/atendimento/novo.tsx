@@ -11,6 +11,7 @@ import { apiRequest, MobileClient, MobileVisitOptions } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
+import ResumeAttendantModal from '../../src/components/ResumeAttendantModal';
 import { editMaskedPhoneBR, maskPhoneBR, phoneDigits } from '../../src/phone';
 import { colors } from '../../src/theme';
 
@@ -33,6 +34,11 @@ export default function NewVisitScreen() {
   const [indicatorResults, setIndicatorResults] = useState<MobileClient[]>([]);
   const [indicatorSearching, setIndicatorSearching] = useState(false);
   const [registeredVisit, setRegisteredVisit] = useState<{ id: number; title: string; description: string } | null>(null);
+  const [resumeCandidate, setResumeCandidate] = useState<{
+    id: number;
+    attendantId: number | null;
+    attendantName: string | null;
+  } | null>(null);
   const [clients, setClients] = useState<MobileClient[]>([]);
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -121,6 +127,22 @@ export default function NewVisitScreen() {
     setError('');
     Keyboard.dismiss();
     try {
+      if (clientMode === 'existing') {
+        const preview = await apiRequest<{
+          retomavel: boolean;
+          visita_id?: number;
+          atendente_pessoa_id?: number | null;
+          atendente_nome?: string | null;
+        }>('mobile/cliente-visita-retomavel?cliente_id=' + selected!.id, { token });
+        if (preview.retomavel && preview.visita_id) {
+          setResumeCandidate({
+            id: preview.visita_id,
+            attendantId: preview.atendente_pessoa_id ?? null,
+            attendantName: preview.atendente_nome ?? null,
+          });
+          return;
+        }
+      }
       const clientData = clientMode === 'existing'
         ? { cliente_id: selected!.id }
         : { novo_cliente: {
@@ -154,6 +176,31 @@ export default function NewVisitScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function resumeFromArrival(mode: 'mesmo' | 'outro', newId: number | null) {
+    if (!token || !resumeCandidate) throw new Error('Escolha uma visita para retomar.');
+    const result = await apiRequest<{ message: string }>(
+      'mobile/atendimentos/' + resumeCandidate.id + '/retomar', {
+        method: 'POST',
+        token,
+        body: {
+          modo_atendente: mode,
+          ...(mode === 'outro' ? { atendente_pessoa_id: newId } : {}),
+          corretor_pessoa_id: main,
+          segundo_corretor_pessoa_id: second,
+        },
+      },
+    );
+    const resumedId = resumeCandidate.id;
+    setResumeCandidate(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // Evita dois modais simultâneos no Android.
+    setTimeout(() => setRegisteredVisit({
+      id: resumedId,
+      title: 'Atendimento retomado!',
+      description: result.message,
+    }), 360);
   }
 
   const brokers = (options?.corretores ?? []).map(p => ({ id: p.id, label: p.nome }));
@@ -357,6 +404,12 @@ export default function NewVisitScreen() {
           setIndicator(null); setIndicatorQuery('');
         }
       }} />
+    <ResumeAttendantModal visible={resumeCandidate !== null}
+      attendantId={resumeCandidate?.attendantId ?? null}
+      attendantName={resumeCandidate?.attendantName ?? null}
+      attendants={options?.atendentes ?? []}
+      onClose={() => setResumeCandidate(null)}
+      onConfirm={resumeFromArrival} />
     <ActionModal visible={registeredVisit !== null} variant="success"
       title={registeredVisit?.title || 'Chegada registrada!'}
       description={registeredVisit?.description || ''}
