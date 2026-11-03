@@ -99,7 +99,8 @@ final class AgendamentosController extends BaseController
         return $db->table('agendamentos a')
             ->select('a.*,p.nome AS captador_nome,c.nome AS corretor_confirmado_nome,
                 s.nome AS segundo_corretor_nome,t.nome AS atendente_nome,
-                v.status AS visita_status')
+                COALESCE(op.situacao,v.status) AS visita_status')
+            ->join('venda_operacoes op','op.visita_id=a.visita_id','left')
             ->join('pessoas p','p.id=a.captador_pessoa_id')
             ->join('pessoas c','c.id=a.corretor_confirmado_pessoa_id','left')
             ->join('pessoas s','s.id=a.segundo_corretor_pessoa_id','left')
@@ -114,40 +115,49 @@ final class AgendamentosController extends BaseController
         $db=db_connect();
         $search=trim((string)($this->request->getGet('q')??''));
         if (mb_strlen($search)>100) return $this->deny(422,'Pesquisa muito longa.');
+        // Indicadores são agregados sobre TODO o filtro, não apenas os 150
+        // registros renderizados. A operação vinculada tem prioridade sobre
+        // o status histórico da visita.
         $builder=$this->rows($db);
-        if ($actor['scope']!==null) {
-            $builder->groupStart()
-                ->where('a.captador_pessoa_id',$actor['scope'])
-                ->orWhere('a.corretor_confirmado_pessoa_id',$actor['scope'])
-                ->orWhere('a.segundo_corretor_pessoa_id',$actor['scope'])
-                ->groupEnd();
+        $statsBuilder=$db->table('agendamentos a')
+            ->select("
+                SUM(CASE WHEN a.situacao <> 'CANCELADO' THEN 1 ELSE 0 END) AS agendados,
+                SUM(CASE WHEN a.situacao = 'COMPARECEU' THEN 1 ELSE 0 END) AS compareceram,
+                SUM(CASE WHEN a.situacao = 'AGENDADO'
+                    AND a.data_visita < CURDATE() THEN 1 ELSE 0 END) AS nao_compareceram,
+                SUM(CASE WHEN a.situacao = 'COMPARECEU'
+                    AND (v.status = 'VENDA' OR op.situacao = 'VENDA') THEN 1 ELSE 0 END) AS vendas,
+                SUM(CASE WHEN a.situacao = 'CANCELADO' THEN 1 ELSE 0 END) AS cancelados
+            ",false)
+            ->join('visitas v','v.id=a.visita_id','left')
+            ->join('venda_operacoes op','op.visita_id=a.visita_id','left');
+        foreach ([$builder,$statsBuilder] as $query) {
+            if ($actor['scope']!==null) {
+                $query->groupStart()
+                    ->where('a.captador_pessoa_id',$actor['scope'])
+                    ->orWhere('a.corretor_confirmado_pessoa_id',$actor['scope'])
+                    ->orWhere('a.segundo_corretor_pessoa_id',$actor['scope'])
+                    ->groupEnd();
+            }
+            if ($search!=='') {
+                $digits=preg_replace('/\D/','',$search);
+                $query->groupStart()->like('a.nome_completo',$search);
+                if(strlen($digits)>=3) $query->orLike('a.telefone',$digits);
+                if(ctype_digit($search)) $query->orWhere('a.id',(int)$search);
+                $query->groupEnd();
+            }
+            if ($periodStart) $query->where('a.data_visita >=',$periodStart);
+            if ($periodEnd) $query->where('a.data_visita <=',$periodEnd);
         }
-        if ($search!=='') {
-            $builder->groupStart()->like('a.nome_completo',$search)
-                ->orLike('a.telefone',preg_replace('/\D/','',$search));
-            if (ctype_digit($search)) $builder->orWhere('a.id',(int)$search);
-            $builder->groupEnd();
-        }
-        $periodStart=(string)($this->request->getGet('inicio')??'');
-        $periodEnd=(string)($this->request->getGet('fim')??'');
-        if ($periodStart && !$this->validDate($periodStart) || $periodEnd && !$this->validDate($periodEnd)
-            || $periodStart && $periodEnd && $periodStart>$periodEnd) {
-            return $this->deny(422,'Período inválido.');
-        }
-        if ($periodStart) $builder->where('a.data_visita >=',$periodStart);
-        if ($periodEnd) $builder->where('a.data_visita <=',$periodEnd);
         $total=$builder->countAllResults(false);
         $rows=$builder->orderBy('a.data_visita','DESC')->orderBy('a.id','DESC')
             ->limit(150)->get()->getResultArray();
         foreach ($rows as &$row) $row=$this->output($row);
         unset($row);
-        $stats=['agendados'=>0,'compareceram'=>0,'nao_compareceram'=>0,'vendas'=>0,'cancelados'=>0];
-        foreach ($rows as $row) {
-            if ($row['situacao']==='CANCELADO') { $stats['cancelados']++; continue; }
-            $stats['agendados']++;
-            if ($row['situacao']==='COMPARECEU') $stats['compareceram']++;
-            elseif ($row['data_visita']<date('Y-m-d')) $stats['nao_compareceram']++;
-            if ($row['visita_status']==='VENDA') $stats['vendas']++;
+        $sums=$statsBuilder->get()->getRowArray()?:[];
+        $stats=[];
+        foreach (['agendados','compareceram','nao_compareceram','vendas','cancelados'] as $field) {
+            $stats[$field]=(int)($sums[$field]??0);
         }
         $stats['taxa_comparecimento']=$stats['agendados']>0
             ? round(100*$stats['compareceram']/$stats['agendados'],1):0;
