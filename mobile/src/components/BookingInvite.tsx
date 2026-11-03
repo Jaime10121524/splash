@@ -208,7 +208,7 @@ export default function BookingInvite({ booking, onClose }: {
         style={[styles.whatsapp, sharing && styles.disabled]} accessibilityRole="button">
         {sharing ? <ActivityIndicator color="#FFFFFF" /> : <>
           <SymbolView name={{ios:'message.fill',android:'chat'}} size={20} tintColor="#FFFFFF"/>
-          <Text style={styles.shareText}>Enviar foto + mensagem no WhatsApp</Text>
+          <Text style={styles.shareText}>Compartilhar foto + copiar mensagem</Text>
         </>}
       </Pressable>
       <Pressable onPress={() => { void share(false); }} disabled={!booking || sharing}
