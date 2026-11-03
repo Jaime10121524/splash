@@ -9,7 +9,7 @@ Primeira entrega independente do frontend web e do aplicativo Capacitor. O aplic
 - Interface mobile criada em React Native: login, início, lista de atendimentos e perfil.
 - Atendimentos consultados com as mesmas regras de visibilidade do corretor ou da gestão.
 - Abas inferiores, gestos de atualização, busca rápida, filtros de status, carregamento e estados vazios.
-- Etapa 2: detalhes de visitas, linha do tempo, registro de chegada para clientes existentes ou **cadastro rápido integrado**, início, resultado e retomada quando permitida.
+- Etapa 2: detalhes de visitas, linha do tempo, registro de chegada para clientes existentes ou **cadastro rápido integrado**, início, resultado e retomada quando permitida. Telefones usam máscara brasileira visual e vão à API só com dígitos.
 - Registros passam pela API com token, validação de perfil, escopo do corretor, bloqueios de status e histórico auditável.
 - A marca utiliza exatamente as cores do web: roxo #7861F9, escuro #624CDE e claro #EFEAFF.
 - O encerramento como VENDA registra somente o resultado comercial; títulos, parcelas e comissões continuam exclusivos do módulo de Vendas.
@@ -69,17 +69,20 @@ Android: pressionar "a" com emulador configurado ou usar uma build de desenvolvi
 - "POST /api/mobile/atendimentos/chegada": aceita `cliente_id` **ou** `novo_cliente` (`nome`, `telefone`, `origem_id`, `dono_corrente_pessoa_id`, CPF/e-mail opcionais, indicação opcional). O cliente é validado com `ClienteRules`, e cliente + corrente + visita são salvos na mesma transação. Preserva o escopo de corretor e bloqueia duplicidade de visitas ativas.
 - "POST /api/mobile/atendimentos/{id}/iniciar": inicia sessão e histórico, exigindo atendente válido.
 - "POST /api/mobile/atendimentos/{id}/finalizar": valida resultado, motivo/retorno, grava histórico e encerra sessão.
-- "POST /api/mobile/atendimentos/{id}/retomar": reabre visita encerrada hoje quando permitido.
+- "GET /api/mobile/cliente-visita-retomavel?cliente_id={id}": verifica, dentro das permissões do usuário, se já existe visita finalizada hoje, antes de registrar chegada.
+- "POST /api/mobile/atendimentos/{id}/retomar": recebe `modo_atendente=mesmo|outro` e, quando diferente, `atendente_pessoa_id`. Retoma a MESMA visita e inicia uma nova sessão com o atendente escolhido na mesma transação, validando perfil e status; aceita corretores opcionais da tela de chegada e registra a alteração em `visita_atendente_trocas`.
+- Na chegada de cliente existente, se houver visita encerrada hoje, pergunta antes de confirmar se será o mesmo atendente ou outro. Cancelar não altera o atendimento.
+- Uma troca de atendente é permitida apenas mediante escolha explícita na retomada do mesmo dia; retornos em outros dias mantêm a regra do sistema web.
 - Confirmação e sucesso das operações de atendimento usam modal visual Splash em vez de `Alert.alert` Android.
 - Nenhum endpoint financeiro foi liberado ao token mobile.
 - O token não deve ser usado na API de sessão web. Nenhuma rota móvel é liberada sem o filtro Shield "tokens:mobile".
 - O frontend trata 403 como falta de permissão, não como uma lista de dados inventados.
-- O app não tem funções offline de escrita nem permite operar uma visita nesta primeira entrega; essas ações exigem a mesma validação do backend da versão web.
+- O app não grava sem rede. Ações de visitas são verificadas no backend com o token Shield, e a retomada com troca de atendente é auditada no banco.
 
 ## Homologação obrigatória antes de merge
 
 1. Conferir "php spark routes" e os filtros "tokens:mobile", inclusive tentativa sem token, token inválido e token revogado.
-2. Executar "php spark migrate" somente se houver migrations pendentes. Esta entrega não cria migrations.
+2. Executar `php spark migrate` antes de testar/usar a nova API mobile. A migration `2026-11-03-000001_AuditarTrocaAtendenteRetomadaMobile.php` cria `visita_atendente_trocas` para auditoria. Fazer backup do banco antes de migrar.
 3. Verificar login, sessão restaurada após reinício, logout e expiração do token no Android real.
 4. Conferir as permissões usando administrador, corretor com pessoa vinculada, corretor sem vínculo e vendedor.
 5. Verificar isolamento de visitas entre corretores, telefones e dados de cliente.
