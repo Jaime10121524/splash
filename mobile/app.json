@@ -26,6 +26,15 @@
           "cameraPermission": "Permitir que o Splash Next utilize a câmera para ler os QR Codes de agendamentos.",
           "recordAudioAndroid": false
         }
+      ],
+      [
+        "react-native-share",
+        {
+          "android": [
+            "com.whatsapp",
+            "com.whatsapp.w4b"
+          ]
+        }
       ]
     ],
     "experiments": {
