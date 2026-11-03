@@ -4,6 +4,7 @@ import { baixarConvite } from '../lib/agendamentoQr.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
 import { SurfaceModal } from '../components/ComercialForms.jsx'
 import './Agendamentos.css'
+import TransientNotice from '../components/TransientNotice.jsx'
 
 const cleanPhone=value=>String(value||'').replace(/\D/g,'').slice(0,11)
 const options=(catalogs,role)=>personOptions(catalogs.pessoas||[],role).filter(p=>p.value!=='')
@@ -131,8 +132,7 @@ export default function Agendamentos({navigate=()=>{}}) {
         <p>Converta visitas marcadas em comparecimentos e acompanhe os fechamentos.</p></div>
       <button className="agenda-primary" onClick={()=>{setError('');setModal({type:'new'})}}>+ Agendar visita</button>
     </header>
-    {notice&&<div role="status" className="agenda-feedback success">{notice}
-      <button onClick={()=>setNotice('')}>Fechar</button></div>}
+    <TransientNotice message={notice} onClose={()=>setNotice('')} />
     {error&&<div role="alert" className="agenda-feedback error">{error}
       <button onClick={()=>setError('')}>Fechar</button></div>}
 
