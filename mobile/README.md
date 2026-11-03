@@ -9,7 +9,10 @@ Primeira entrega independente do frontend web e do aplicativo Capacitor. O aplic
 - Interface mobile criada em React Native: login, início, lista de atendimentos e perfil.
 - Atendimentos consultados com as mesmas regras de visibilidade do corretor ou da gestão.
 - Abas inferiores, gestos de atualização, busca rápida, filtros de status, carregamento e estados vazios.
-- Nenhuma venda, cliente, visita ou comissão é modificada nesta entrega (consulta somente).
+- Etapa 2: detalhes de visitas, linha do tempo, registro de chegada para clientes existentes, início, resultado e retomada quando permitida.
+- Registros passam pela API com token, validação de perfil, escopo do corretor, bloqueios de status e histórico auditável.
+- A marca utiliza exatamente as cores do web: roxo #7861F9, escuro #624CDE e claro #EFEAFF.
+- O encerramento como VENDA registra somente o resultado comercial; títulos, parcelas e comissões continuam exclusivos do módulo de Vendas.
 
 ## Pré-requisitos
 
@@ -60,6 +63,14 @@ Android: pressionar "a" com emulador configurado ou usar uma build de desenvolvi
 - "GET /api/mobile/me": token Shield Bearer, escopo mobile.
 - "POST /api/mobile/logout": revoga o token apresentado.
 - "GET /api/mobile/atendimentos?periodo=hoje|todos": consulta escopada à pessoa vinculada ao corretor. Máximo de 100 itens exibidos; servidor retorna contadores reais.
+- "GET /api/mobile/atendimentos/{id}": detalhes, status e histórico de uma visita escopada.
+- "GET /api/mobile/atendimento-opcoes": atendentes e corretores ativos e motivos de não fechamento.
+- "GET /api/mobile/clientes?q={consulta}": localiza até 25 clientes ativos, respeitando a corrente do corretor.
+- "POST /api/mobile/atendimentos/chegada": cria ou retoma visita existente hoje, com transação, horário do servidor e regras de corretor.
+- "POST /api/mobile/atendimentos/{id}/iniciar": inicia sessão e histórico, exigindo atendente válido.
+- "POST /api/mobile/atendimentos/{id}/finalizar": valida resultado, motivo/retorno, grava histórico e encerra sessão.
+- "POST /api/mobile/atendimentos/{id}/retomar": reabre visita encerrada hoje quando permitido.
+- Nenhum endpoint financeiro foi liberado ao token mobile.
 - O token não deve ser usado na API de sessão web. Nenhuma rota móvel é liberada sem o filtro Shield "tokens:mobile".
 - O frontend trata 403 como falta de permissão, não como uma lista de dados inventados.
 - O app não tem funções offline de escrita nem permite operar uma visita nesta primeira entrega; essas ações exigem a mesma validação do backend da versão web.
@@ -74,4 +85,4 @@ Android: pressionar "a" com emulador configurado ou usar uma build de desenvolvi
 6. Testar no servidor HTTPS (incluindo HostGator), no modo escuro do aparelho e com teclado aberto.
 7. Validar TypeScript e testar compilação Android. Não considerar este PR um APK pronto.
 
-Próximas entregas: detalhamento de visita e ações autenticadas (chegada/início/finalização), clientes, vendas, notificações nativas, financeiro e fluxos por perfil.
+Próximas entregas: cadastro completo de clientes pelo app, vendas, notificações nativas, financeiro e fluxos por perfil. Registrar chegada nesta etapa exige cliente já cadastrado.
