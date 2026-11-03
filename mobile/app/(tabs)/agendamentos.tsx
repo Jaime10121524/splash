@@ -365,7 +365,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
             </View>}
           <View pointerEvents="none" style={styles.cameraOutline}/>
         </View>
-      </View>
+      </View>}
       {mode==='confirm'&&current&&<>
         <View style={styles.hero}><Text style={styles.eyebrow}>CONFIRA O LEAD</Text>
           <Text style={styles.heroTitle}>{current.nome_completo}</Text>
