@@ -43,8 +43,12 @@ export async function apiRequest<T>(path: string, options: {
   method?: 'GET' | 'POST'; token?: string | null; body?: unknown;
 } = {}): Promise<T> {
   const origin = process.env.EXPO_PUBLIC_SPLASH_API_URL?.replace(/\/+$/, '');
-  if (!origin || (!/^https:\/\/[^/]+/i.test(origin) && !(__DEV__ && /^http:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?$/i.test(origin)))) {
-    throw new ApiError('Configure EXPO_PUBLIC_SPLASH_API_URL com a URL HTTPS da API.', 0);
+  // HTTP só para testes de desenvolvimento em localhost ou na LAN privada.
+  // Builds de distribuição exigem HTTPS para proteger login e tokens.
+  const localDevUrl = /^http:\/\/(?:localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d{1,5})?$/i;
+  const httpsUrl = /^https:\/\/[^/\s]+$/i;
+  if (!origin || (!httpsUrl.test(origin) && !(__DEV__ && localDevUrl.test(origin)))) {
+    throw new ApiError('Configure a URL HTTPS da API ou, apenas em desenvolvimento, o IP local do computador.', 0);
   }
   if (!/^mobile\/[a-z0-9/?=&-]+$/i.test(path)) {
     throw new ApiError('Rota nativa inválida.', 0);
