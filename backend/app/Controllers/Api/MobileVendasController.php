@@ -74,8 +74,20 @@ final class MobileVendasController extends VendasController
         $managers=$db->table('pessoas p')->select('p.id,p.nome')->join('pessoa_papeis pp','pp.pessoa_id=p.id')
             ->where('pp.papel','gerente')->where('p.ativo',1)->groupBy('p.id,p.nome')
             ->orderBy('p.nome')->get()->getResultArray();
+        $people=[];
+        if($a['admin']){
+            foreach($db->table('pessoas p')->select('p.id,p.nome,pp.papel')
+                ->join('pessoa_papeis pp','pp.pessoa_id=p.id')
+                ->where('p.ativo',1)->whereIn('pp.papel',['corretor','gerente','vendedor'])
+                ->orderBy('p.nome')->get()->getResultArray() as $p){
+                $id=(int)$p['id'];
+                if(!isset($people[$id]))$people[$id]=['id'=>$id,'nome'=>$p['nome'],'papeis'=>[]];
+                $people[$id]['papeis'][]=$p['papel'];
+            }
+        }
         return $this->response->setJSON([
             'planos'=>$plans,'formas'=>$methods,'gerentes'=>$managers,
+            'pessoas'=>array_values($people),
             'pode_corrigir_comissao'=>(bool)$a['admin'],
         ])->setHeader('Cache-Control','no-store');
     }
