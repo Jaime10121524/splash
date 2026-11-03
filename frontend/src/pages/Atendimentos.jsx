@@ -129,7 +129,8 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
           result=await comercialPost('/api/atendimentos/chegada',{cliente_id:selectedClient.id,...brokerPayload})
         }else{
           result=await comercialPost('/api/atendimentos/chegada',{
-            novo_cliente:{...newClient,ativo:true},...brokerPayload,
+            novo_cliente:{...newClient,ativo:true,bonificacao_valor:String(newClient.bonificacao_valor||'')
+              .replace(/\./g,'').replace(',','.')},...brokerPayload,
           })
         }
       }else if(modal.type==='brokers'){
