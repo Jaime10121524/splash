@@ -4,6 +4,7 @@ import Planos from './pages/Planos.jsx'
 import PessoasUsuarios from './pages/PessoasUsuarios.jsx'
 import Clientes from './pages/Clientes.jsx'
 import Atendimentos from './pages/Atendimentos.jsx'
+import Agendamentos from './pages/Agendamentos.jsx'
 import OrigensMotivos from './pages/OrigensMotivos.jsx'
 import Vendas from './pages/Vendas.jsx'
 import FechamentosPeriodos from './pages/FechamentosPeriodos.jsx'
@@ -66,6 +67,7 @@ function Icon({ name, size = 20, stroke = 1.8, ...props }) {
 const nav = [
   { id: 'dashboard', label: 'Visão geral', icon: 'grid', roles: ['admin','corretor','vendedor','gerente','operador'], section: 'Principal' },
   { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
+  { id: 'agendamentos', label: 'Agendamentos', icon: 'calendar', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
   { id: 'planos', label: 'Planos', icon: 'tag', roles: ['admin'], section: 'Operação' },
   { id: 'pessoas', label: 'Pessoas', icon: 'users', roles: ['admin'], section: 'Operação' },
   { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
@@ -85,6 +87,7 @@ const nav = [
 ]
 const descriptions = {
   atendimentos: 'Organize chegadas, atendentes e resultados de cada visita.',
+  agendamentos: 'Cadastre visitas antecipadas, compartilhe QR Codes e acompanhe o funil de leads.',
   planos: 'Gerencie códigos, valores, prazos e versões históricas dos planos.',
   pessoas: 'Cadastre corretores, gerentes e atendentes com múltiplos papéis.',
   usuarios: 'Gerencie login e permissões dos participantes.',
@@ -531,7 +534,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='alertas'?<AlertasComerciais/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='agendamentos'?<Agendamentos navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='alertas'?<AlertasComerciais/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
