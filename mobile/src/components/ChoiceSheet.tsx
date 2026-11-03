@@ -57,7 +57,7 @@ export default function ChoiceSheet({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20,14,48,.50)' },
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(20,14,48,.50)' },
   sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 20, maxHeight: '75%', minHeight: 190 },
   handle: { width: 46, height: 5, borderRadius: 9, backgroundColor: '#D6D1E4', alignSelf: 'center', marginTop: 12 },
   head: { paddingVertical: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
