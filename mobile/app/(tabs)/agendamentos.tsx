@@ -38,7 +38,7 @@ function dateISO(value: string): string | null {
     && d.getUTCDate() === Number(parts[0]) ? iso : null;
 }
 
-export default function AgendamentosScreen() {
+export default function AgendamentosScreen({ initialMode = 'list' }: { initialMode?: 'list' | 'scan' }) {
   const { token } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const lockedScan = useRef(false);
@@ -46,7 +46,7 @@ export default function AgendamentosScreen() {
   const scrollFormToBottom = () => {
     setTimeout(() => formScroll.current?.scrollToEnd({ animated: true }), 220);
   };
-  const [mode, setMode] = useState<ScreenMode>('list');
+  const [mode, setMode] = useState<ScreenMode>(initialMode);
   const [rows, setRows] = useState<Booking[]>([]);
   const [stats, setStats] = useState<Metrics | null>(null);
   const [options, setOptions] = useState<MobileVisitOptions | null>(null);
@@ -110,6 +110,18 @@ export default function AgendamentosScreen() {
     }
   }, [token]);
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+  useFocusEffect(useCallback(() => {
+    if (initialMode === 'scan') {
+      lockedScan.current = false;
+      setError('');
+      setMode('scan');
+    }
+  }, [initialMode]));
+  useEffect(() => {
+    if (initialMode === 'scan' && permission && !permission.granted && permission.canAskAgain) {
+      void requestPermission();
+    }
+  }, [initialMode, permission?.granted, permission?.canAskAgain, requestPermission]);
 
   function chooseBooking(booking: Booking, qr: string) {
     setCurrent(booking); setScannedQr(qr); setBroker(booking.corretor_confirmado_pessoa_id || booking.captador_pessoa_id);
@@ -159,7 +171,9 @@ export default function AgendamentosScreen() {
       const newBooking: Booking = {
         id: r.agendamento_id, qr_token: r.qr_payload.split(':').pop() || '',
         nome_completo: name.trim(), telefone: phoneDigits(phone), data_visita: iso,
-        quantidade_pessoas: Number(people), captador_pessoa_id: captor, situacao: 'AGENDADO',
+        quantidade_pessoas: Number(people), captador_pessoa_id: captor,
+        captador_nome: options?.corretores.find(v => v.id === captor)?.nome || null,
+        situacao: 'AGENDADO',
       };
       await refresh();setMode('list');setInvite(newBooking);
       setName('');setPhone('');setDate(dateBR(todayPlus(0)));setPeople('1');
@@ -197,7 +211,7 @@ export default function AgendamentosScreen() {
         },
       );
       setMode('list');setCurrent(null);await refresh();
-      setSuccess({ title:'Comparecimento confirmado!', description:result.message, visitId:result.visita_id });
+      setSuccess({ title:'Chegada registrada!', description:result.message, visitId:result.visita_id });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível realizar o check-in.'); }
     finally { setBusy(false); }
@@ -206,7 +220,7 @@ export default function AgendamentosScreen() {
   const brokers = options?.corretores || [];
   const attendants = options?.atendentes || [];
   const title = mode === 'create' ? 'Nova visita agendada'
-    : mode === 'scan' ? 'Ler convite QR'
+    : mode === 'scan' ? 'Registrar chegada'
     : mode === 'confirm' ? 'Confirmar chegada' : 'Agendamentos';
   const list = rows.filter(r => !search.trim()
     || r.nome_completo.toLowerCase().includes(search.trim().toLowerCase())
@@ -221,7 +235,11 @@ export default function AgendamentosScreen() {
 
   return <SafeAreaView style={styles.root} edges={['top']}>
     <View style={styles.top}><Text style={styles.topTitle}>{title}</Text>
-      {mode!=='list'&&<Pressable onPress={()=>{setMode('list');setError('');}}
+      {mode!=='list'&&<Pressable onPress={()=>{
+        if (initialMode==='scan') router.replace('/(tabs)/agendamentos');
+        else setMode('list');
+        setError('');
+      }}
         style={styles.back} accessibilityLabel="Voltar">
         <SymbolView name={{ios:'xmark',android:'close'}} tintColor={colors.ink} size={21}/>
       </Pressable>}</View>
@@ -334,22 +352,27 @@ export default function AgendamentosScreen() {
         </Pressable>
       </>}
       {mode==='scan'&&<View>
-        <Text style={styles.instructions}>Enquadre o QR Code do convite. O aplicativo verifica o código no servidor antes de confirmar a chegada.</Text>
+        <Text style={styles.instructions}>Leia o QR Code do voucher para confirmar a chegada. Isso não inicia o atendimento.</Text>
         <View style={styles.cameraWrap}>
           {permission?.granted?<CameraView style={styles.camera} facing="back"
             barcodeScannerSettings={{barcodeTypes:['qr']}}
             onBarcodeScanned={event=>{void scanQr(event.data);}}/>:
-            <Text style={styles.empty}>A câmera precisa de permissão.</Text>}
+            <View style={styles.cameraPermission}>
+              <Text style={styles.cameraPermissionText}>Permita o acesso à câmera para registrar a chegada.</Text>
+              <Pressable style={styles.permissionButton} onPress={()=>{void requestPermission();}}>
+                <Text style={styles.primaryText}>Permitir câmera</Text>
+              </Pressable>
+            </View>}
           <View pointerEvents="none" style={styles.cameraOutline}/>
         </View>
-      </View>}
+      </View>
       {mode==='confirm'&&current&&<>
         <View style={styles.hero}><Text style={styles.eyebrow}>CONFIRA O LEAD</Text>
           <Text style={styles.heroTitle}>{current.nome_completo}</Text>
           <Text style={styles.heroSub}>{dateBR(current.data_visita)} · {current.quantidade_pessoas} pessoa(s)</Text>
           <Text style={styles.heroSub}>Captado por: {current.captador_nome||'Corretor cadastrado'}</Text>
         </View>
-        <Text style={styles.instructions}>Confirme se o corretor que cadastrou é quem está recebendo. Você pode trocar o responsável ou adicionar um segundo corretor.</Text>
+        <Text style={styles.instructions}>Registre somente a chegada. O cliente ficará aguardando; o atendimento será iniciado separadamente. Confira corretor(es) e atendente.</Text>
         <View style={styles.form}>
           {select('Corretor que está recebendo *',brokers.find(v=>v.id===broker)?.nome||'',()=>setPicker('broker'))}
           {select('Segundo corretor (opcional)',brokers.find(v=>v.id===second)?.nome||'Nenhum',()=>setPicker('second'))}
@@ -367,7 +390,7 @@ export default function AgendamentosScreen() {
           </View>
         </View>
         <Pressable style={[styles.primary,styles.save,busy&&styles.disabled]} disabled={busy} onPress={()=>{void checkin();}}>
-          {busy?<ActivityIndicator color="#FFFFFF"/>:<Text style={styles.primaryText}>Confirmar presença e iniciar</Text>}
+          {busy?<ActivityIndicator color="#FFFFFF"/>:<Text style={styles.primaryText}>Confirmar chegada</Text>}
         </Pressable>
       </>}
     </ScrollView>
@@ -391,8 +414,8 @@ export default function AgendamentosScreen() {
     <BookingInvite booking={invite} onClose={()=>setInvite(null)}/>
     <ToastNotice message={notice} onDismiss={()=>setNotice('')}/>
     <ActionModal visible={success!==null} variant="success"
-      title={success?.title||'Comparecimento registrado'}
-      description={success?.description||''} primaryLabel="Abrir atendimento"
+      title={success?.title||'Chegada registrada'}
+      description={success?.description||''} primaryLabel="Ver ficha da visita"
       secondaryLabel="Voltar à agenda"
       onPrimary={()=>{const visit=success?.visitId;setSuccess(null);if(visit)router.push({
         pathname:'/atendimento/[id]',params:{id:String(visit)},
@@ -466,6 +489,9 @@ const styles=StyleSheet.create({
   camera:{width:'100%',height:'100%'},
   cameraOutline:{borderWidth:3,borderColor:'#D1BFFF',borderRadius:26,position:'absolute',
     top:69,left:55,right:55,bottom:69},
+  cameraPermission:{padding:25,alignItems:'center',justifyContent:'center'},
+  cameraPermissionText:{color:'#FFFFFF',textAlign:'center',fontSize:14,lineHeight:22,marginBottom:18},
+  permissionButton:{backgroundColor:colors.brand,paddingVertical:13,paddingHorizontal:18,borderRadius:15},
   clientLookup:{marginTop:9,borderTopWidth:1,borderTopColor:colors.line,paddingTop:9},
   searchClient:{alignSelf:'flex-end',paddingVertical:11},
 });
