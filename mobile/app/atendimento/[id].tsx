@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet, { Choice } from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
+import ResumeAttendantModal from '../../src/components/ResumeAttendantModal';
 import { colors, shadows } from '../../src/theme';
 
 const statusNames: Record<string, string> = {
@@ -76,7 +77,8 @@ export default function AtendimentoDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [confirming, setConfirming] = useState<'finish' | 'resume' | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [resumeOpen, setResumeOpen] = useState(false);
   const [success, setSuccess] = useState<{ title: string; description: string } | null>(null);
   const [mode, setMode] = useState<FormMode>(null);
   const [sheet, setSheet] = useState<SheetField>(null);
@@ -139,15 +141,13 @@ export default function AtendimentoDetailScreen() {
     Haptics.selectionAsync().catch(() => {});
   }
 
-  async function applyAction(action: 'start' | 'finish' | 'resume') {
+  async function applyAction(action: 'start' | 'finish') {
     if (saving || !token) return;
     const payload = action === 'start'
       ? { atendente_pessoa_id: mainAttendant, atendente_adicional_pessoa_id: secondAttendant }
-      : action === 'finish'
-        ? { status: outcome, motivo_nao_venda_id: outcome === 'SEM_VENDA' ? reason : null,
+      : { status: outcome, motivo_nao_venda_id: outcome === 'SEM_VENDA' ? reason : null,
           retorno_previsto: outcome === 'RETORNO' ? parseReturnDate(returnDate) : null,
-          observacoes: notes.trim() }
-        : {};
+          observacoes: notes.trim() };
     if (action === 'start' && !mainAttendant) { setError('Selecione o atendente responsável.'); return; }
     if (action === 'start' && mainAttendant === secondAttendant) { setError('Selecione atendentes diferentes.'); return; }
     if (action === 'finish' && outcome === 'RETORNO' && !parseReturnDate(returnDate)) {
@@ -160,14 +160,13 @@ export default function AtendimentoDetailScreen() {
     setError('');
     try {
       const result = await apiRequest<{ message: string }>('mobile/atendimentos/' + id + '/' +
-        ({ start: 'iniciar', finish: 'finalizar', resume: 'retomar' }[action]), {
+        ({ start: 'iniciar', finish: 'finalizar' }[action]), {
         method: 'POST', token, body: payload,
       });
       setMode(null);
       await load();
       setSuccess({
-        title: action === 'start' ? 'Atendimento iniciado!'
-          : action === 'resume' ? 'Visita retomada!' : 'Resultado registrado!',
+        title: action === 'start' ? 'Atendimento iniciado!' : 'Resultado registrado!',
         description: result.message,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -189,19 +188,37 @@ export default function AtendimentoDetailScreen() {
       return;
     }
     setError('');
-    setConfirming('finish');
+    setConfirming(true);
   }
 
   function confirmResume() {
-    setConfirming('resume');
+    setError('');
+    setResumeOpen(true);
   }
 
   function submitConfirmed() {
-    const action = confirming;
-    setConfirming(null);
-    if (action === 'finish' || action === 'resume') {
-      void applyAction(action);
-    }
+    setConfirming(false);
+    void applyAction('finish');
+  }
+
+  async function resumeWithAttendant(mode: 'mesmo' | 'outro', newId: number | null) {
+    if (!token) throw new Error('Sessão inválida. Entre novamente.');
+    const response = await apiRequest<{ message: string }>('mobile/atendimentos/' + id + '/retomar', {
+      method: 'POST',
+      token,
+      body: {
+        modo_atendente: mode,
+        ...(mode === 'outro' ? { atendente_pessoa_id: newId } : {}),
+      },
+    });
+    setResumeOpen(false);
+    await load();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // Android precisa encerrar o primeiro modal antes de abrir o de sucesso.
+    setTimeout(() => setSuccess({
+      title: 'Atendimento retomado!',
+      description: response.message,
+    }), 360);
   }
 
   async function openWhatsApp() {
@@ -350,6 +367,19 @@ export default function AtendimentoDetailScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Linha do tempo</Text>
+              {(data?.trocas_atendente || []).length > 0 && <View style={styles.changeHistory}>
+                <Text style={styles.changeEyebrow}>TROCAS DE ATENDENTE</Text>
+                {(data?.trocas_atendente || []).map((change, index) => <View key={index} style={styles.changeRow}>
+                  <SymbolView name={{ ios: 'person.2.circle', android: 'supervisor_account' }}
+                    size={19} tintColor={colors.brandDark} />
+                  <View style={styles.changeText}>
+                    <Text style={styles.changeTitle}>
+                      {change.anterior_nome || 'Sem atendente'} → {change.novo_nome}
+                    </Text>
+                    <Text style={styles.changeDate}>{formatDatetime(change.criado_em)}</Text>
+                  </View>
+                </View>)}
+              </View>}
               {(data?.historico || []).length ? data!.historico.map((event, index) =>
                 <View key={String(index) + event.criado_em} style={styles.timelineRow}>
                   <View style={styles.timelineTrack}>
@@ -376,17 +406,20 @@ export default function AtendimentoDetailScreen() {
           if (sheet === 'reason') setReason(value);
         }}
       />
-      <ActionModal visible={confirming !== null} variant="confirm"
-        title={confirming === 'resume' ? 'Retomar esta visita?' :
-          outcome === 'VENDA' ? 'Confirmar venda fechada?' : 'Finalizar atendimento?'}
-        description={confirming === 'resume'
-          ? 'O atendimento de hoje voltará para Aguardando, com o histórico preservado.'
-          : outcome === 'VENDA'
-            ? 'Vamos registrar o resultado comercial. O título e os valores financeiros devem ser lançados separadamente no módulo Vendas.'
-            : 'O resultado será salvo no histórico da visita e o horário de encerramento será registrado pelo servidor.'}
-        primaryLabel={confirming === 'resume' ? 'Sim, retomar' : 'Sim, finalizar'}
+      <ResumeAttendantModal visible={resumeOpen}
+        attendantId={visit?.atendente_pessoa_id ?? null}
+        attendantName={visit?.atendente_nome ?? null}
+        attendants={options?.atendentes ?? []}
+        onClose={() => setResumeOpen(false)}
+        onConfirm={resumeWithAttendant} />
+      <ActionModal visible={confirming} variant="confirm"
+        title={outcome === 'VENDA' ? 'Confirmar venda fechada?' : 'Finalizar atendimento?'}
+        description={outcome === 'VENDA'
+          ? 'O resultado comercial será salvo, mas o título e os valores financeiros devem ser lançados no módulo de Vendas.'
+          : 'O resultado será salvo no histórico e o horário de encerramento será registrado pelo servidor.'}
+        primaryLabel="Sim, finalizar"
         secondaryLabel="Voltar" onPrimary={submitConfirmed}
-        onSecondary={() => setConfirming(null)} busy={saving} />
+        onSecondary={() => setConfirming(false)} busy={saving} />
       <ActionModal visible={success !== null} variant="success"
         title={success?.title || 'Operação concluída'}
         description={success?.description || ''}
@@ -448,6 +481,12 @@ const styles = StyleSheet.create({
   outcomeText: { fontSize: 11.5, color: colors.muted, fontWeight: '700' },
   outcomeTextActive: { color: colors.brandDark },
   saleNote: { backgroundColor: '#F2EDFF', borderRadius: 13, padding: 12, color: '#5944A0', fontSize: 11.5, lineHeight: 19, marginTop: 14 },
+  changeHistory: { backgroundColor: '#F8F6FF', borderRadius: 14, padding: 13, marginBottom: 18 },
+  changeEyebrow: { color: colors.brandDark, fontWeight: '900', letterSpacing: 1.1, fontSize: 9.5, marginBottom: 8 },
+  changeRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 8 },
+  changeText: { flex: 1 },
+  changeTitle: { color: colors.ink, fontSize: 12.5, fontWeight: '800' },
+  changeDate: { fontSize: 11, color: colors.muted, marginTop: 4 },
   timelineRow: { flexDirection: 'row', gap: 13, minHeight: 63 },
   timelineTrack: { width: 17, alignItems: 'center' },
   timelineDot: { width: 12, height: 12, borderRadius: 6, borderWidth: 3, borderColor: colors.brand, backgroundColor: colors.pale, marginTop: 3 },
