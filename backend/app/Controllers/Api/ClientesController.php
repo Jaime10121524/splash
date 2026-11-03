@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\ClienteRules;
+use App\Libraries\BonificacaoIndicacao;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -73,6 +74,11 @@ class ClientesController extends CommercialBaseController
             if($id<1)throw new \RuntimeException('Falha no cadastro.');
             $this->insertOwnerEvent($db,$id,null,(int)$clean['dono_corrente_pessoa_id'],
                 $clean['indicador_cliente_id']?'INDICACAO':'CADASTRO',null);
+            $bonus=BonificacaoIndicacao::registrar($db,$id,$clean,$input,auth('session')->user());
+            if(isset($bonus['error'])){
+                $db->transRollback();
+                return $this->errorResponse(422,$bonus['error']);
+            }
             $this->commitOrFail($db);
             return $this->responseOK('Cliente cadastrado.',201,['cliente_id'=>$id]);
         } catch(Throwable $e){
