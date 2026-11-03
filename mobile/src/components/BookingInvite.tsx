@@ -7,6 +7,7 @@ import { SymbolView } from 'expo-symbols';
 import QRCode from 'react-native-qrcode-svg';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import { colors } from '../theme';
 
 export type Booking = {
@@ -69,6 +70,7 @@ export default function BookingInvite({ booking, onClose }: {
   const card = useRef<ComponentRef<typeof View>>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState('');
+  const [hint, setHint] = useState('');
   const date = booking?.data_visita?.split('-') ?? [];
   const prettyDate = date.length === 3 ? date[2] + '/' + date[1] + '/' + date[0] : booking?.data_visita;
   const code = booking?.qr_token ? 'SPLASH:AG:1:' + booking.qr_token : '';
@@ -91,26 +93,36 @@ export default function BookingInvite({ booking, onClose }: {
     }
   }
 
-  async function share() {
+  async function share(withCaption: boolean) {
     if (!card.current || !booking || sharing || !code) return;
     setSharing(true);
     setError('');
+    setHint('');
     try {
-      // Somente o token do agendamento vai no QR Code; sem dados pessoais.
-      // Mantém proporção do voucher ao exportar em alta resolução.
+      if (!(await Sharing.isAvailableAsync())) {
+        setError('Compartilhamento de imagens indisponível neste dispositivo.');
+        return;
+      }
+      // A imagem contém o QR opaco, sem telefone ou outros dados embutidos no código.
       const uri = await captureRef(card.current, {
         format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1920,
       });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/png', dialogTitle: 'Compartilhar voucher Splash Park Fazendinha',
-          UTI: 'public.png',
+      if (withCaption) {
+        // O Expo Go só compartilha o arquivo, não suporta incluir EXTRA_TEXT
+        // no mesmo envio Android. Copiamos a legenda para colar no WhatsApp.
+        await Clipboard.setStringAsync(whatsAppMessage(booking, prettyDate || booking.data_visita), {
+          android: { isSensitive: true },
         });
-      } else {
-        setError('Compartilhamento indisponível neste dispositivo.');
+        setHint('Mensagem copiada! Escolha WhatsApp, selecione a conversa do cliente (' +
+          booking.telefone + ') e COLE o texto na legenda da foto antes de enviar.');
       }
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: withCaption ? 'Escolha WhatsApp e cole a legenda copiada' : 'Compartilhar voucher PNG',
+        UTI: 'public.png',
+      });
     } catch {
-      setError('Não foi possível gerar a imagem. Tente novamente.');
+      setError('Não foi possível compartilhar a foto. Tente novamente.');
     } finally {
       setSharing(false);
     }
@@ -191,21 +203,25 @@ export default function BookingInvite({ booking, onClose }: {
         </View>}
       </ScrollView>
       {error !== '' && <Text style={styles.error}>{error}</Text>}
-      <Pressable onPress={() => { void openWhatsApp(); }} disabled={!booking || sharing}
+      {hint !== '' && <Text style={styles.hint} accessibilityRole="text">{hint}</Text>}
+      <Pressable onPress={() => { void share(true); }} disabled={!booking || sharing}
         style={[styles.whatsapp, sharing && styles.disabled]} accessibilityRole="button">
-        <SymbolView name={{ios:'message.fill',android:'chat'}} size={20} tintColor="#FFFFFF"/>
-        <Text style={styles.shareText}>WhatsApp · abrir conversa com mensagem</Text>
-      </Pressable>
-      <Pressable onPress={() => { void share(); }} disabled={!booking || sharing}
-        style={[styles.share, sharing && styles.disabled]} accessibilityRole="button">
         {sharing ? <ActivityIndicator color="#FFFFFF" /> : <>
-          <SymbolView name={{ ios: 'square.and.arrow.up', android: 'share' }} size={20} tintColor="#FFFFFF" />
-          <Text style={styles.shareText}>Compartilhar voucher em PNG</Text>
+          <SymbolView name={{ios:'message.fill',android:'chat'}} size={20} tintColor="#FFFFFF"/>
+          <Text style={styles.shareText}>Enviar foto + mensagem no WhatsApp</Text>
         </>}
       </Pressable>
+      <Pressable onPress={() => { void share(false); }} disabled={!booking || sharing}
+        style={[styles.share, sharing && styles.disabled]} accessibilityRole="button">
+        <SymbolView name={{ios:'square.and.arrow.up',android:'share'}} size={19} tintColor="#FFFFFF"/>
+        <Text style={styles.shareText}>Compartilhar apenas o PNG</Text>
+      </Pressable>
+      <Pressable onPress={() => { void openWhatsApp(); }} disabled={!booking || sharing}
+        style={styles.textOnly} accessibilityRole="button">
+        <Text style={styles.textOnlyLabel}>Abrir conversa do cliente (somente texto)</Text>
+      </Pressable>
       <Text style={styles.footer}>
-        A mensagem fica pronta na conversa; confirme o envio no WhatsApp.
-        Para anexar o PNG, use Compartilhar e escolha a conversa do cliente.
+        Escolha o contato no WhatsApp, cole a legenda copiada e confirme o envio da foto com o texto.
       </Text>
     </SafeAreaView>
   </Modal>;
@@ -249,6 +265,10 @@ const styles = StyleSheet.create({
   addressText: { fontSize: 8.8, fontWeight: '800', lineHeight: 11, color: colors.navy, flex: 1 },
   whatsapp: { backgroundColor: '#177E53', minHeight: 50, borderRadius: 15, marginHorizontal: 5,
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
+  hint: { backgroundColor: '#EAF5EE', color: '#155C3D', fontSize: 11, fontWeight: '700',
+    lineHeight: 16, marginHorizontal: 5, marginBottom: 10, borderRadius: 12, padding: 10 },
+  textOnly: { minHeight: 36, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  textOnlyLabel: { color: colors.brandDark, fontSize: 11, fontWeight: '800' },
   share: { backgroundColor: colors.brand, minHeight: 55, borderRadius: 17, marginHorizontal: 5,
     flexDirection: 'row', gap: 11, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
