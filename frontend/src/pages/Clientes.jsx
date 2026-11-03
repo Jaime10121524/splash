@@ -60,7 +60,9 @@ export default function Clientes({navigate}) {
     setSaving(true);setFormError('')
     try{
       const url=modal==='new'?'/api/clientes':'/api/clientes/'+modal.id+'/editar'
-      const payload=await comercialPost(url,fields)
+      const body={...fields,bonificacao_valor:String(fields.bonificacao_valor||'')
+        .replace(/\./g,'').replace(',','.')}
+      const payload=await comercialPost(url,body)
       setNotice(payload.message);setModal(null)
       await refresh()
     }catch(e){setFormError(e.message)}
