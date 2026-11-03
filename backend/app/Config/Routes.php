@@ -21,6 +21,7 @@ $routes->group('api', static function ($routes): void {
             // Operações nativas mantêm o filtro Shield tokens:mobile.
             $routes->get('atendimento-opcoes', 'Api\MobileVisitasController::options');
             $routes->get('clientes', 'Api\MobileVisitasController::clients');
+            $routes->get('cliente-visita-retomavel', 'Api\MobileVisitasController::resumableClientVisit');
             $routes->post('atendimentos/chegada', 'Api\MobileVisitasController::arrival');
             $routes->get('atendimentos/(:num)', 'Api\MobileVisitasController::show/$1');
             $routes->post('atendimentos/(:num)/iniciar', 'Api\MobileVisitasController::start/$1');
