@@ -282,11 +282,8 @@ final class AgendamentosController extends BaseController
             if ($book['situacao']!=='AGENDADO' || $book['visita_id']!==null) {
                 $db->transRollback();return $this->deny(409,'Este QR Code já foi utilizado ou o agendamento foi cancelado.');
             }
-            // O voucher só autoriza chegada na data agendada, nunca em outro dia.
-            $today=\CodeIgniter\I18n\Time::now(config('App')->appTimezone)->toDateString();
-            if ($book['data_visita']!==$today) {
-                $db->transRollback();return $this->deny(409,'Voucher válido somente na data agendada.');
-            }
+            // Recepção pode confirmar chegada fora da data prevista.
+            // A data original continua no agendamento; chegada_em registra o dia real.
             $qr=(string)($data['qr']??'');
             if (!hash_equals('SPLASH:AG:1:'.$book['qr_token'],$qr)) {
                 $db->transRollback();return $this->deny(403,'O QR Code apresentado não corresponde a este agendamento.');
