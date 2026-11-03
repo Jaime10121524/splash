@@ -96,7 +96,7 @@ export default function BookingInvite({ booking, onClose }: {
   async function sendWithWhatsApp() {
     if (!card.current || !booking || sharing || !code) return;
     setError(''); setHint('');
-    const digits = booking.telefone.replace(/\\D/g, '');
+    const digits = booking.telefone.replace(/\D/g, '');
     if (![10, 11, 12, 13].includes(digits.length)) {
       setError('Confira o telefone com DDD cadastrado no agendamento.');
       return;
