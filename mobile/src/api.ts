@@ -40,7 +40,7 @@ export class ApiError extends Error {
 }
 
 export async function apiRequest<T>(path: string, options: {
-  method?: 'GET' | 'POST'; token?: string | null; body?: unknown;
+  method?: 'GET' | 'POST'; token?: string | null; body?: unknown; timeoutMs?: number;
 } = {}): Promise<T> {
   const origin = process.env.EXPO_PUBLIC_SPLASH_API_URL?.replace(/\/+$/, '');
   // HTTP só para testes de desenvolvimento em localhost ou na LAN privada.
@@ -54,10 +54,13 @@ export async function apiRequest<T>(path: string, options: {
     throw new ApiError('Rota nativa inválida.', 0);
   }
 
-  let response: Response;
+  const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 12000, 2000), 30000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    response = await fetch(origin + '/api/' + path, {
+    const response = await fetch(origin + '/api/' + path, {
       method: options.method ?? 'GET',
+      signal: controller.signal,
       headers: {
         Accept: 'application/json',
         ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -65,15 +68,31 @@ export async function apiRequest<T>(path: string, options: {
       },
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
     });
-  } catch {
-    throw new ApiError('Sem conexão com o Splash. Verifique sua internet e tente novamente.', 0);
-  }
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new ApiError(data.message ?? 'Não foi possível concluir a operação.', response.status);
+    const raw = await response.text();
+    let data: { message?: string; [key: string]: unknown } = {};
+    try { data = raw ? JSON.parse(raw) : {}; } catch {
+      if (!response.ok) throw new ApiError('O servidor retornou HTTP ' + response.status + ' sem JSON. Confira o log do backend.', response.status);
+      throw new ApiError('Resposta inesperada da API. Verifique o backend.', response.status);
+    }
+
+    if (!response.ok) {
+      const detail = typeof data.message === 'string' ? data.message : 'Erro HTTP ' + response.status + ' no backend.';
+      if (response.status >= 500) {
+        throw new ApiError('O servidor Splash falhou (HTTP ' + response.status + '). Confira o terminal do PHP.', response.status);
+      }
+      throw new ApiError(detail, response.status);
+    }
+    return data as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (controller.signal.aborted) {
+      throw new ApiError('O servidor não respondeu em ' + Math.round(timeoutMs / 1000) + ' segundos. Verifique o IP, a porta 8080 e o terminal do backend.', 0);
+    }
+    throw new ApiError('Não foi possível conectar à API. Verifique o endereço, Wi-Fi e firewall do computador.', 0);
+  } finally {
+    clearTimeout(timeout);
   }
-  return data as T;
 }
 
 export function displayTime(value: string | null | undefined): string {
