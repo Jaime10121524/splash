@@ -18,7 +18,7 @@ import { editMaskedPhoneBR, maskPhoneBR, phoneDigits } from '../../src/phone';
 import { useAuth } from '../../src/AuthContext';
 import { colors } from '../../src/theme';
 
-type ScreenMode = 'list' | 'create' | 'scan' | 'confirm';
+type ScreenMode = 'list' | 'create' | 'edit' | 'scan' | 'confirm';
 type PickerName = 'captor' | 'broker' | 'second' | 'attendant' | 'client' | null;
 type Metrics = { agendados: number; compareceram: number; nao_compareceram: number; vendas: number; taxa_comparecimento: number; taxa_fechamento: number };
 
@@ -66,6 +66,9 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [people, setPeople] = useState('1');
   const [captor, setCaptor] = useState<number | null>(null);
+  const [editing, setEditing] = useState<Booking | null>(null);
+  const [editDate, setEditDate] = useState(todayPlus(0));
+  const [editPeople, setEditPeople] = useState(1);
 
   const [current, setCurrent] = useState<Booking | null>(null);
   const [scannedQr, setScannedQr] = useState('');
@@ -187,6 +190,39 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
     finally { setBusy(false); }
   }
 
+  function beginEdit(booking: Booking) {
+    setEditing(booking);
+    setEditDate(booking.data_visita);
+    setEditPeople(booking.quantidade_pessoas);
+    setError('');
+    setMode('edit');
+  }
+
+  async function saveEdit() {
+    if (!token || !editing || editDate < todayPlus(0) || editPeople < 1 || editPeople > 100) {
+      setError('Selecione data válida e quantidade de 1 a 100 pessoas.');
+      return;
+    }
+    setBusy(true); setError('');
+    try {
+      const result = await apiRequest<{ message: string }>(
+        'mobile/agendamentos/' + editing.id + '/editar', {
+          method: 'POST', token,
+          body: { data_visita: editDate, quantidade_pessoas: editPeople },
+        },
+      );
+      const updated: Booking = { ...editing, data_visita: editDate, quantidade_pessoas: editPeople };
+      setEditing(null); setMode('list');
+      await refresh();
+      setNotice(result.message);
+      setInvite(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível atualizar o agendamento.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function searchClients() {
     if (!token || clientQuery.trim().length < 2) return;
     setBusy(true);setError('');
@@ -261,6 +297,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
   const brokers = options?.corretores || [];
   const attendants = options?.atendentes || [];
   const title = mode === 'create' ? 'Nova visita agendada'
+    : mode === 'edit' ? 'Editar agendamento'
     : mode === 'scan' ? 'Registrar chegada'
     : mode === 'confirm' ? 'Confirmar chegada' : 'Agendamentos';
   const list = rows.filter(r => !search.trim()
@@ -334,6 +371,10 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
               <Text style={[styles.statusText,row.situacao==='COMPARECEU'&&styles.presentText]}>
                 {row.situacao==='COMPARECEU'?'Compareceu':row.situacao==='CANCELADO'?'Cancelado':'Agendado'}
               </Text></View>
+            {row.situacao==='AGENDADO' && <Pressable style={styles.qrButton} onPress={()=>beginEdit(row)}>
+              <SymbolView name={{ios:'pencil',android:'edit'}} tintColor={colors.brandDark} size={17}/>
+              <Text style={styles.qrText}>Editar</Text>
+            </Pressable>}
             <Pressable style={styles.qrButton} onPress={()=>setInvite(row)}>
               <SymbolView name={{ios:'qrcode',android:'qr_code'}} tintColor={colors.brandDark} size={18}/>
               <Text style={styles.qrText}>Convite</Text></Pressable>
@@ -400,6 +441,49 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
           {busy?<ActivityIndicator color="#FFFFFF"/>:<Text style={styles.primaryText}>Salvar e gerar convite QR</Text>}
         </Pressable>
       </>}
+      {mode==='edit' && editing && <>
+        <Text style={styles.instructions}>
+          Ajuste o dia da visita e a quantidade de pessoas.
+          O QR Code permanece o mesmo e o voucher será atualizado.
+        </Text>
+        <View style={styles.form}>
+          <Text style={styles.label}>Cliente</Text>
+          <Text style={styles.editCustomer}>{editing.nome_completo}</Text>
+          <Text style={styles.label}>Data da visita *</Text>
+          <Pressable style={styles.datePickerButton} accessibilityRole="button"
+            onPress={() => setCalendarOpen(true)}>
+            <View style={styles.dateIcon}>
+              <SymbolView name={{ios:'calendar',android:'event'}} size={21} tintColor={colors.brandDark}/>
+            </View>
+            <View style={styles.dateTextGroup}>
+              <Text style={styles.datePickerValue}>{dateBR(editDate)}</Text>
+              <Text style={styles.datePickerHint}>Toque para escolher no calendário</Text>
+            </View>
+            <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} tintColor={colors.brandDark} size={20}/>
+          </Pressable>
+          <Text style={styles.label}>Quantidade de pessoas *</Text>
+          <View style={styles.counter}>
+            <Pressable accessibilityLabel="Diminuir pessoas" accessibilityRole="button"
+              style={[styles.counterButton,editPeople<=1&&styles.counterDisabled]}
+              disabled={editPeople<=1} onPress={()=>setEditPeople(n=>Math.max(1,n-1))}>
+              <SymbolView name={{ios:'minus',android:'remove'}} tintColor={colors.brandDark} size={20}/>
+            </Pressable>
+            <View style={styles.counterCenter}>
+              <Text style={styles.counterValue}>{editPeople}</Text>
+              <Text style={styles.counterCaption}>{editPeople===1?'pessoa':'pessoas'}</Text>
+            </View>
+            <Pressable accessibilityLabel="Aumentar pessoas" accessibilityRole="button"
+              style={[styles.counterButton,editPeople>=100&&styles.counterDisabled]}
+              disabled={editPeople>=100} onPress={()=>setEditPeople(n=>Math.min(100,n+1))}>
+              <SymbolView name={{ios:'plus',android:'add'}} tintColor={colors.brandDark} size={20}/>
+            </Pressable>
+          </View>
+        </View>
+        <Pressable disabled={busy} style={[styles.primary,styles.save,busy&&styles.disabled]}
+          onPress={()=>{void saveEdit();}}>
+          {busy?<ActivityIndicator color="#FFFFFF"/>:<Text style={styles.primaryText}>Salvar e atualizar voucher</Text>}
+        </Pressable>
+      </>}
       {mode==='scan'&&<View>
         <Text style={styles.instructions}>Leia o QR Code do voucher para confirmar a chegada. Isso não inicia o atendimento.</Text>
         <View style={styles.cameraWrap}>
@@ -421,6 +505,9 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
           <Text style={styles.heroTitle}>{current.nome_completo}</Text>
           <Text style={styles.heroSub}>{dateBR(current.data_visita)} · {current.quantidade_pessoas} pessoa(s)</Text>
           <Text style={styles.heroSub}>Corretor captador: {current.captador_nome || 'Corretor responsável'}</Text>
+          {current.data_visita!==todayPlus(0) && <Text style={styles.heroSub}>
+            Atenção: a chegada é hoje, fora da data prevista. Confirme a presença normalmente.
+          </Text>}
         </View>
         <Text style={styles.instructions}>
           Confirme a chegada do visitante. Por padrão, ele ficará AGUARDANDO e o atendimento
@@ -498,8 +585,10 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
         if(picker==='attendant')setAttendant(value);
         if(picker==='client')setClientId(value);
       }} onClose={()=>setPicker(null)}/>
-    <VisitDateCalendar open={calendarOpen} value={dateISO(date)||todayPlus(0)}
-      onChange={iso => setDate(dateBR(iso))} onClose={()=>setCalendarOpen(false)}/>
+    <VisitDateCalendar open={calendarOpen}
+      value={mode==='edit' ? editDate : dateISO(date)||todayPlus(0)}
+      onChange={iso => mode==='edit' ? setEditDate(iso) : setDate(dateBR(iso))}
+      onClose={()=>setCalendarOpen(false)}/>
     <BookingInvite booking={invite} onClose={()=>setInvite(null)}/>
     <ToastNotice message={notice} onDismiss={()=>setNotice('')}/>
     <ActionModal visible={success!==null} variant="success"
@@ -560,6 +649,7 @@ const styles=StyleSheet.create({
   label:{fontSize:12,fontWeight:'800',color:colors.ink,marginTop:8},
   input:{height:51,backgroundColor:'#FAF9FF',borderWidth:1,borderColor:colors.line,borderRadius:14,
     paddingHorizontal:14,color:colors.ink,fontSize:14},
+  editCustomer:{fontSize:16,fontWeight:'900',color:colors.navy,paddingVertical:4},
   selector:{minHeight:62,marginTop:8,borderRadius:15,borderWidth:1,borderColor:colors.line,
     backgroundColor:'#FAF9FF',paddingHorizontal:15,flexDirection:'row',alignItems:'center',gap:8},
   caption:{color:colors.muted,fontSize:10,fontWeight:'700'},
