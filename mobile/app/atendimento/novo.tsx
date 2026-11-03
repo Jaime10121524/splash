@@ -12,13 +12,15 @@ import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
 import ResumeAttendantModal from '../../src/components/ResumeAttendantModal';
+import ClientPickerModal from '../../src/components/ClientPickerModal';
 import { editMaskedPhoneBR, maskPhoneBR, phoneDigits } from '../../src/phone';
 import { colors } from '../../src/theme';
 
 type BrokerField = 'main' | 'second' | 'origin' | 'owner' | null;
 
 export default function NewVisitScreen() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const admin = !!user?.groups?.includes('admin');
   const [options, setOptions] = useState<MobileVisitOptions | null>(null);
   const [selected, setSelected] = useState<MobileClient | null>(null);
   const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing');
@@ -30,9 +32,10 @@ export default function NewVisitScreen() {
   const [originId, setOriginId] = useState<number | null>(null);
   const [ownerId, setOwnerId] = useState<number | null>(null);
   const [indicator, setIndicator] = useState<MobileClient | null>(null);
-  const [indicatorQuery, setIndicatorQuery] = useState('');
-  const [indicatorResults, setIndicatorResults] = useState<MobileClient[]>([]);
-  const [indicatorSearching, setIndicatorSearching] = useState(false);
+  const [indicatorPickerOpen, setIndicatorPickerOpen] = useState(false);
+  const [bonificacaoReg, setBonificacaoReg] = useState(false);
+  const [bonificacaoValor, setBonificacaoValor] = useState('');
+  const [bonificacaoPaga, setBonificacaoPaga] = useState(false);
   const [registeredVisit, setRegisteredVisit] = useState<{ id: number; title: string; description: string } | null>(null);
   const [resumeCandidate, setResumeCandidate] = useState<{
     id: number;
@@ -79,20 +82,6 @@ export default function NewVisitScreen() {
     return () => { active = false; clearTimeout(job); };
   }, [token, query, selected, clientMode]);
 
-  useEffect(() => {
-    if (!token || clientMode !== 'new' || indicator || indicatorQuery.trim().length < 2) {
-      setIndicatorResults([]); setIndicatorSearching(false); return;
-    }
-    let active = true;
-    setIndicatorSearching(true);
-    const job = setTimeout(() => {
-      apiRequest<{ clientes: MobileClient[] }>('mobile/clientes?q=' + encodeURIComponent(indicatorQuery.trim()), { token })
-        .then(result => { if (active) setIndicatorResults(result.clientes); })
-        .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Não foi possível pesquisar quem indicou.'); })
-        .finally(() => { if (active) setIndicatorSearching(false); });
-    }, 350);
-    return () => { active = false; clearTimeout(job); };
-  }, [token, clientMode, indicator, indicatorQuery]);
 
   async function register() {
     if (saving || !main || !token) {
@@ -116,6 +105,13 @@ export default function NewVisitScreen() {
       if (!originId) {
         setError('Selecione a origem do lead.');
         return;
+      }
+    }
+    if (bonificacaoReg && clientMode === 'new') {
+      if (!indicator) { setError('Escolha quem indicou para registrar a bonificação.');return; }
+      const amount = bonificacaoValor.trim().replace(/\./g,'').replace(',','.');
+      if (!/^\d+(?:\.\d{1,2})?$/.test(amount) || !(Number(amount)>0)) {
+        setError('Informe o valor da bonificação. Exemplo: 30,00.');return;
       }
     }
     if (second === main) {
@@ -150,6 +146,9 @@ export default function NewVisitScreen() {
             cpf: newCpf.replace(/\D/g, ''), email: newEmail.trim(),
             origem_id: originId, indicador_cliente_id: indicator?.id ?? null,
             dono_corrente_pessoa_id: owner,
+            bonificacao_registrar: bonificacaoReg && !!indicator,
+            bonificacao_valor: bonificacaoReg ? bonificacaoValor.trim().replace(/\./g,'').replace(',','.') : null,
+            bonificacao_paga: bonificacaoReg && bonificacaoPaga && admin,
           } };
       const result = await apiRequest<{ message: string; visita_id: number; retomada?: boolean; cliente_cadastrado?: boolean }>(
         'mobile/atendimentos/chegada', {
@@ -303,25 +302,41 @@ export default function NewVisitScreen() {
             </Pressable>
             {origin?.permite_indicador && <View style={styles.fieldSpace}>
               <Text style={styles.fieldLabel}>Quem indicou? (opcional)</Text>
-              {indicator ? <View style={styles.selectedClient}>
-                <View style={styles.clientInfo}><Text style={styles.clientName}>{indicator.nome}</Text>
-                  <Text style={styles.clientSub}>A corrente será herdada deste cliente</Text></View>
-                <Pressable onPress={() => { setIndicator(null); setIndicatorQuery(''); }} accessibilityLabel="Remover indicação">
-                  <SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel' }} size={21} tintColor={colors.muted} />
-                </Pressable>
-              </View> : <>
-                <View style={styles.searchBox}>
-                  <SymbolView name={{ ios: 'magnifyingglass', android: 'search' }} size={19} tintColor={colors.brandDark} />
-                  <TextInput style={styles.searchInput} placeholder="Pesquisar indicador"
-                    placeholderTextColor="#A09BB4" value={indicatorQuery} onChangeText={setIndicatorQuery} />
-                  {indicatorSearching && <ActivityIndicator size="small" color={colors.brand} />}
+              <Pressable style={[styles.selectBox,indicator && styles.indicatorBox]}
+                accessibilityRole="button" onPress={() => { Keyboard.dismiss();setIndicatorPickerOpen(true); }}>
+                <View style={styles.clientInfo}>
+                  <Text style={[styles.selectValue,!indicator && styles.placeholder]}>
+                    {indicator?.nome || 'Localizar cliente indicador'}
+                  </Text>
+                  {!!indicator&&<Text style={styles.clientSub}>Corrente herdada de quem indicou</Text>}
                 </View>
-                {indicatorResults.map(item => <Pressable key={item.id} style={styles.clientResult}
-                  onPress={() => { Keyboard.dismiss(); setIndicator(item); setIndicatorResults([]); }}>
-                  <Text style={styles.clientName}>{item.nome}</Text>
-                  <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right' }} size={18} tintColor={colors.muted} />
-                </Pressable>)}
-              </>}
+                <SymbolView name={{ios:'magnifyingglass',android:'search'}} size={19} tintColor={colors.brandDark}/>
+              </Pressable>
+              {indicator&&<View style={styles.bonusCard}>
+                <Text style={styles.bonusQuestion}>O indicador recebeu bonificação?</Text>
+                <Text style={styles.bonusHelp}>O valor será atribuído à conta do titular da corrente.</Text>
+                <View style={styles.bonusRow}>
+                  <Pressable onPress={() => {setBonificacaoReg(false);setBonificacaoPaga(false);}}
+                    style={[styles.bonusOption,!bonificacaoReg&&styles.bonusActive]}>
+                    <Text style={[styles.bonusChoice,!bonificacaoReg&&styles.bonusChoiceActive]}>Não</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setBonificacaoReg(true)}
+                    style={[styles.bonusOption,bonificacaoReg&&styles.bonusActive]}>
+                    <Text style={[styles.bonusChoice,bonificacaoReg&&styles.bonusChoiceActive]}>Sim</Text>
+                  </Pressable>
+                </View>
+                {bonificacaoReg&&<>
+                  <Text style={[styles.fieldLabel,{marginTop:12}]}>Valor da bonificação (R$)</Text>
+                  <TextInput style={styles.newInput} placeholder="30,00"
+                    keyboardType="decimal-pad" value={bonificacaoValor} onChangeText={setBonificacaoValor}/>
+                  <Text style={styles.bonusHelp}>O lançamento começa pendente, sem afetar o financeiro até a confirmação.</Text>
+                  {admin&&<Pressable style={styles.bonusPaid} onPress={()=>setBonificacaoPaga(!bonificacaoPaga)}>
+                    <SymbolView name={{ios:bonificacaoPaga?'checkmark.circle.fill':'circle',android:bonificacaoPaga?'check_circle':'radio_button_unchecked'}}
+                      size={21} tintColor={colors.brandDark}/>
+                    <Text style={styles.bonusPaidText}>Pagamento já realizado — lançar despesa agora</Text>
+                  </Pressable>}
+                </>}
+              </View>}
             </View>}
             {!indicator && <View style={styles.fieldSpace}>
               <Text style={styles.fieldLabel}>Dono da corrente *</Text>
@@ -400,8 +415,14 @@ export default function NewVisitScreen() {
         if (sheet === 'owner') setOwnerId(value);
         if (sheet === 'origin') {
           setOriginId(value);
-          setIndicator(null); setIndicatorQuery('');
+          setIndicator(null);setBonificacaoReg(false);setBonificacaoPaga(false);setBonificacaoValor('');
         }
+      }} />
+    <ClientPickerModal visible={indicatorPickerOpen} token={token} title="Selecionar quem indicou"
+      onClose={() => setIndicatorPickerOpen(false)}
+      onChoose={client => {
+        setIndicator(client);
+        if (!client) { setBonificacaoReg(false);setBonificacaoPaga(false);setBonificacaoValor(''); }
       }} />
     <ResumeAttendantModal visible={resumeCandidate !== null}
       attendantId={resumeCandidate?.attendantId ?? null}
@@ -454,6 +475,17 @@ const styles = StyleSheet.create({
   clientSub: { color: colors.muted, fontSize: 11, marginTop: 4 },
   fieldLabel: { color: colors.ink, fontWeight: '800', fontSize: 12, marginBottom: 8 },
   fieldSpace: { marginTop: 16 },
+  indicatorBox: { backgroundColor:'#F5F1FF',borderColor:'#D5C6FF' },
+  bonusCard: { marginTop:14,backgroundColor:'#F9F7FF',borderRadius:16,padding:14,borderWidth:1,borderColor:'#E3DAFF' },
+  bonusQuestion: { fontWeight:'900',fontSize:13,color:colors.ink },
+  bonusHelp: { color:colors.muted,fontSize:11,lineHeight:17,marginTop:6 },
+  bonusRow: { flexDirection:'row',gap:9,marginTop:12 },
+  bonusOption: { flex:1,minHeight:39,borderRadius:11,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:colors.line,justifyContent:'center',alignItems:'center' },
+  bonusActive: { backgroundColor:colors.brand,borderColor:colors.brand },
+  bonusChoice: { color:colors.brandDark,fontSize:12,fontWeight:'800' },
+  bonusChoiceActive: { color:'#FFFFFF' },
+  bonusPaid: { minHeight:49,marginTop:12,flexDirection:'row',alignItems:'center',gap:10 },
+  bonusPaidText: { flex:1,fontSize:11,color:colors.ink,fontWeight:'700',lineHeight:17 },
   newFields: { marginTop: 6 },
   newInput: { height: 52, borderWidth: 1, borderColor: colors.line, borderRadius: 15, paddingHorizontal: 15,
     color: colors.ink, fontSize: 14, backgroundColor: '#FAF9FF' },
