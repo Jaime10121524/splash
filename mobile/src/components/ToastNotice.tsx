@@ -58,7 +58,7 @@ const styles=StyleSheet.create({
   icon:{width:32,height:32,borderRadius:11,backgroundColor:colors.pale,alignItems:'center',justifyContent:'center'},
   iconError:{backgroundColor:'#FFF1E8'},
   iconSuccess:{backgroundColor:'#EBF7F1'},
-  message:{color:colors.ink,fontWeight:'750',fontSize:12,lineHeight:18,flex:1},
+  message:{color:colors.ink,fontWeight:'700',fontSize:12,lineHeight:18,flex:1},
   close:{width:24,height:30,alignItems:'center',justifyContent:'center'},
   track:{height:4,width:'100%',backgroundColor:'#F1EDFB'},
   gradient:{width:'100%',height:'100%'},
