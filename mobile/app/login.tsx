@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable,
+  ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { router, Redirect } from 'expo-router';
@@ -9,6 +9,7 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../src/AuthContext';
 import { colors } from '../src/theme';
+import { apiRequest } from '../src/api';
 
 export default function LoginScreen() {
   const { user, ready, login } = useAuth();
@@ -17,12 +18,27 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [connection, setConnection] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const passwordRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   if (ready && user) return <Redirect href="/(tabs)" />;
 
   async function submit() {
     if (busy || !username.trim() || !password) return;
-    setBusy(true); setError('');
+    Keyboard.dismiss();
+    setBusy(true); setError(''); setConnection('');
     try {
       await login(username, password);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -32,17 +48,35 @@ export default function LoginScreen() {
     } finally { setBusy(false); }
   }
 
+  async function testConnection() {
+    if (checking || busy) return;
+    Keyboard.dismiss();
+    setChecking(true); setConnection(''); setError('');
+    try {
+      const value = await apiRequest<{ ok: boolean }>('mobile/ping', { timeoutMs: 7000 });
+      setConnection(value.ok ? 'Conexão com a API funcionando.' : 'A API não confirmou a conexão.');
+    } catch (e) {
+      setConnection(e instanceof Error ? e.message : 'Não foi possível conectar.');
+    } finally { setChecking(false); }
+  }
+
   return (
     <SafeAreaView style={styles.root}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView ref={scrollRef}
+          style={styles.flex}
+          contentContainerStyle={[styles.body, keyboardVisible && styles.bodyKeyboard]}
+          keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+          {!keyboardVisible && <>
           <View style={styles.mark}><Text style={styles.markText}>s</Text><View style={styles.markDot} /></View>
           <Text style={styles.brand}>splash<Text style={{ color: colors.brand }}>.</Text></Text>
           <View style={styles.badge}><View style={styles.badgeDot} /><Text style={styles.badgeText}>SEU ESPAÇO DE TRABALHO</Text></View>
           <Text style={styles.headline}>Tudo flui melhor{'\n'}por aqui.</Text>
           <Text style={styles.intro}>Suas visitas e atendimentos organizados, sem complicação.</Text>
+          </>}
 
-          <View style={styles.panel}>
+          <View style={[styles.panel, keyboardVisible && styles.panelKeyboard]}>
             <Text style={styles.panelTitle}>Bem-vindo de volta</Text>
             <Text style={styles.panelSubtitle}>Entre com o mesmo acesso do Splash.</Text>
             <Text style={styles.label}>Usuário</Text>
@@ -51,10 +85,11 @@ export default function LoginScreen() {
               placeholder="Seu usuário" placeholderTextColor="#9BA8B8"
               autoCapitalize="none" autoCorrect={false} returnKeyType="next"
               accessibilityLabel="Usuário" autoComplete="username"
+              onSubmitEditing={() => passwordRef.current?.focus()} blurOnSubmit={false}
             />
             <Text style={styles.label}>Senha</Text>
             <View style={styles.passwordRow}>
-              <TextInput
+              <TextInput ref={passwordRef}
                 style={[styles.field, styles.passwordInput]} value={password} onChangeText={setPassword}
                 placeholder="Sua senha" placeholderTextColor="#9BA8B8"
                 secureTextEntry={!showPassword} onSubmitEditing={submit}
@@ -70,10 +105,15 @@ export default function LoginScreen() {
               style={({ pressed }) => [styles.button, (busy || !username.trim() || !password) && styles.buttonDisabled, pressed && styles.pressed]}
               accessibilityRole="button" accessibilityLabel="Entrar no Splash"
             >
-              {busy ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.buttonText}>Entrar no Splash</Text><SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" /></>}
+              {busy ? <><ActivityIndicator color="#FFFFFF" /><Text style={styles.buttonText}>Conectando...</Text></> : <><Text style={styles.buttonText}>Entrar no Splash</Text><SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" /></>}
             </Pressable>
+            {__DEV__ && <Pressable onPress={testConnection} disabled={checking || busy}
+              accessibilityRole="button" style={styles.testConnection}>
+              {checking ? <ActivityIndicator size="small" color={colors.brandDark} /> : <Text style={styles.testConnectionText}>Testar conexão com a API</Text>}
+            </Pressable>}
+            {!!connection && <Text style={styles.connectionResult}>{connection}</Text>}
           </View>
-          <Text style={styles.footer}>SPLASH · APLICATIVO NATIVO</Text>
+          {!keyboardVisible && <Text style={styles.footer}>SPLASH · APLICATIVO NATIVO</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -84,6 +124,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   body: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 44, paddingBottom: 30 },
+  bodyKeyboard: { flexGrow: 1, justifyContent: 'flex-start', paddingTop: 10, paddingBottom: 24 },
   mark: { width: 59, height: 59, backgroundColor: colors.navy, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   markText: { color: '#FFFFFF', fontWeight: '900', fontSize: 37, marginBottom: 6 },
   markDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.brand, position: 'absolute', right: 11, bottom: 11 },
@@ -94,6 +135,7 @@ const styles = StyleSheet.create({
   headline: { marginTop: 15, color: colors.ink, fontWeight: '900', fontSize: 33, lineHeight: 39, letterSpacing: -1 },
   intro: { color: colors.muted, marginTop: 12, fontSize: 14, lineHeight: 22, maxWidth: 285 },
   panel: { backgroundColor: '#FFFFFF', borderRadius: 26, padding: 23, marginTop: 33, borderColor: colors.line, borderWidth: 1 },
+  panelKeyboard: { marginTop: 0 },
   panelTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   panelSubtitle: { color: colors.muted, fontSize: 13, marginTop: 6, marginBottom: 19 },
   label: { color: colors.ink, fontSize: 12, fontWeight: '700', marginBottom: 7, marginTop: 13 },
@@ -106,5 +148,8 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.55 },
   buttonText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  testConnection: { marginTop: 15, alignItems: 'center', justifyContent: 'center', minHeight: 38 },
+  testConnectionText: { fontSize: 12, fontWeight: '700', color: colors.brandDark },
+  connectionResult: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 19 },
   footer: { color: '#9DA9B9', fontSize: 10, textAlign: 'center', fontWeight: '800', letterSpacing: 1.5, marginTop: 29 },
 });
