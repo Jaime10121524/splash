@@ -15,7 +15,7 @@ Primeira entrega independente do frontend web e do aplicativo Capacitor. O aplic
 
 - Node.js 22.13+ (Expo SDK 58), Android Studio/emulador ou celular Android.
 - Backend CodeIgniter atualizado com as rotas "/api/mobile/*" desta branch.
-- HTTPS acessível no celular; nunca publicar um backend HTTP com credenciais reais.
+- Para desenvolvimento em PC e celular na mesma rede Wi-Fi, é permitido HTTP com IP privado somente na build de desenvolvimento. Não utilize senhas reais em uma rede sem criptografia; para uso real, configure HTTPS.
 - A configuração local vai em "mobile/.env.local", não comitar.
 
 ## Configurar no PowerShell
@@ -31,7 +31,26 @@ Primeira entrega independente do frontend web e do aplicativo Capacitor. O aplic
     npm run typecheck
     npx expo start
 
-Editar EXPO_PUBLIC_SPLASH_API_URL com a origem HTTPS do backend, SEM "/api" e sem barra final, por exemplo "https://seu-dominio.com". Para simular Android local, use apenas desenvolvimento com endereço acessível do emulador e política de rede apropriada.
+Editar EXPO_PUBLIC_SPLASH_API_URL com a origem do backend, SEM "/api" e sem barra final.
+
+### Teste no mesmo computador e celular (rede Wi-Fi privada)
+
+1. No PowerShell, execute `ipconfig` e anote o IPv4 da placa Wi-Fi, por exemplo `192.168.1.105`.
+2. Em outro terminal inicie o backend:
+   ```powershell
+   cd D:\Ahritech\Sistemas\Web\splash\backend
+   php spark serve --host 0.0.0.0 --port 8080
+   ```
+3. No navegador do celular (mesma Wi-Fi) abra `http://192.168.1.105:8080/api/mobile/me` (substitua pelo IP real). A resposta de acesso negado/401 em JSON confirma que a rota é alcançável; erro de conexão indica rede/firewall/servidor.
+4. No `mobile/.env.local` use:
+   ```env
+   EXPO_PUBLIC_SPLASH_API_URL=http://192.168.1.105:8080
+   ```
+5. No diretório `mobile`, execute `npx.cmd expo start --lan --clear` e abra no Expo Go. Não use `localhost` no celular: é o próprio celular, não o PC.
+
+Para emulador Android, usar `http://10.0.2.2:8080`. Para um backend HTTPS de teste ou produção, usar `https://seu-dominio.com`.
+
+O HTTP local é permitido no app somente em modo de desenvolvimento. Use uma rede confiável e credenciais descartáveis; em produção e para dados reais, HTTPS é obrigatório. Se a rede ou o Android bloquearem HTTP, exponha o backend por uma origem HTTPS de desenvolvimento ao invés de desabilitar proteções.
 
 Android: pressionar "a" com emulador configurado ou usar uma build de desenvolvimento. Em produção, gerar APK/AAB próprio do Expo, sem substituir o app Capacitor existente antes de homologar.
 
