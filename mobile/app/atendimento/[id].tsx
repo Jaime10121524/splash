@@ -312,6 +312,12 @@ export default function AtendimentoDetailScreen() {
                 <Text style={styles.primaryText}>Finalizar e registrar resultado</Text>
                 <SymbolView name={{ ios: 'checkmark', android: 'check' }} size={19} tintColor="#FFFFFF" />
               </Pressable>}
+              {visit.status === 'VENDA' && <Pressable style={styles.primaryAction}
+                onPress={() => router.push({pathname:'/venda/[id]',
+                  params:visit.operacao_id?{id:String(visit.operacao_id)}:{id:'novo',visita:String(visit.id)}})}>
+                <Text style={styles.primaryText}>{visit.operacao_id?'Ver venda e comissões':'Cadastrar venda e pagamentos'}</Text>
+                <SymbolView name={{ios:'arrow.right',android:'arrow_forward'}} size={19} tintColor="#FFFFFF" />
+              </Pressable>}
               {canResume && <Pressable style={styles.primaryAction} disabled={saving} onPress={confirmResume}>
                 <Text style={styles.primaryText}>{saving ? 'Retomando...' : 'Retomar visita de hoje'}</Text>
                 <SymbolView name={{ ios: 'arrow.counterclockwise', android: 'restart_alt' }} size={19} tintColor="#FFFFFF" />
