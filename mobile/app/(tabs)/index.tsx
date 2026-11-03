@@ -59,7 +59,10 @@ export default function HomeScreen() {
           <Text style={styles.title}>Olá, {firstName}! <Text>👋</Text></Text>
           <Text style={styles.date}>{today}</Text>
         </View>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{firstName.slice(0, 1).toUpperCase()}</Text></View>
+        <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/perfil')}
+          accessibilityRole="button" accessibilityLabel="Abrir meu perfil">
+          <Text style={styles.avatarText}>{firstName.slice(0, 1).toUpperCase()}</Text>
+        </Pressable>
       </View>
       <View style={styles.hero}>
         <View style={styles.heroCircle} />
