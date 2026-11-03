@@ -66,8 +66,10 @@ final class MobileVendasController extends VendasController
         $a=$this->actor();
         if($a instanceof ResponseInterface)return $a;
         $db=db_connect();
-        $plans=$db->table('plano_versoes')->select('id,plano_id,nome,codigo,valor,duracao_meses,ativo')
+        $plans=$db->table('plano_versoes')->select('id,plano_id,codigo,valor,duracao_meses,ativo')
             ->where('ativo',1)->orderBy('duracao_meses','ASC')->get()->getResultArray();
+        foreach($plans as &$plan)$plan['nome']=$plan['codigo'].' · '.$plan['duracao_meses'].' meses';
+        unset($plan);
         $methods=$db->table('venda_formas_pagamento')
             ->select('id,nome,codigo,credito,ativo')
             ->where('ativo',1)->where('codigo !=','ABATIMENTO_EMP')->orderBy('id')->get()->getResultArray();
