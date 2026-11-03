@@ -41,6 +41,12 @@ final class MobileController extends BaseController
         ];
     }
 
+    public function ping(): ResponseInterface
+    {
+        // Sem dados privados: teste simples de alcance da API em desenvolvimento.
+        return $this->noCache($this->response->setJSON(['ok' => true]));
+    }
+
     public function login(): ResponseInterface
     {
         // API mobile stateless: rate limit separado, sem cookies nem tokens CSRF.
