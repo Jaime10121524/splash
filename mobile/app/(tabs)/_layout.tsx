@@ -27,6 +27,10 @@ export default function TabsLayout() {
         title: 'Atendimentos',
         tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'person.2', android: 'groups' }} size={24} tintColor={color} />,
       }} />
+      <Tabs.Screen name="clientes" options={{
+        title: 'Clientes',
+        tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'person.crop.rectangle.stack', android: 'contacts' }} size={23} tintColor={color} />,
+      }} />
       <Tabs.Screen name="perfil" options={{
         title: 'Perfil',
         tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'person.crop.circle', android: 'account_circle' }} size={24} tintColor={color} />,
