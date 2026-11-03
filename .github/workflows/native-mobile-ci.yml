@@ -23,6 +23,11 @@ jobs:
       - name: Verificar TypeScript
         run: npm run typecheck
         working-directory: mobile
+      - name: Verificar empacotamento JavaScript Android
+        run: npx expo export --platform android --output-dir .expo-export
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_SPLASH_API_URL: https://exemplo.invalid
   lint-php:
     runs-on: ubuntu-latest
     steps:
