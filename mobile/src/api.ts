@@ -48,6 +48,7 @@ export type MobileVisitOptions = {
   corretores: MobilePersonOption[];
   atendentes: MobilePersonOption[];
   motivos: { id: number; descricao: string }[];
+  origens: { id: number; nome: string; permite_indicador: boolean }[];
   minha_pessoa_id: number | null;
 };
 export type MobileClient = { id: number; nome: string; telefone: string | null };
