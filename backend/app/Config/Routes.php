@@ -39,6 +39,15 @@ $routes->group('api', static function ($routes): void {
             $routes->post('atendimentos/(:num)/iniciar', 'Api\MobileVisitasController::start/$1');
             $routes->post('atendimentos/(:num)/finalizar', 'Api\MobileVisitasController::finish/$1');
             $routes->post('atendimentos/(:num)/retomar', 'Api\MobileVisitasController::resume/$1');
+            // Vendas do aplicativo: regras financeiras compartilhadas com o web, acesso por token.
+            $routes->get('vendas/opcoes', 'Api\MobileVendasController::opcoes');
+            $routes->post('vendas/previa', 'Api\MobileVendasController::previa');
+            $routes->post('vendas', 'Api\MobileVendasController::create');
+            $routes->get('vendas/(:num)', 'Api\MobileVendasController::detalhe/$1');
+            $routes->post('vendas/(:num)/receber', 'Api\MobileVendasController::receber/$1');
+            $routes->post('vendas/(:num)/ajustar-comissao', 'Api\MobileVendasController::ajustarComissao/$1');
+            $routes->get('vendas/(:num)/rateios', 'Api\MobileRateiosController::rateiosVenda/$1');
+            $routes->post('vendas/(:num)/rateios', 'Api\MobileRateiosController::ratear/$1');
         });
     });
     $routes->post('session/login', 'Api\\SessionController::login', ['filter' => 'csrf']);
