@@ -25,6 +25,9 @@ jobs:
       - name: Verificar TypeScript
         run: npm run typecheck
         working-directory: mobile
+      - name: Testar máscara telefônica brasileira
+        run: npm run test:phone
+        working-directory: mobile
       - name: Verificar empacotamento JavaScript Android
         run: npx expo export --platform android --output-dir .expo-export
         working-directory: mobile
