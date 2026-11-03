@@ -30,6 +30,9 @@ export type VisitDetail = Visit & {
   motivo_nao_venda_id: number | null;
   motivo_nome: string | null;
   operacao_situacao: string | null;
+  cliente_cpf: string | null;
+  cliente_email: string | null;
+  cliente_nascimento: string | null;
 };
 
 export type VisitHistoryEvent = {
