@@ -4,6 +4,7 @@ import { FormControl } from '../components/UiFields.jsx'
 import { comercialGet, comercialPost, dateBR, localDateISO, personOptions, timeSpan } from '../lib/comercialApi.js'
 import './ComercialPages.css'
 import { formatPhone } from '../components/PhoneInput.jsx'
+import TransientNotice from '../components/TransientNotice.jsx'
 
 const statusLabels={
   AGUARDANDO:'Aguardando', ATENDENDO:'Em atendimento',
@@ -181,7 +182,7 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
         <button className="com-main-button" type="button" onClick={()=>openArrival()}>＋ Registrar chegada</button>
       </div>
     </header>
-    {notice&&<div className="com-alert success" role="status">{notice}<button type="button" onClick={()=>setNotice('')}>Fechar</button></div>}
+    <TransientNotice message={notice} onClose={()=>setNotice('')} />
     {error&&<div className="com-alert error" role="alert">{error}<button type="button" onClick={()=>{setError('');reload().catch(e=>setError(e.message))}}>Tentar novamente</button></div>}
     <div className="com-stats">
       {kpis.map(([label,value,description])=><article key={label}><span>{label}</span><strong>{value}</strong><small>{description}</small></article>)}
