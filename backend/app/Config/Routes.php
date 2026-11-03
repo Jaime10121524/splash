@@ -8,6 +8,17 @@ $routes->get('/', 'Home::index');
 // Sessões e autenticação da SPA (mesma origem em produção; proxy /api no Vite local).
 $routes->group('api', static function ($routes): void {
     $routes->get('session', 'Api\\SessionController::show');
+
+    // React Native: autenticação stateless com token Shield; não altera a sessão SPA.
+    // Escopo "mobile" é obrigatório em cada endpoint protegido.
+    $routes->group('mobile', static function ($routes): void {
+        $routes->post('login', 'Api\MobileController::login');
+        $routes->group('', ['filter' => 'tokens:mobile'], static function ($routes): void {
+            $routes->get('me', 'Api\MobileController::me');
+            $routes->post('logout', 'Api\MobileController::logout');
+            $routes->get('atendimentos', 'Api\MobileController::atendimentos');
+        });
+    });
     $routes->post('session/login', 'Api\\SessionController::login', ['filter' => 'csrf']);
     $routes->post('session/logout', 'Api\\SessionController::logout', ['filter' => 'csrf']);
     $routes->get('alertas-comerciais/config', 'Api\\AlertasComerciaisController::consultar');
