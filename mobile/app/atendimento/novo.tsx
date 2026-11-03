@@ -178,7 +178,7 @@ export default function NewVisitScreen() {
     }
   }
 
-  async function resumeFromArrival(mode: 'mesmo' | 'outro', newId: number | null) {
+  async function resumeFromArrival(mode: 'mesmo', _newId: null) {
     if (!token || !resumeCandidate) throw new Error('Escolha uma visita para retomar.');
     const result = await apiRequest<{ message: string }>(
       'mobile/atendimentos/' + resumeCandidate.id + '/retomar', {
@@ -186,7 +186,6 @@ export default function NewVisitScreen() {
         token,
         body: {
           modo_atendente: mode,
-          ...(mode === 'outro' ? { atendente_pessoa_id: newId } : {}),
           corretor_pessoa_id: main,
           segundo_corretor_pessoa_id: second,
         },
