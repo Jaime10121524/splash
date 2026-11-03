@@ -339,22 +339,18 @@ final class AgendamentosController extends BaseController
                 'cliente_id'=>$clientId,'corretor_pessoa_id'=>$broker,
                 'segundo_corretor_pessoa_id'=>$second,
                 'atendente_pessoa_id'=>$attendant,
-                'status'=>'ATENDENDO','chegada_em'=>$now,'inicio_em'=>$now,
+                'status'=>'AGUARDANDO','chegada_em'=>$now,
                 'criado_por_usuario_id'=>(int)$actor['user']->id,
             ]);
             $visitId=(int)$db->insertID();
             if ($visitId<1) throw new \RuntimeException('Falha ao iniciar visita.');
-            $db->table('visita_sessoes')->insert([
-                'visita_id'=>$visitId,'inicio_em'=>$now,
-                'criado_por_usuario_id'=>(int)$actor['user']->id,
+            // Check-in marca somente a chegada. Sessão e início são criados
+            // exclusivamente pelo endpoint /atendimentos/{id}/iniciar.
+            $db->table('visita_status_historico')->insert([
+                'visita_id'=>$visitId,'status_anterior'=>null,
+                'status_novo'=>'AGUARDANDO',
+                'usuario_id'=>(int)$actor['user']->id,'criado_em'=>$now,
             ]);
-            foreach([['status_anterior'=>null,'status_novo'=>'AGUARDANDO'],
-                ['status_anterior'=>'AGUARDANDO','status_novo'=>'ATENDENDO']] as $event) {
-                $db->table('visita_status_historico')->insert([
-                    'visita_id'=>$visitId,...$event,
-                    'usuario_id'=>(int)$actor['user']->id,'criado_em'=>$now,
-                ]);
-            }
             $db->table('agendamentos')->where('id',$bookingId)->update([
                 'situacao'=>'COMPARECEU','compareceu_em'=>$now,
                 'cliente_id'=>$clientId,'visita_id'=>$visitId,
@@ -365,10 +361,10 @@ final class AgendamentosController extends BaseController
             ]);
             if ($db->transStatus()===false) throw new \RuntimeException('Falha no check-in.');
             $db->transCommit();
-            try { \App\Libraries\VisitasAvisos::registrar($visitId,'INICIADO'); }
+            try { \App\Libraries\VisitasAvisos::registrar($visitId,'CHEGADA'); }
             catch(Throwable $ignored) { log_message('warning','Aviso check-in não enviado: '.$ignored->getMessage()); }
             return $this->response->setJSON([
-                'message'=>'Comparecimento confirmado. Atendimento iniciado.',
+                'message'=>'Chegada registrada. A visita está aguardando o início do atendimento.',
                 'agendamento_id'=>$bookingId,'visita_id'=>$visitId,
                 'cliente_id'=>$clientId,
             ])->setHeader('Cache-Control','no-store');
