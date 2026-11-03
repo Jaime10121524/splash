@@ -1,13 +1,15 @@
-import {useEffect} from 'react'
+import {useEffect,useRef} from 'react'
 import './TransientNotice.css'
 
 /** Avisos informativos, sem decisão, desaparecem em cinco segundos. */
 export default function TransientNotice({message,onClose,kind='success',duration=5000}) {
+  const close=useRef(onClose)
+  close.current=onClose
   useEffect(()=>{
     if(!message)return
-    const timeout=window.setTimeout(onClose,duration)
+    const timeout=window.setTimeout(()=>close.current(),duration)
     return ()=>window.clearTimeout(timeout)
-  },[message,duration,onClose])
+  },[message,duration])
   if(!message)return null
   return <div className={'splash-toast '+kind} role="status" key={message}>
     <div className="splash-toast-content">
