@@ -294,6 +294,7 @@ final class MobileVisitasController extends BaseController
                 v.observacoes,v.motivo_nao_venda_id,v.corretor_pessoa_id,v.segundo_corretor_pessoa_id,
                 v.atendente_pessoa_id,v.atendente_adicional_pessoa_id,v.criado_por_usuario_id,
                 c.nome AS cliente_nome,c.telefone AS cliente_telefone,
+                c.cpf AS cliente_cpf,c.email AS cliente_email,c.data_nascimento AS cliente_nascimento,
                 p.nome AS atendente_nome,a.nome AS adicional_nome,cp.nome AS corretor_nome,
                 sp.nome AS segundo_corretor_nome,m.descricao AS motivo_nome,
                 op.situacao AS operacao_situacao')
