@@ -235,6 +235,53 @@ final class MobileVisitasController extends BaseController
             ->setHeader('Cache-Control', 'no-store');
     }
 
+
+    /**
+     * A chegada consulta isto antes de salvar: se houve encerramento hoje,
+     * a escolha de atendente acontece ANTES de alterar a visita.
+     */
+    public function resumableClientVisit(): ResponseInterface
+    {
+        if ($denied = $this->access()) return $denied;
+        $clientId = $this->validId($this->request->getGet('cliente_id'));
+        if ($clientId === null) return $this->error(422, 'Cliente inválido.');
+
+        $db = db_connect();
+        $user = auth('tokens')->user();
+        $client = $db->table('clientes')->select('id,dono_corrente_pessoa_id,ativo')
+            ->where('id', $clientId)->get()->getRowArray();
+        $scope = $this->scope($user);
+        if (! $client || ! (bool) $client['ativo']
+            || ($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope)) {
+            return $this->error(404, 'Cliente não encontrado.');
+        }
+
+        $day = substr($this->now(), 0, 10);
+        $visit = $db->table('visitas v')
+            ->select('v.id,v.status,v.corretor_pessoa_id,v.segundo_corretor_pessoa_id,
+                v.atendente_pessoa_id,v.atendente_adicional_pessoa_id,v.criado_por_usuario_id,
+                p.nome AS atendente_nome')
+            ->join('pessoas p', 'p.id=v.atendente_pessoa_id', 'left')
+            ->where('v.cliente_id', $clientId)
+            ->where('v.chegada_em >=', $day . ' 00:00:00')
+            ->where('v.chegada_em <=', $day . ' 23:59:59')
+            ->orderBy('v.id', 'DESC')->get(1)->getRowArray();
+
+        if (! $visit || ! in_array($visit['status'], ['RETORNO', 'SEM_VENDA', 'PENDENCIA'], true)
+            || $db->table('venda_operacoes')->where('visita_id', (int) $visit['id'])->countAllResults()) {
+            return $this->response->setJSON(['retomavel' => false])
+                ->setHeader('Cache-Control', 'no-store');
+        }
+        if (! $this->allowed($visit, $user)) return $this->error(403, 'Visita de outro corretor.');
+
+        return $this->response->setJSON([
+            'retomavel' => true,
+            'visita_id' => (int) $visit['id'],
+            'atendente_pessoa_id' => $visit['atendente_pessoa_id'] === null ? null : (int) $visit['atendente_pessoa_id'],
+            'atendente_nome' => $visit['atendente_nome'],
+        ])->setHeader('Cache-Control', 'no-store');
+    }
+
     public function show(int|string $id): ResponseInterface
     {
         if ($denied = $this->access()) return $denied;
@@ -354,25 +401,8 @@ final class MobileVisitasController extends BaseController
                 ->where('chegada_em <=', substr($now, 0, 10) . ' 23:59:59')
                 ->orderBy('id', 'DESC')->get(1)->getRowArray();
             if ($sameDay && in_array($sameDay['status'], ['SEM_VENDA', 'RETORNO', 'PENDENCIA'], true)) {
-                if ($db->table('venda_operacoes')->where('visita_id', (int) $sameDay['id'])->countAllResults()) {
-                    $db->transRollback();
-                    return $this->error(409, 'Esta visita possui uma operação de venda vinculada.');
-                }
-                if (! $this->allowed($sameDay, $user)) {
-                    $db->transRollback();
-                    return $this->error(403, 'Não é permitido retomar visita de outro corretor.');
-                }
-                $this->updateBrokers($db, $sameDay, $brokers, (int) $user->id, $now);
-                $db->table('visitas')->where('id', (int) $sameDay['id'])
-                    ->update(['status' => 'AGUARDANDO', 'fim_em' => null,
-                        'retorno_previsto' => null, 'motivo_nao_venda_id' => null,
-                        'atualizado_em' => $now]);
-                $this->event($db, (int) $sameDay['id'], (string) $sameDay['status'], 'AGUARDANDO', (int) $user->id, $now);
-                if ($db->transStatus() === false) throw new \RuntimeException('Falha ao retomar visita.');
-                $db->transCommit();
-                $this->notice((int) $sameDay['id'], 'RETOMADA');
-                return $this->ok('Visita de hoje retomada sem duplicar o atendimento.',
-                    ['visita_id' => (int) $sameDay['id'], 'cliente_id' => $clientId, 'retomada' => true]);
+                $db->transRollback();
+                return $this->error(409, 'Há uma visita encerrada hoje. Escolha como deseja retomá-la antes de registrar nova chegada.');
             }
             $last = $db->table('visitas')
                 ->select('atendente_pessoa_id,atendente_adicional_pessoa_id')
@@ -573,10 +603,13 @@ final class MobileVisitasController extends BaseController
                 $db->transRollback();
                 return $this->error(409, 'A visita possui uma venda vinculada.');
             }
-            $brokers = $this->brokers($db, [
+            $inputBrokers = $data['corretor_pessoa_id'] ?? null;
+            // Na tela de chegada é possível ajustar os corretores da visita
+            // sem alterar o dono da corrente do cliente.
+            $brokers = $this->brokers($db, $inputBrokers === null ? [
                 'corretor_pessoa_id' => $visit['corretor_pessoa_id'],
                 'segundo_corretor_pessoa_id' => $visit['segundo_corretor_pessoa_id'],
-            ], $user);
+            ] : $data, $user);
             if (isset($brokers['error'])) {
                 $db->transRollback();
                 return $this->error(422, $brokers['error']);
@@ -611,6 +644,8 @@ final class MobileVisitasController extends BaseController
                 $db->transRollback();
                 return $this->error(422, 'O atendente adicional deve ser diferente do responsável.');
             }
+
+            $this->updateBrokers($db, $visit, $brokers, (int) $user->id, $now);
 
             // A decisão é atômica: retoma a MESMA visita, reabre o histórico e
             // inicia a próxima sessão com o atendente escolhido.
