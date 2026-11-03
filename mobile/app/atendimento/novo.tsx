@@ -293,7 +293,7 @@ export default function NewVisitScreen() {
             <TextInput style={styles.newInput} value={newPhone}
               onChangeText={value => setNewPhone(previous => editMaskedPhoneBR(previous, value))}
               placeholder="(21) 99999-9999" placeholderTextColor="#A09BB4"
-              keyboardType="phone-pad" maxLength={15} accessibilityLabel="Telefone do novo cliente"
+              keyboardType="phone-pad" maxLength={20} accessibilityLabel="Telefone do novo cliente"
               textContentType="telephoneNumber" />
             <Text style={[styles.fieldLabel, styles.fieldSpace]}>Origem do lead *</Text>
             <Pressable onPress={() => { Keyboard.dismiss(); setSheet('origin'); }}
