@@ -12,6 +12,7 @@ import { apiRequest, MobileClient, MobileVisitOptions } from '../../src/api';
 import BookingInvite, { type Booking } from '../../src/components/BookingInvite';
 import ChoiceSheet from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
+import ToastNotice from '../../src/components/ToastNotice';
 import { editMaskedPhoneBR, maskPhoneBR, phoneDigits } from '../../src/phone';
 import { useAuth } from '../../src/AuthContext';
 import { colors } from '../../src/theme';
@@ -202,8 +203,7 @@ export default function AgendamentosScreen() {
       {error!==''&&<View style={styles.feedback}><Text style={styles.feedbackText}>{error}</Text>
         <Pressable onPress={()=>setError('')} accessibilityLabel="Fechar aviso"><SymbolView name={{ios:'xmark',android:'close'}} size={17} tintColor="#9B663B"/></Pressable>
       </View>}
-      {notice!==''&&<Pressable onPress={()=>setNotice('')} style={styles.notice}>
-        <Text style={styles.noticeText}>{notice}</Text></Pressable>}
+
       {mode==='list'&&<>
         <View style={styles.hero}><Text style={styles.eyebrow}>FUNIL DE LEADS</Text>
           <Text style={styles.heroTitle}>Da agenda{'\n'}ao resultado.</Text>
@@ -335,6 +335,7 @@ export default function AgendamentosScreen() {
         if(picker==='client')setClientId(value);
       }} onClose={()=>setPicker(null)}/>
     <BookingInvite booking={invite} onClose={()=>setInvite(null)}/>
+    <ToastNotice message={notice} onDismiss={()=>setNotice('')}/>
     <ActionModal visible={success!==null} variant="success"
       title={success?.title||'Comparecimento registrado'}
       description={success?.description||''} primaryLabel="Abrir atendimento"
