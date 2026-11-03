@@ -13,6 +13,7 @@ import BookingInvite, { type Booking } from '../../src/components/BookingInvite'
 import ChoiceSheet from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
 import ToastNotice from '../../src/components/ToastNotice';
+import VisitDateCalendar from '../../src/components/VisitDateCalendar';
 import { editMaskedPhoneBR, maskPhoneBR, phoneDigits } from '../../src/phone';
 import { useAuth } from '../../src/AuthContext';
 import { colors } from '../../src/theme';
@@ -62,11 +63,14 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [date, setDate] = useState(dateBR(todayPlus(0)));
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [people, setPeople] = useState('1');
   const [captor, setCaptor] = useState<number | null>(null);
 
   const [current, setCurrent] = useState<Booking | null>(null);
   const [scannedQr, setScannedQr] = useState('');
+  const [startNow, setStartNow] = useState(false);
+  const [showClientLookup, setShowClientLookup] = useState(false);
   const [broker, setBroker] = useState<number | null>(null);
   const [second, setSecond] = useState<number | null>(null);
   const [attendant, setAttendant] = useState<number | null>(null);
@@ -127,6 +131,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
     setCurrent(booking); setScannedQr(qr); setBroker(booking.corretor_confirmado_pessoa_id || booking.captador_pessoa_id);
     setSecond(booking.segundo_corretor_pessoa_id || null); setAttendant(booking.atendente_pessoa_id || null);
     setClientId(booking.cliente_id || null); setClientQuery(booking.telefone); setClients([]);
+    setStartNow(false); setShowClientLookup(false);
     setError(''); setMode('confirm');
   }
   async function inspectQr(qr: string) {
@@ -194,27 +199,63 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
     finally { setBusy(false); }
   }
 
-  async function checkin() {
-    if (!token || !current || !scannedQr || !broker || !attendant || broker===second) {
-      setError('Confirme o corretor e selecione o atendente.');
+  async function checkin(startImmediately: boolean) {
+    if (!token || !current || !scannedQr) {
+      setError('Confira o QR Code do agendamento.');
       return;
     }
-    setBusy(true);setError('');
+    if (startImmediately && (!broker || !attendant || broker===second)) {
+      setError('Para iniciar agora, selecione o corretor e o atendente.');
+      return;
+    }
+    setBusy(true); setError('');
     try {
+      // Primeira operação: somente registrar presença, criando visita AGUARDANDO.
+      // Sem início imediato, o backend preserva o corretor captador e NÃO
+      // exige atendente. O QR nunca inicia o atendimento por si só.
       const result = await apiRequest<{ visita_id: number; message: string }>(
         'mobile/agendamentos/' + current.id + '/checkin', {
           method: 'POST', token, body: {
-            qr: scannedQr, corretor_pessoa_id: broker,
-            segundo_corretor_pessoa_id: second, atendente_pessoa_id: attendant,
+            qr: scannedQr,
             cliente_id: clientId,
+            ...(startImmediately ? {
+              corretor_pessoa_id: broker,
+              segundo_corretor_pessoa_id: second,
+              atendente_pessoa_id: attendant,
+            } : {}),
           },
         },
       );
-      setMode('list');setCurrent(null);await refresh();
-      setSuccess({ title:'Chegada registrada!', description:result.message, visitId:result.visita_id });
+      // Segunda operação, expressamente escolhida pelo usuário:
+      // iniciar a visita AGUARDANDO no endpoint já existente.
+      let title = 'Chegada registrada!';
+      let description = result.message;
+      if (startImmediately && attendant) {
+        try {
+          const started = await apiRequest<{ message: string }>(
+            'mobile/atendimentos/' + result.visita_id + '/iniciar', {
+              method: 'POST', token,
+              body: { atendente_pessoa_id: attendant, atendente_adicional_pessoa_id: null },
+            },
+          );
+          title = 'Atendimento iniciado!';
+          description = 'Chegada registrada. ' + started.message;
+        } catch (startError) {
+          title = 'Chegada registrada; atendimento aguardando';
+          description = 'A chegada foi salva, mas não foi possível iniciar o atendimento: ' +
+            (startError instanceof Error ? startError.message : 'Verifique o atendimento.') +
+            ' Abra a ficha da visita para iniciar manualmente. Não leia o QR novamente.';
+        }
+      }
+      setMode('list'); setCurrent(null);
+      await refresh();
+      setSuccess({ title, description, visitId: result.visita_id });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível realizar o check-in.'); }
-    finally { setBusy(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível registrar a chegada.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   const brokers = options?.corretores || [];
@@ -315,10 +356,18 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
             onChangeText={v=>setPhone(p=>editMaskedPhoneBR(p,v))} keyboardType="phone-pad"
             placeholder="(21) 99999-9999" placeholderTextColor={colors.muted}/>
           <Text style={styles.label}>Data da visita *</Text>
-          <TextInput style={styles.input} value={date} onChangeText={setDate}
-            onFocus={scrollFormToBottom}
-            keyboardType="numbers-and-punctuation" maxLength={10}
-            placeholder="DD/MM/AAAA" placeholderTextColor={colors.muted}/>
+          <Pressable accessibilityRole="button" accessibilityLabel={'Escolher data da visita: '+date}
+            onPress={() => { Keyboard.dismiss(); setCalendarOpen(true); }}
+            style={styles.datePickerButton}>
+            <View style={styles.dateIcon}>
+              <SymbolView name={{ios:'calendar',android:'event'}} size={21} tintColor={colors.brandDark}/>
+            </View>
+            <View style={styles.dateTextGroup}>
+              <Text style={styles.datePickerValue}>{date}</Text>
+              <Text style={styles.datePickerHint}>Toque para escolher no calendário</Text>
+            </View>
+            <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} tintColor={colors.brandDark} size={20}/>
+          </Pressable>
           <View style={styles.dateButtons}>
             <Pressable onPress={()=>setDate(dateBR(todayPlus(0)))}><Text style={styles.quickText}>Hoje</Text></Pressable>
             <Pressable onPress={()=>setDate(dateBR(todayPlus(1)))}><Text style={styles.quickText}>Amanhã</Text></Pressable>
@@ -367,31 +416,69 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
         </View>
       </View>}
       {mode==='confirm'&&current&&<>
-        <View style={styles.hero}><Text style={styles.eyebrow}>CONFIRA O LEAD</Text>
+        <View style={styles.hero}>
+          <Text style={styles.eyebrow}>CONFIRMAR CHEGADA</Text>
           <Text style={styles.heroTitle}>{current.nome_completo}</Text>
           <Text style={styles.heroSub}>{dateBR(current.data_visita)} · {current.quantidade_pessoas} pessoa(s)</Text>
-          <Text style={styles.heroSub}>Captado por: {current.captador_nome||'Corretor cadastrado'}</Text>
+          <Text style={styles.heroSub}>Corretor captador: {current.captador_nome || 'Corretor responsável'}</Text>
         </View>
-        <Text style={styles.instructions}>Registre somente a chegada. O cliente ficará aguardando; o atendimento será iniciado separadamente. Confira corretor(es) e atendente.</Text>
-        <View style={styles.form}>
-          {select('Corretor que está recebendo *',brokers.find(v=>v.id===broker)?.nome||'',()=>setPicker('broker'))}
-          {select('Segundo corretor (opcional)',brokers.find(v=>v.id===second)?.nome||'Nenhum',()=>setPicker('second'))}
-          {select('Quem vai atender? *',attendants.find(v=>v.id===attendant)?.nome||'',()=>setPicker('attendant'))}
-          <View style={styles.clientLookup}>
-            <Text style={styles.label}>Vincular cliente existente (opcional)</Text>
-            <TextInput style={styles.input} value={clientQuery} onChangeText={setClientQuery}
-              onFocus={scrollFormToBottom}
-              placeholder="Nome ou telefone" placeholderTextColor={colors.muted}/>
-            <Pressable onPress={()=>{void searchClients();}} style={styles.searchClient}><Text style={styles.quickText}>Localizar cliente</Text></Pressable>
-            {clients.length>0&&select('Cadastro do cliente',
-              clients.find(v=>v.id===clientId)?.nome||'Criar novo cadastro',
-              ()=>setPicker('client'))}
-            {clientId&&<Pressable onPress={()=>setClientId(null)}><Text style={styles.quickText}>Não vincular este cliente</Text></Pressable>}
+        <Text style={styles.instructions}>
+          Confirme a chegada do visitante. Por padrão, ele ficará AGUARDANDO e o atendimento
+          poderá ser iniciado manualmente depois.
+        </Text>
+        {!startNow && <>
+          <Pressable style={[styles.primary,styles.save,busy&&styles.disabled]}
+            disabled={busy} onPress={() => { void checkin(false); }}>
+            {busy ? <ActivityIndicator color="#FFFFFF"/> :
+              <Text style={styles.primaryText}>Confirmar chegada · deixar aguardando</Text>}
+          </Pressable>
+          <Pressable style={styles.secondaryAction} disabled={busy}
+            onPress={() => { setStartNow(true); setError(''); }}>
+            <SymbolView name={{ios:'person.crop.circle.badge.checkmark',android:'person_add'}}
+              tintColor={colors.brandDark} size={21}/>
+            <Text style={styles.secondaryActionText}>Registrar chegada e iniciar atendimento agora</Text>
+          </Pressable>
+        </>}
+        {startNow && <>
+          <Text style={styles.startNotice}>INÍCIO IMEDIATO: confirme o corretor e escolha quem atenderá.
+            O início será registrado somente após sua confirmação.</Text>
+          <View style={styles.form}>
+            {select('Corretor responsável *',brokers.find(v=>v.id===broker)?.nome||'',()=>setPicker('broker'))}
+            {select('Segundo corretor (opcional)',brokers.find(v=>v.id===second)?.nome||'Nenhum',()=>setPicker('second'))}
+            {select('Quem vai atender? *',attendants.find(v=>v.id===attendant)?.nome||'',()=>setPicker('attendant'))}
           </View>
-        </View>
-        <Pressable style={[styles.primary,styles.save,busy&&styles.disabled]} disabled={busy} onPress={()=>{void checkin();}}>
-          {busy?<ActivityIndicator color="#FFFFFF"/>:<Text style={styles.primaryText}>Confirmar chegada</Text>}
+          <Pressable style={[styles.primary,styles.save,busy&&styles.disabled]}
+            disabled={busy} onPress={() => { void checkin(true); }}>
+            {busy ? <ActivityIndicator color="#FFFFFF"/> :
+              <Text style={styles.primaryText}>Confirmar chegada e iniciar atendimento</Text>}
+          </Pressable>
+          <Pressable style={styles.secondaryAction} disabled={busy}
+            onPress={() => { setStartNow(false); setError(''); }}>
+            <Text style={styles.secondaryActionText}>Voltar · registrar apenas a chegada</Text>
+          </Pressable>
+        </>}
+        <Pressable style={styles.clientToggle} disabled={busy}
+          onPress={() => setShowClientLookup(v=>!v)}>
+          <Text style={styles.quickText}>Vincular cliente já cadastrado (opcional)</Text>
+          <SymbolView name={{ios:showClientLookup?'chevron.up':'chevron.down',
+            android:showClientLookup?'keyboard_arrow_up':'keyboard_arrow_down'}}
+            tintColor={colors.brandDark} size={18}/>
         </Pressable>
+        {showClientLookup && <View style={styles.form}>
+          <Text style={styles.label}>Localizar pelo nome ou telefone</Text>
+          <TextInput style={styles.input} value={clientQuery} onChangeText={setClientQuery}
+            onFocus={scrollFormToBottom} placeholder="Nome ou telefone"
+            placeholderTextColor={colors.muted}/>
+          <Pressable onPress={() => { void searchClients(); }} style={styles.searchClient}>
+            <Text style={styles.quickText}>Localizar cliente</Text>
+          </Pressable>
+          {clients.length>0&&select('Cadastro do cliente',
+            clients.find(v=>v.id===clientId)?.nome||'Criar novo cadastro',
+            ()=>setPicker('client'))}
+          {clientId && <Pressable onPress={()=>setClientId(null)}>
+            <Text style={styles.quickText}>Não vincular este cliente</Text>
+          </Pressable>}
+        </View>}
       </>}
     </ScrollView>
     </KeyboardAvoidingView>
@@ -411,6 +498,8 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
         if(picker==='attendant')setAttendant(value);
         if(picker==='client')setClientId(value);
       }} onClose={()=>setPicker(null)}/>
+    <VisitDateCalendar open={calendarOpen} value={dateISO(date)||todayPlus(0)}
+      onChange={iso => setDate(dateBR(iso))} onClose={()=>setCalendarOpen(false)}/>
     <BookingInvite booking={invite} onClose={()=>setInvite(null)}/>
     <ToastNotice message={notice} onDismiss={()=>setNotice('')}/>
     <ActionModal visible={success!==null} variant="success"
@@ -420,7 +509,10 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
       onPrimary={()=>{const visit=success?.visitId;setSuccess(null);if(visit)router.push({
         pathname:'/atendimento/[id]',params:{id:String(visit)},
       });}}
-      onSecondary={()=>setSuccess(null)}/>
+      onSecondary={()=>{
+        setSuccess(null);
+        if(initialMode==='scan')router.replace('/(tabs)/agendamentos');
+      }}/>
   </SafeAreaView>;
 }
 
@@ -473,6 +565,20 @@ const styles=StyleSheet.create({
   caption:{color:colors.muted,fontSize:10,fontWeight:'700'},
   selectValue:{color:colors.ink,fontWeight:'800',marginTop:6,fontSize:13},
   dateButtons:{flexDirection:'row',gap:16,marginTop:3},
+  datePickerButton:{height:62,flexDirection:'row',alignItems:'center',gap:12,
+    paddingHorizontal:10,borderWidth:1,borderColor:'#D8CCFF',borderRadius:15,backgroundColor:'#FAF9FF'},
+  dateIcon:{height:43,width:43,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:colors.pale},
+  dateTextGroup:{flex:1},
+  datePickerValue:{fontSize:17,fontWeight:'900',color:colors.ink},
+  datePickerHint:{fontSize:10,color:colors.muted,marginTop:3},
+  secondaryAction:{marginTop:12,minHeight:56,borderRadius:16,borderWidth:1,borderColor:'#CEBEFF',
+    backgroundColor:'#F6F2FF',flexDirection:'row',alignItems:'center',justifyContent:'center',
+    gap:8,paddingHorizontal:12},
+  secondaryActionText:{fontSize:12,fontWeight:'900',color:colors.brandDark,textAlign:'center'},
+  startNotice:{fontSize:12,color:colors.brandDark,lineHeight:19,marginBottom:12,
+    backgroundColor:colors.pale,borderRadius:14,padding:13,marginTop:10},
+  clientToggle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',
+    marginTop:17,padding:12,borderRadius:13,backgroundColor:'#FFFFFF'},
   counter:{minHeight:62,flexDirection:'row',alignItems:'center',gap:9,
     borderRadius:16,borderWidth:1,borderColor:colors.line,padding:6,backgroundColor:'#FAF9FF'},
   counterButton:{width:49,height:49,borderRadius:13,backgroundColor:colors.pale,
