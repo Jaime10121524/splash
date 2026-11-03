@@ -38,9 +38,18 @@ export type VisitHistoryEvent = {
   criado_em: string;
 };
 
+export type AttendantChangeEvent = {
+  criado_em: string;
+  atendente_anterior_pessoa_id: number | null;
+  atendente_novo_pessoa_id: number;
+  anterior_nome: string | null;
+  novo_nome: string;
+};
+
 export type VisitDetailsResponse = {
   visita: VisitDetail;
   historico: VisitHistoryEvent[];
+  trocas_atendente?: AttendantChangeEvent[];
 };
 
 export type MobilePersonOption = { id: number; nome: string };
