@@ -20,6 +20,38 @@ export type Visit = {
   corretor_nome: string | null;
 };
 
+export type VisitDetail = Visit & {
+  corretor_pessoa_id: number | null;
+  segundo_corretor_pessoa_id: number | null;
+  atendente_pessoa_id: number | null;
+  atendente_adicional_pessoa_id: number | null;
+  adicional_nome: string | null;
+  segundo_corretor_nome: string | null;
+  motivo_nao_venda_id: number | null;
+  motivo_nome: string | null;
+  operacao_situacao: string | null;
+};
+
+export type VisitHistoryEvent = {
+  status_anterior: string | null;
+  status_novo: string;
+  criado_em: string;
+};
+
+export type VisitDetailsResponse = {
+  visita: VisitDetail;
+  historico: VisitHistoryEvent[];
+};
+
+export type MobilePersonOption = { id: number; nome: string };
+export type MobileVisitOptions = {
+  corretores: MobilePersonOption[];
+  atendentes: MobilePersonOption[];
+  motivos: { id: number; descricao: string }[];
+  minha_pessoa_id: number | null;
+};
+export type MobileClient = { id: number; nome: string; telefone: string | null };
+
 export type VisitData = {
   visitas: Visit[];
   indicadores: {
@@ -50,7 +82,7 @@ export async function apiRequest<T>(path: string, options: {
   if (!origin || (!httpsUrl.test(origin) && !(__DEV__ && localDevUrl.test(origin)))) {
     throw new ApiError('Configure a URL HTTPS da API ou, apenas em desenvolvimento, o IP local do computador.', 0);
   }
-  if (!/^mobile\/[a-z0-9/?=&-]+$/i.test(path)) {
+  if (!/^mobile\/[a-z0-9/?=&%._-]+$/i.test(path)) {
     throw new ApiError('Rota nativa inválida.', 0);
   }
 
