@@ -27,7 +27,8 @@ export type Booking = {
   visita_status?: string | null;
 };
 
-const cardWidth = Math.min(Dimensions.get('window').width - 34, 360);
+// Formato de tela vertical (9:16), idêntico no Android e no PNG compartilhado.
+const cardWidth = Math.min(Dimensions.get('window').width - 28, 360);
 const benefits = [
   'Tour guiado pelo clube',
   'Café de boas-vindas chegando até as 10 horas',
@@ -61,7 +62,7 @@ export default function BookingInvite({ booking, onClose }: {
       // Somente o token do agendamento vai no QR Code; sem dados pessoais.
       // Mantém proporção do voucher ao exportar em alta resolução.
       const uri = await captureRef(card.current, {
-        format: 'png', quality: 1, result: 'tmpfile', width: 1080,
+        format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1920,
       });
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
@@ -90,33 +91,42 @@ export default function BookingInvite({ booking, onClose }: {
       <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewContent}>
         {booking && <View ref={card} collapsable={false} style={[styles.card, { width: cardWidth }]}>
           <View style={styles.top}>
-            <View style={styles.orbit} />
-            <Text style={styles.brand}>SPLASH PARK</Text>
-            <Text style={styles.fazendinha}>FAZENDINHA</Text>
+            <Text style={styles.brand}>SPLASH PARK <Text style={styles.fazendinha}>FAZENDINHA</Text></Text>
             <Text style={styles.tagline}>VOUCHER DE VISITA AGENDADA</Text>
           </View>
           <View style={styles.body}>
-            <Text style={styles.brokerCaption}>VOCÊ SERÁ ATENDIDO PELO CORRETOR:</Text>
-            <Text style={styles.brokerName}>{booking.captador_nome || 'Corretor responsável'}</Text>
-            <View style={styles.divider} />
-            <View style={styles.dataRow}>
-              <View style={styles.dateBlock}>
+            <View style={styles.brokerBox}>
+              <Text style={styles.brokerCaption}>VOCÊ SERÁ ATENDIDO PELO CORRETOR:</Text>
+              <Text style={styles.brokerName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.75}>
+                {booking.captador_nome || 'Corretor responsável'}
+              </Text>
+            </View>
+            <View style={styles.visitBox}>
+              <View style={styles.visitDate}>
                 <Text style={styles.fieldLabel}>DATA DA VISITA</Text>
                 <Text style={styles.dateValue}>{prettyDate}</Text>
               </View>
-              <View style={styles.peopleBlock}>
+              <View style={styles.visitCount}>
                 <Text style={styles.fieldLabel}>PESSOAS</Text>
                 <Text style={styles.dateValue}>{booking.quantidade_pessoas}</Text>
               </View>
             </View>
-            <Text style={styles.fieldLabel}>NOME DO CLIENTE</Text>
-            <Text style={styles.clientName}>{booking.nome_completo}</Text>
-            <View style={styles.qrContainer}>
-              <QRCode size={174} value={code || 'SPLASH:SEM-CODIGO'}
-                backgroundColor="#FFFFFF" color="#24184E"
-                ecl="M" quietZone={10} />
-              <Text style={styles.qrInstruction}>APRESENTE O QR CODE NA RECEPÇÃO</Text>
-              <Text style={styles.number}>AGENDAMENTO Nº {booking.id}</Text>
+            <View>
+              <Text style={styles.fieldLabel}>NOME DO CLIENTE</Text>
+              <Text style={styles.clientName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.8}>
+                {booking.nome_completo}
+              </Text>
+            </View>
+            <View style={styles.qrRow}>
+              <View style={styles.qrBackground}>
+                <QRCode size={117} value={code || 'SPLASH:SEM-CODIGO'}
+                  backgroundColor="#FFFFFF" color="#24184E" ecl="M" quietZone={4} />
+              </View>
+              <View style={styles.qrDetails}>
+                <Text style={styles.qrInstruction}>APRESENTE O QR CODE NA RECEPÇÃO</Text>
+                <Text style={styles.number}>AGENDAMENTO Nº {booking.id}</Text>
+                <Text style={styles.qrNote}>A leitura confirma apenas a chegada.</Text>
+              </View>
             </View>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>O que você vai ter nessa visita</Text>
@@ -137,7 +147,7 @@ export default function BookingInvite({ booking, onClose }: {
               )}
             </View>
             <View style={styles.address}>
-              <Text style={styles.addressHeading}>ONDE FICAMOS</Text>
+              <Text style={styles.addressHeading}>ENDEREÇO</Text>
               <Text style={styles.addressText}>Estrada do Frutuoso, 315, Santa Cruz, Rio de Janeiro - RJ</Text>
             </View>
           </View>
@@ -158,38 +168,40 @@ export default function BookingInvite({ booking, onClose }: {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 12 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   close: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { color: colors.ink, fontWeight: '900', fontSize: 16 },
   previewScroll: { flex: 1 },
-  previewContent: { alignItems: 'center', paddingBottom: 20 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 20, overflow: 'hidden' },
-  top: { backgroundColor: colors.navy, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 16, alignItems: 'center', overflow: 'hidden' },
-  orbit: { position: 'absolute', width: 220, height: 220, borderRadius: 120, backgroundColor: '#6B52BF', right: -95, top: -110, opacity: .45 },
-  brand: { color: '#FFFFFF', fontWeight: '900', fontSize: 24, letterSpacing: 1.1 },
-  fazendinha: { color: '#DACFFF', fontWeight: '900', fontSize: 19, letterSpacing: 2.6 },
-  tagline: { marginTop: 8, color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
-  body: { paddingHorizontal: 19, paddingTop: 17, paddingBottom: 19 },
-  brokerCaption: { color: colors.brandDark, fontSize: 10, fontWeight: '900', letterSpacing: .55, textAlign: 'center' },
-  brokerName: { color: colors.navy, fontSize: 22, fontWeight: '900', lineHeight: 26, textAlign: 'center', marginTop: 7 },
-  divider: { height: 1, backgroundColor: '#E5DFFF', marginVertical: 15 },
-  dataRow: { flexDirection: 'row', gap: 10, marginBottom: 11 },
-  dateBlock: { flex: 1, backgroundColor: '#F4F0FF', padding: 12, borderRadius: 12 },
-  peopleBlock: { width: 86, backgroundColor: '#F4F0FF', padding: 12, borderRadius: 12 },
-  fieldLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: .5 },
-  dateValue: { color: colors.navy, fontSize: 16, fontWeight: '900', marginTop: 5 },
-  clientName: { color: colors.ink, fontSize: 15, fontWeight: '900', marginTop: 5, lineHeight: 20 },
-  qrContainer: { alignItems: 'center', paddingVertical: 7, marginTop: 8, backgroundColor: '#FFFFFF' },
-  qrInstruction: { color: colors.navy, fontWeight: '900', fontSize: 10, marginTop: 5, textAlign: 'center' },
-  number: { color: colors.brandDark, fontWeight: '900', fontSize: 10, marginTop: 4 },
-  section: { borderRadius: 12, backgroundColor: '#F7F5FF', padding: 12, marginTop: 11 },
-  sectionTitle: { color: colors.navy, fontSize: 14, fontWeight: '900', marginBottom: 7 },
-  item: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 4, gap: 6 },
-  itemMarker: { color: colors.brandDark, fontSize: 11, fontWeight: '900', width: 17 },
-  itemText: { color: colors.ink, fontSize: 10.5, lineHeight: 15, flex: 1 },
-  address: { marginTop: 14, borderTopColor: '#E5DFFF', borderTopWidth: 1, paddingTop: 12 },
-  addressHeading: { fontSize: 10, fontWeight: '900', letterSpacing: 1, color: colors.brandDark },
-  addressText: { fontSize: 11, fontWeight: '800', lineHeight: 16, color: colors.navy, marginTop: 5 },
+  previewContent: { alignItems: 'center', paddingBottom: 16 },
+  card: { aspectRatio: 9 / 16, backgroundColor: '#FFFFFF', borderRadius: 18, overflow: 'hidden' },
+  top: { backgroundColor: colors.navy, height: '10%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  brand: { color: '#FFFFFF', fontWeight: '900', fontSize: 17, textAlign: 'center' },
+  fazendinha: { color: '#D7C8FF', fontWeight: '900', fontSize: 14 },
+  tagline: { marginTop: 3, color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: .6 },
+  body: { flex: 1, paddingHorizontal: 13, paddingTop: 8, paddingBottom: 8, justifyContent: 'space-between' },
+  brokerBox: { alignItems: 'center' },
+  brokerCaption: { color: colors.brandDark, fontSize: 9, fontWeight: '900', textAlign: 'center' },
+  brokerName: { color: colors.navy, fontSize: 18, fontWeight: '900', lineHeight: 20, textAlign: 'center', marginTop: 3 },
+  visitBox: { backgroundColor: '#F2EEFF', borderRadius: 10, flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 7 },
+  visitDate: { flex: 1 },
+  visitCount: { minWidth: 74, paddingLeft: 6, borderLeftWidth: 1, borderLeftColor: '#DAD0FC' },
+  fieldLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: .3 },
+  dateValue: { color: colors.navy, fontSize: 14, fontWeight: '900', marginTop: 3 },
+  clientName: { color: colors.ink, fontSize: 13, fontWeight: '900', lineHeight: 15, marginTop: 3 },
+  qrRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  qrBackground: { padding: 3, backgroundColor: '#FFFFFF' },
+  qrDetails: { flex: 1, gap: 8 },
+  qrInstruction: { color: colors.navy, fontSize: 11, fontWeight: '900', lineHeight: 14 },
+  number: { color: colors.brandDark, fontSize: 9.5, fontWeight: '900' },
+  qrNote: { color: colors.muted, fontSize: 8.5, lineHeight: 11 },
+  section: { borderRadius: 9, backgroundColor: '#F7F5FF', paddingHorizontal: 9, paddingVertical: 6 },
+  sectionTitle: { color: colors.navy, fontSize: 11.5, fontWeight: '900', marginBottom: 3 },
+  item: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
+  itemMarker: { color: colors.brandDark, fontSize: 8.8, lineHeight: 11.5, fontWeight: '900', width: 13 },
+  itemText: { color: colors.ink, fontSize: 8.8, lineHeight: 11.5, flex: 1 },
+  address: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, borderTopWidth: 1, borderTopColor: '#E5DFFF', paddingTop: 5 },
+  addressHeading: { fontSize: 8, fontWeight: '900', color: colors.brandDark, marginTop: 1 },
+  addressText: { fontSize: 8.8, fontWeight: '800', lineHeight: 11, color: colors.navy, flex: 1 },
   share: { backgroundColor: colors.brand, minHeight: 55, borderRadius: 17, marginHorizontal: 5,
     flexDirection: 'row', gap: 11, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
