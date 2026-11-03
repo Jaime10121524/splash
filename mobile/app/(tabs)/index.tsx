@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -43,7 +43,7 @@ export default function HomeScreen() {
     } finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
   async function refresh() { setRefreshing(true); await load(); }
   function openVisits() { Haptics.selectionAsync().catch(() => {}); router.push('/(tabs)/atendimentos'); }
 
@@ -82,7 +82,8 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Atividade recente</Text>
           <Pressable onPress={openVisits} accessibilityRole="button"><Text style={styles.link}>Ver tudo</Text></Pressable>
         </View>
-        {data.visitas.length ? data.visitas.slice(0, 4).map(visit => <VisitCard key={visit.id} visit={visit} compact />)
+        {data.visitas.length ? data.visitas.slice(0, 4).map(visit => <VisitCard key={visit.id} visit={visit} compact
+          onPress={() => router.push({ pathname: '/atendimento/[id]', params: { id: String(visit.id) } })} />)
           : <View style={styles.info}><Text style={styles.infoText}>Nenhum atendimento registrado hoje.</Text></View>}
         <Pressable style={styles.action} onPress={openVisits}>
           <View style={styles.actionIcon}><SymbolView name={{ ios: 'list.bullet.clipboard', android: 'assignment' }} size={22} tintColor={colors.brandDark} /></View>
