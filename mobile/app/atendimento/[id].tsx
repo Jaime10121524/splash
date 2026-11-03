@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable,
+  ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable,
   RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -80,7 +80,7 @@ export default function AtendimentoDetailScreen() {
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
-  const [success, setSuccess] = useState<{ title: string; description: string; completeClientId?: number } | null>(null);
+  const [success, setSuccess] = useState<{ title: string; description: string; completeClientId?: number; saleVisitId?: number } | null>(null);
   const [mode, setMode] = useState<FormMode>(null);
   const [sheet, setSheet] = useState<SheetField>(null);
   const [mainAttendant, setMainAttendant] = useState<number | null>(null);
@@ -174,6 +174,7 @@ export default function AtendimentoDetailScreen() {
           ? result.message + ' Quer aproveitar e completar o cadastro do cliente?'
           : result.message,
         completeClientId: incomplete ? visit?.cliente_id : undefined,
+        saleVisitId: action === 'finish' && outcome === 'VENDA' ? id : undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
@@ -356,7 +357,7 @@ export default function AtendimentoDetailScreen() {
                 value={options?.motivos.find(p => p.id === reason)?.descricao}
                 hint="Selecionar motivo" onPress={() => setSheet('reason')} />}
               {outcome === 'VENDA' && <Text style={styles.saleNote}>
-                Registrar “Venda fechada” não emite título nem gera financeiro. O lançamento da venda será feito no módulo de Vendas.
+                Após finalizar, você poderá cadastrar o título e registrar os pagamentos. Se necessário, também poderá completar primeiro o cadastro do cliente.
               </Text>}
               <View style={styles.formField}>
                 <Text style={styles.fieldLabel}>Observações</Text>
@@ -420,31 +421,63 @@ export default function AtendimentoDetailScreen() {
       <ActionModal visible={confirming} variant="confirm"
         title={outcome === 'VENDA' ? 'Confirmar venda fechada?' : 'Finalizar atendimento?'}
         description={outcome === 'VENDA'
-          ? 'O resultado comercial será salvo, mas o título e os valores financeiros devem ser lançados no módulo de Vendas.'
+          ? 'O resultado será salvo. Em seguida, escolha cadastrar a venda ou completar primeiro o cliente. Nenhum pagamento será lançado sem confirmação.'
           : 'O resultado será salvo no histórico e o horário de encerramento será registrado pelo servidor.'}
         primaryLabel="Sim, finalizar"
         secondaryLabel="Voltar" onPrimary={submitConfirmed}
         onSecondary={() => setConfirming(false)} busy={saving} />
-      <ToastNotice message={success && !success.completeClientId
+      <ToastNotice message={success && !success.saleVisitId
         ? success.title + ' ' + success.description : ''}
         kind="success" onDismiss={() => setSuccess(null)} />
-      <ActionModal visible={!!success?.completeClientId} variant="success"
-        title={success?.title || 'Operação concluída'}
-        description={success?.description || ''}
-        primaryLabel={success?.completeClientId ? 'Completar cadastro' : 'Entendi'}
-        secondaryLabel={success?.completeClientId ? 'Agora não' : null}
-        onSecondary={() => setSuccess(null)}
-        onPrimary={() => {
-          const clientId = success?.completeClientId;
-          setSuccess(null);
-          if (clientId) router.push({ pathname:'/cliente/[id]',params:{id:String(clientId)} });
-        }} />
+      <Modal visible={!!success?.saleVisitId} transparent animationType="fade"
+        onRequestClose={() => setSuccess(null)}>
+        <View style={styles.saleOverlay}>
+          <View style={styles.saleModal}>
+            <Text style={styles.saleModalTag}>ATENDIMENTO CONCLUÍDO</Text>
+            <Text style={styles.saleModalTitle}>Venda fechada!</Text>
+            <Text style={styles.saleModalDescription}>
+              O atendimento foi encerrado. Como deseja continuar?
+            </Text>
+            <Pressable style={styles.salePrimary} onPress={() => {
+              const saleVisitId = success?.saleVisitId;
+              setSuccess(null);
+              if (saleVisitId) router.push({pathname:'/venda/[id]',
+                params:{id:'novo',visita:String(saleVisitId)}});
+            }}>
+              <Text style={styles.salePrimaryText}>Cadastrar a venda agora</Text>
+            </Pressable>
+            {!!success?.completeClientId && <Pressable style={styles.saleSecondary} onPress={() => {
+              const clientId=success?.completeClientId;
+              const saleVisitId=success?.saleVisitId;
+              setSuccess(null);
+              if (clientId&&saleVisitId) router.push({pathname:'/cliente/[id]',
+                params:{id:String(clientId),vendaVisita:String(saleVisitId)}});
+            }}>
+              <Text style={styles.saleSecondaryText}>Completar o cliente e depois vender</Text>
+            </Pressable>}
+            <Pressable style={styles.saleLater} onPress={()=>setSuccess(null)}>
+              <Text style={styles.saleLaterText}>Fazer isso depois</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  saleOverlay: { flex:1,backgroundColor:'rgba(21,15,43,.65)',justifyContent:'center',padding:23 },
+  saleModal: { backgroundColor:'#FFFFFF',borderRadius:24,padding:24,gap:13 },
+  saleModalTag: { color:colors.brandDark,fontSize:10,fontWeight:'900',letterSpacing:1 },
+  saleModalTitle: { color:colors.navy,fontSize:25,fontWeight:'900' },
+  saleModalDescription: { color:colors.muted,fontSize:14,lineHeight:20,marginBottom:7 },
+  salePrimary: {backgroundColor:colors.brand,padding:17,borderRadius:15,alignItems:'center'},
+  salePrimaryText: {color:'#FFFFFF',fontSize:14,fontWeight:'900'},
+  saleSecondary: {backgroundColor:'#F0EAFE',padding:16,borderRadius:15,alignItems:'center'},
+  saleSecondaryText: {color:colors.brandDark,fontSize:13,fontWeight:'900',textAlign:'center'},
+  saleLater: {padding:12,alignItems:'center'},
+  saleLaterText: {color:colors.muted,fontSize:13,fontWeight:'800'},
   flex: { flex: 1 },
   content: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 38 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 22 },
