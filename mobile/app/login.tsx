@@ -21,12 +21,12 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../src/AuthContext';
 import { ApiError, apiRequest } from '../src/api';
 
-const navy = '#0C2737';
-const accent = '#05AFA1';
-const accentLight = '#72EADB';
-const background = '#F3F6F8';
-const ink = '#193144';
-const subdued = '#758897';
+const navy = '#24184E';
+const accent = '#7861F9';
+const accentLight = '#CFC3FF';
+const background = '#F7F8FC';
+const ink = '#1B2540';
+const subdued = '#79829A';
 
 type ErrorKind = 'credentials' | 'connection' | 'server';
 
@@ -189,7 +189,7 @@ export default function LoginScreen() {
               <View style={styles.lockBubble}>
                 <SymbolView
                   name={{ ios: 'lock.shield', android: 'verified_user' }}
-                  tintColor="#078C82"
+                  tintColor="#624CDE"
                   size={21}
                 />
               </View>
@@ -197,11 +197,11 @@ export default function LoginScreen() {
 
             <Text style={styles.fieldLabel}>Usuário</Text>
             <View style={[styles.fieldBox, focused === 'username' && styles.fieldFocused]}>
-              <InputSymbol kind="user" color={focused === 'username' ? accent : '#8193A3'} />
+              <InputSymbol kind="user" color={focused === 'username' ? accent : '#9286B0'} />
               <TextInput
                 style={styles.field}
                 placeholder="Seu usuário"
-                placeholderTextColor="#96A4B0"
+                placeholderTextColor="#9D9BB2"
                 value={username}
                 onChangeText={(value) => { setUsername(value); if (error) setError(''); }}
                 autoCapitalize="none"
@@ -218,12 +218,12 @@ export default function LoginScreen() {
 
             <Text style={[styles.fieldLabel, styles.passwordLabel]}>Senha</Text>
             <View style={[styles.fieldBox, focused === 'password' && styles.fieldFocused]}>
-              <InputSymbol kind="lock" color={focused === 'password' ? accent : '#8193A3'} />
+              <InputSymbol kind="lock" color={focused === 'password' ? accent : '#9286B0'} />
               <TextInput
                 ref={passwordField}
                 style={styles.field}
                 placeholder="Digite sua senha"
-                placeholderTextColor="#96A4B0"
+                placeholderTextColor="#9D9BB2"
                 value={password}
                 onChangeText={(value) => { setPassword(value); if (error) setError(''); }}
                 secureTextEntry={!visiblePassword}
@@ -246,7 +246,7 @@ export default function LoginScreen() {
                     ? { ios: 'eye.slash', android: 'visibility_off' }
                     : { ios: 'eye', android: 'visibility' }}
                   size={20}
-                  tintColor="#637F8F"
+                  tintColor="#786C94"
                 />
               </Pressable>
             </View>
@@ -316,7 +316,7 @@ export default function LoginScreen() {
                   style={styles.testButton}
                 >
                   {checking ? <ActivityIndicator size="small" color={accent} /> : (
-                    <SymbolView name={{ ios: 'wifi', android: 'wifi' }} size={16} tintColor="#708B98" />
+                    <SymbolView name={{ ios: 'wifi', android: 'wifi' }} size={16} tintColor="#8176A1" />
                   )}
                   <Text style={styles.testLabel}>Testar conexão com a API</Text>
                 </Pressable>
@@ -349,35 +349,35 @@ const styles = StyleSheet.create({
   hero: { minHeight: 320, backgroundColor: navy, paddingHorizontal: 25, paddingTop: 25, paddingBottom: 80, overflow: 'hidden' },
   heroSmall: { minHeight: 276, paddingBottom: 75 },
   heroCompact: { minHeight: 102, paddingBottom: 31, paddingTop: 17 },
-  orbitLarge: { position: 'absolute', width: 320, height: 320, borderRadius: 160, borderWidth: 55, borderColor: '#1B4752', top: -134, right: -165, opacity: 0.48 },
-  orbitSmall: { position: 'absolute', width: 116, height: 116, borderRadius: 58, borderWidth: 25, borderColor: '#347B7A', top: 170, right: -78, opacity: 0.27 },
+  orbitLarge: { position: 'absolute', width: 320, height: 320, borderRadius: 160, borderWidth: 55, borderColor: '#443475', top: -134, right: -165, opacity: 0.48 },
+  orbitSmall: { position: 'absolute', width: 116, height: 116, borderRadius: 58, borderWidth: 25, borderColor: '#5C45A6', top: 170, right: -78, opacity: 0.27 },
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 1 },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  mark: { backgroundColor: '#0EAC9E', justifyContent: 'center', alignItems: 'center' },
+  mark: { backgroundColor: '#7861F9', justifyContent: 'center', alignItems: 'center' },
   markLines: { alignItems: 'center', flexDirection: 'row', gap: 3, transform: [{ rotate: '20deg' }] },
   markLine: { width: 4, backgroundColor: '#FFFFFF', borderRadius: 4 },
-  markDot: { position: 'absolute', bottom: 6, right: 6, width: 5, height: 5, borderRadius: 4, backgroundColor: '#B0FFF5' },
+  markDot: { position: 'absolute', bottom: 6, right: 6, width: 5, height: 5, borderRadius: 4, backgroundColor: '#ECE6FF' },
   brandName: { fontSize: 22, color: '#FFFFFF', letterSpacing: -1.1, fontWeight: '800' },
   brandPeriod: { color: accentLight },
-  versionPill: { flexDirection: 'row', gap: 7, alignItems: 'center', backgroundColor: '#214353', borderRadius: 40, paddingHorizontal: 11, paddingVertical: 8 },
-  versionText: { fontSize: 10, fontWeight: '800', color: '#D1E8EC', letterSpacing: 1.3 },
+  versionPill: { flexDirection: 'row', gap: 7, alignItems: 'center', backgroundColor: '#3B2D69', borderRadius: 40, paddingHorizontal: 11, paddingVertical: 8 },
+  versionText: { fontSize: 10, fontWeight: '800', color: '#F0EAFE', letterSpacing: 1.3 },
   onlineDot: { width: 6, height: 6, backgroundColor: accentLight, borderRadius: 5 },
   heroWords: { marginTop: 36, zIndex: 1, maxWidth: 330 },
   heroWordsSmall: { marginTop: 23 },
   heroEyebrow: { color: accentLight, fontSize: 10, letterSpacing: 2, fontWeight: '800', marginBottom: 10 },
   heroTitle: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', letterSpacing: -1.5, lineHeight: 40 },
-  heroDescription: { color: '#AEC6D0', fontSize: 12, lineHeight: 20, marginTop: 12, maxWidth: 275 },
+  heroDescription: { color: '#D3C9EE', fontSize: 12, lineHeight: 20, marginTop: 12, maxWidth: 275 },
   formCard: { marginHorizontal: 17, marginTop: -52, backgroundColor: '#FFFFFF', borderRadius: 28, paddingHorizontal: 22, paddingTop: 25, paddingBottom: 16, borderWidth: 1, borderColor: '#EDF1F4', elevation: 5, shadowColor: navy, shadowOpacity: 0.07, shadowOffset: { width: 0, height: 9 }, shadowRadius: 23 },
   formCardCompact: { marginTop: -25 },
   welcomeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 23 },
   welcomeText: { flex: 1 },
   welcome: { fontSize: 22, fontWeight: '800', color: ink, letterSpacing: -0.7 },
   welcomeDetail: { color: subdued, fontSize: 12.5, marginTop: 6 },
-  lockBubble: { width: 41, height: 41, backgroundColor: '#E7F7F3', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  lockBubble: { width: 41, height: 41, backgroundColor: '#EFEAFF', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   fieldLabel: { fontSize: 12, color: ink, fontWeight: '700', marginBottom: 8 },
   passwordLabel: { marginTop: 18 },
-  fieldBox: { backgroundColor: '#F6F8FA', borderWidth: 1.5, borderColor: '#E9EEF1', borderRadius: 15, height: 54, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  fieldFocused: { backgroundColor: '#F7FFFD', borderColor: '#52CDBE' },
+  fieldBox: { backgroundColor: '#F9F8FF', borderWidth: 1.5, borderColor: '#E9E5F4', borderRadius: 15, height: 54, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  fieldFocused: { backgroundColor: '#F8F5FF', borderColor: '#7861F9' },
   field: { flex: 1, color: ink, fontSize: 15, paddingVertical: 0, minWidth: 0, height: '100%' },
   eyeButton: { width: 34, height: 42, alignItems: 'center', justifyContent: 'center' },
   feedback: { marginTop: 16, borderRadius: 16, backgroundColor: '#FFF8F3', borderWidth: 1, borderColor: '#F6E6D8', flexDirection: 'row', alignItems: 'flex-start', padding: 13, gap: 10 },
@@ -389,13 +389,13 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.52 },
   buttonPressed: { transform: [{ scale: 0.985 }], opacity: 0.94 },
   buttonText: { fontWeight: '800', fontSize: 15, color: '#FFFFFF', letterSpacing: 0.15 },
-  buttonArrow: { position: 'absolute', right: 15, backgroundColor: '#2EC4B6', width: 33, height: 33, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  buttonArrow: { position: 'absolute', right: 15, backgroundColor: '#917CFB', width: 33, height: 33, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   debugBlock: { alignItems: 'center', paddingTop: 10 },
   testButton: { flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, minHeight: 40 },
-  testLabel: { fontSize: 12, fontWeight: '600', color: '#708B98' },
-  connectionMessage: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#EFF8F6', maxWidth: '100%' },
-  connectionText: { fontSize: 11, color: '#487A77', textAlign: 'center', lineHeight: 17 },
+  testLabel: { fontSize: 12, fontWeight: '600', color: '#8176A1' },
+  connectionMessage: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#F1EEFF', maxWidth: '100%' },
+  connectionText: { fontSize: 11, color: '#6452BD', textAlign: 'center', lineHeight: 17 },
   footer: { flexDirection: 'row', marginTop: 29, alignItems: 'center', justifyContent: 'center', gap: 9 },
-  footerLine: { width: 18, height: 1, backgroundColor: '#B9C9CE' },
-  footerText: { color: '#97ABB3', fontSize: 9.5, fontWeight: '800', letterSpacing: 1.2 },
+  footerLine: { width: 18, height: 1, backgroundColor: '#CECAE0' },
+  footerText: { color: '#A49BBE', fontSize: 9.5, fontWeight: '800', letterSpacing: 1.2 },
 });
