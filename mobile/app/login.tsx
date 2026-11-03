@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -13,8 +13,6 @@ import {
   TextInput,
   useWindowDimensions,
   View,
-  type ScrollView as ScrollViewInstance,
-  type TextInput as TextInputInstance,
 } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -61,8 +59,8 @@ export default function LoginScreen() {
   const { user, ready, login } = useAuth();
   const { height } = useWindowDimensions();
   const smallerDisplay = height < 740;
-  const scroll = useRef<ScrollViewInstance>(null);
-  const passwordField = useRef<TextInputInstance>(null);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const passwordField = useRef<ComponentRef<typeof TextInput>>(null);
   const feedbackMotion = useRef(new Animated.Value(0)).current;
 
   const [username, setUsername] = useState('');
