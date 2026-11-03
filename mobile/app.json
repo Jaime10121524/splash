@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Splash Next",
+    "slug": "splash-mobile",
+    "scheme": "splashmobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": { "bundleIdentifier": "com.ahritech.splashnext", "supportsTablet": false },
+    "android": { "package": "com.ahritech.splashnext", "edgeToEdgeEnabled": true },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true }
+  }
+}
