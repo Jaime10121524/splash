@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet, { Choice } from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
+import ToastNotice from '../../src/components/ToastNotice';
 import ResumeAttendantModal from '../../src/components/ResumeAttendantModal';
 import { colors, shadows } from '../../src/theme';
 
@@ -424,7 +425,10 @@ export default function AtendimentoDetailScreen() {
         primaryLabel="Sim, finalizar"
         secondaryLabel="Voltar" onPrimary={submitConfirmed}
         onSecondary={() => setConfirming(false)} busy={saving} />
-      <ActionModal visible={success !== null} variant="success"
+      <ToastNotice message={success && !success.completeClientId
+        ? success.title + ' ' + success.description : ''}
+        kind="success" onDismiss={() => setSuccess(null)} />
+      <ActionModal visible={!!success?.completeClientId} variant="success"
         title={success?.title || 'Operação concluída'}
         description={success?.description || ''}
         primaryLabel={success?.completeClientId ? 'Completar cadastro' : 'Entendi'}
