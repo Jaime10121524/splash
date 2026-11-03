@@ -79,7 +79,7 @@ export default function AtendimentoDetailScreen() {
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
-  const [success, setSuccess] = useState<{ title: string; description: string } | null>(null);
+  const [success, setSuccess] = useState<{ title: string; description: string; completeClientId?: number } | null>(null);
   const [mode, setMode] = useState<FormMode>(null);
   const [sheet, setSheet] = useState<SheetField>(null);
   const [mainAttendant, setMainAttendant] = useState<number | null>(null);
@@ -165,9 +165,14 @@ export default function AtendimentoDetailScreen() {
       });
       setMode(null);
       await load();
+      const incomplete = action === 'finish' && outcome === 'VENDA'
+        && !!visit && (!visit.cliente_cpf || !visit.cliente_email || !visit.cliente_nascimento);
       setSuccess({
         title: action === 'start' ? 'Atendimento iniciado!' : 'Resultado registrado!',
-        description: result.message,
+        description: incomplete
+          ? result.message + ' Quer aproveitar e completar o cadastro do cliente?'
+          : result.message,
+        completeClientId: incomplete ? visit?.cliente_id : undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
@@ -422,8 +427,14 @@ export default function AtendimentoDetailScreen() {
       <ActionModal visible={success !== null} variant="success"
         title={success?.title || 'Operação concluída'}
         description={success?.description || ''}
-        primaryLabel="Entendi" secondaryLabel={null}
-        onPrimary={() => setSuccess(null)} />
+        primaryLabel={success?.completeClientId ? 'Completar cadastro' : 'Entendi'}
+        secondaryLabel={success?.completeClientId ? 'Agora não' : null}
+        onSecondary={() => setSuccess(null)}
+        onPrimary={() => {
+          const clientId = success?.completeClientId;
+          setSuccess(null);
+          if (clientId) router.push({ pathname:'/cliente/[id]',params:{id:String(clientId)} });
+        }} />
     </SafeAreaView>
   );
 }
