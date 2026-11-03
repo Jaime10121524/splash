@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { apiRequest, MobileUser } from './api';
+import { ApiError, apiRequest, MobileUser } from './api';
 
 const KEY = 'splash.mobile.auth.token';
 type LoginResponse = { token: string; user: MobileUser };
@@ -28,9 +28,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!stored) return;
         const result = await apiRequest<{ user: MobileUser }>('mobile/me', { token: stored });
         if (mounted) { setUser(result.user); setToken(stored); }
-      } catch {
-        // Sem rede, não declaramos sessão válida; mantemos o token seguro para
-        // permitir nova tentativa na próxima abertura, sem expor dados privados.
+      } catch (error) {
+        // Token inválido/expirado é apagado; falha de rede não elimina credenciais.
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          await SecureStore.deleteItemAsync(KEY).catch(() => {});
+        }
       } finally {
         if (mounted) setReady(true);
       }
