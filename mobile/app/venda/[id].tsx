@@ -1,3 +1,4 @@
+import FeedbackPopup from '../../src/components/FeedbackPopup';
 import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -288,8 +289,7 @@ export default function VendaMobile(){
               {i+1}. {['Título','Pagamento','Comissões'][i]}
             </Text></Pressable>)}</View>
         {loading?<ActivityIndicator color={colors.brand} size="large" style={{marginTop:45}}/>:null}
-        {!!error&&<View style={s.error}><Text style={s.errorText}>{error}</Text></View>}
-        {!!notice&&<View style={s.notice}><Text style={s.noticeText}>{notice}</Text></View>}
+
 
         {!loading&&step==='titulo'&&!opId&&visit&&<>
           <View style={s.card}><Text style={s.kicker}>ATENDIMENTO Nº {visit.id}</Text>
@@ -467,6 +467,8 @@ export default function VendaMobile(){
         if(choice?.field==='person'&&choice.index!==undefined)changeRow(choice.index,{beneficiario_pessoa_id:value||0});
         if(choice?.field==='source'&&choice.index!==undefined)changeRow(choice.index,{responsavel_pessoa_id:value||0});
       }}/>
+    <FeedbackPopup error={error} success={notice}
+      onDismiss={()=>{setError('');setNotice('');}}/>
     <ActionModal visible={confirm} variant="confirm" title="Cadastrar o título?"
       description="Primeiro registramos a venda. Depois os pagamentos e a apuração de comissões serão registrados com auditoria."
       primaryLabel="Sim, cadastrar" secondaryLabel="Revisar" busy={busy}
