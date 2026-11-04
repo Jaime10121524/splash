@@ -1,3 +1,4 @@
+import FeedbackPopup from '../../src/components/FeedbackPopup';
 import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -436,9 +437,7 @@ export default function AtendimentoDetailScreen() {
         primaryLabel="Sim, finalizar"
         secondaryLabel="Voltar" onPrimary={submitConfirmed}
         onSecondary={() => setConfirming(false)} busy={saving} />
-      <ToastNotice message={success && !success.saleVisitId
-        ? success.title + ' ' + success.description : ''}
-        kind="success" onDismiss={() => setSuccess(null)} />
+
       <Modal visible={!!success?.saleVisitId} transparent animationType="fade"
         onRequestClose={() => setSuccess(null)}>
         <View style={styles.saleOverlay}>
@@ -471,6 +470,9 @@ export default function AtendimentoDetailScreen() {
           </View>
         </View>
       </Modal>
+      <FeedbackPopup error={error}
+        success={success&&!success.saleVisitId?success.title+' '+success.description:''}
+        onDismiss={()=>{setError('');setSuccess(null);}}/>
     </SafeAreaView>
   );
 }
