@@ -165,3 +165,37 @@ export function roleName(role: string): string {
   };
   return roles[role] ?? 'Usuário';
 }
+
+/** URLs da API privada: a foto não é pública e requer Authorization no Image. */
+export function mobileMediaUrl(path:string):string {
+  const origin=process.env.EXPO_PUBLIC_SPLASH_API_URL?.replace(/\/+$/,'');
+  if(!origin || !/^mobile\/(?:me\/foto|vendas\/[1-9]\d*\/foto)$/.test(path))
+    throw new Error('Endereço da foto inválido.');
+  return origin+'/api/'+path;
+}
+export async function uploadMobilePhoto(path:string,asset:{
+  uri:string;mimeType?:string|null;fileName?:string|null;fileSize?:number|null
+},token:string):Promise<{message:string}> {
+  const url=mobileMediaUrl(path);
+  const type=asset.mimeType||'image/jpeg';
+  if(!['image/jpeg','image/png','image/webp'].includes(type))
+    throw new Error('Escolha uma foto JPG, PNG ou WebP.');
+  const limit=path==='mobile/me/foto'?2*1024*1024:5*1024*1024;
+  if(asset.fileSize && asset.fileSize>limit)
+    throw new Error('Foto muito grande. Limite: '+(limit/1048576)+' MB.');
+  const ext=type==='image/png'?'png':type==='image/webp'?'webp':'jpg';
+  const form=new FormData();
+  form.append('foto',{uri:asset.uri,name:'splash-photo.'+ext,type} as unknown as Blob);
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),30000);
+  try{
+    const response=await fetch(url,{method:'POST',headers:{Accept:'application/json',
+      Authorization:'Bearer '+token},body:form,signal:controller.signal});
+    const output: {message?:string}=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(output.message||'Falha ao enviar foto (HTTP '+response.status+').');
+    return {message:output.message||'Foto enviada.'};
+  }catch(e){
+    if(controller.signal.aborted)throw new Error('O upload demorou demais. Confira a conexão.');
+    throw e;
+  }finally{clearTimeout(timeout);}
+}
