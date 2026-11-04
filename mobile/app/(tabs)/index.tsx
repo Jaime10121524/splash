@@ -68,12 +68,12 @@ export default function HomeScreen() {
           <Text style={styles.date}>{today}</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.bell} onPress={()=>router.push('/(tabs)/notificacoes')}
+          <Pressable style={styles.bell} onPress={()=>router.push('/notificacoes')}
             accessibilityRole="button" accessibilityLabel={'Notificações: '+unread+' não lidas'}>
             <SymbolView name={{ios:'bell.fill',android:'notifications'}} size={22} tintColor={colors.brandDark}/>
             {!!unread&&<View style={styles.bellCount}><Text style={styles.bellText}>{unread>99?'99+':unread}</Text></View>}
           </Pressable>
-          <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/perfil')}
+          <Pressable style={styles.avatar} onPress={() => router.push('/perfil')}
             accessibilityRole="button" accessibilityLabel="Abrir meu perfil">
             {photo&&token?<Image source={{uri:mobileMediaUrl('mobile/me/foto')+'?v='+photoKey,
                 headers:{Authorization:'Bearer '+token}}} style={styles.avatarImage}
