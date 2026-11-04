@@ -61,6 +61,27 @@ final class MobileVendasController extends VendasController
         return $visit instanceof ResponseInterface?$visit:$op;
     }
 
+    /** Lista resumida: somente operações visíveis no escopo da conta. */
+    public function index():ResponseInterface
+    {
+        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
+        $db=db_connect();
+        $query=$db->table('venda_operacoes o')
+            ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.data_venda,o.valor_cobrado,c.nome AS cliente_nome')
+            ->join('clientes c','c.id=o.cliente_id')
+            ->join('visitas v','v.id=o.visita_id','left')
+            ->where('o.situacao','VENDA');
+        if($a['scope']!==null){
+            $query->groupStart()->where('o.corretor_pessoa_id',$a['scope'])
+                ->orWhere('o.segundo_corretor_pessoa_id',$a['scope'])
+                ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd()
+                ->where('o.visita_id IS NOT NULL',null,false);
+        }
+        $rows=$query->orderBy('o.id','DESC')->limit(100)->get()->getResultArray();
+        return $this->response->setJSON(['vendas'=>$rows])
+            ->setHeader('Cache-Control','no-store');
+    }
+
     public function opcoes(): ResponseInterface
     {
         $a=$this->actor();
