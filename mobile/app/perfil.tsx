@@ -1,3 +1,4 @@
+import FeedbackPopup from '../src/components/FeedbackPopup';
 import ThemeSettings from '../src/components/ThemeSettings';
 import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
@@ -112,8 +113,7 @@ export default function ProfileScreen(){
           {busy?<ActivityIndicator color="#FFFFFF"/>:<Text style={s.saveText}>Salvar alterações</Text>}
         </Pressable>
       </View>
-      {!!notice&&<View style={s.success}><Text style={s.successText}>{notice}</Text></View>}
-      {!!error&&<View style={s.error}><Text style={s.errorText}>{error}</Text></View>}
+
       <ThemeSettings/>
       <Pressable style={[s.logout,busy&&s.faded]} onPress={()=>{void signOut();}} disabled={busy}>
         <SymbolView name={{ios:'rectangle.portrait.and.arrow.right',android:'logout'}} size={20} tintColor={colors.danger}/>
@@ -121,6 +121,8 @@ export default function ProfileScreen(){
       </Pressable>
       <Text style={s.footer}>Splash Next · Sua conta protegida</Text>
     </ScrollView>
+    <FeedbackPopup error={error} success={notice}
+      onDismiss={()=>{setError('');setNotice('');}}/>
   </SafeAreaView>;
 }
 const lightStyles = StyleSheet.create({
