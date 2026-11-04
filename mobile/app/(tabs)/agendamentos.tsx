@@ -1,3 +1,4 @@
+import FeedbackPopup from '../../src/components/FeedbackPopup';
 import {useThemedStyles} from '../../src/ThemeContext';
 import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -592,7 +593,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
       onChange={iso => mode==='edit' ? setEditDate(iso) : setDate(dateBR(iso))}
       onClose={()=>setCalendarOpen(false)}/>
     <BookingInvite booking={invite} onClose={()=>setInvite(null)}/>
-    <ToastNotice message={notice} onDismiss={()=>setNotice('')}/>
+    
     <ActionModal visible={success!==null} variant="success"
       title={success?.title||'Chegada registrada'}
       description={success?.description||''} primaryLabel="Ver ficha da visita"
@@ -604,6 +605,8 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
         setSuccess(null);
         if(initialMode==='scan')router.replace('/(tabs)/agendamentos');
       }}/>
+    <FeedbackPopup error={success?'':error} success={success?'':notice}
+      onDismiss={()=>{setError('');setNotice('');}}/>
   </SafeAreaView>;
 }
 
