@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -38,21 +39,25 @@ const roles:Record<string,string>={TITULAR:'Corretor principal',ATENDENTE:'Atend
 const allowedRoles=['ATENDENTE','GERENTE','CORRETOR'];
 
 function Input({label,value,onChange,placeholder,numeric=false}:{label:string;value:string;onChange:(s:string)=>void;placeholder:string;numeric?:boolean}){
+  const s=useThemedStyles(lightStyles);
   return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput style={s.input} value={value} onChangeText={onChange}
     placeholder={placeholder} placeholderTextColor="#A6A0B4" keyboardType={numeric?'decimal-pad':'default'} /></View>;
 }
 function Select({label,value,onPress}:{label:string;value:string;onPress:()=>void}){
+  const s=useThemedStyles(lightStyles);
   return <Pressable style={s.select} onPress={onPress}><View style={{flex:1}}>
     <Text style={s.label}>{label}</Text><Text style={s.selectValue}>{value}</Text></View><Text style={s.arrow}>⌄</Text>
   </Pressable>;
 }
 function Btn({text,onPress,muted=false,disabled=false}:{text:string;onPress:()=>void;muted?:boolean;disabled?:boolean}){
+  const s=useThemedStyles(lightStyles);
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress}
     style={[s.button,muted&&s.buttonMuted,disabled&&{opacity:.5}]}>
     <Text style={[s.buttonText,muted&&s.buttonTextMuted]}>{text}</Text></Pressable>;
 }
 
 export default function VendaMobile(){
+  const s=useThemedStyles(lightStyles);
   const params=useLocalSearchParams<{id:string;visita?:string}>();
   const rawId=Array.isArray(params.id)?params.id[0]:params.id;
   const rawVisit=Array.isArray(params.visita)?params.visita[0]:params.visita;
@@ -405,7 +410,7 @@ export default function VendaMobile(){
       onPrimary={()=>{void saveTitle();}} onSecondary={()=>setConfirm(false)}/>
   </SafeAreaView>;
 }
-const s=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   salePhoto:{height:195,borderRadius:17,backgroundColor:colors.pale,overflow:'hidden'},
   salePhotoImage:{height:'100%',width:'100%'},
