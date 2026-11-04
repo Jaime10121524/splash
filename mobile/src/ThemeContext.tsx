@@ -38,7 +38,7 @@ export function ThemeProvider({children}:{children:React.ReactNode}){
     return ()=>{active=false;};
   },[]);
   useEffect(()=>{
-    if(loaded)Appearance.setColorScheme(mode==='system'?null:mode);
+    if(loaded)Appearance.setColorScheme(mode==='system'?'auto':mode);
     return ()=>{};
   },[mode,loaded]);
   const setMode=useCallback(async(value:ThemeMode)=>{
