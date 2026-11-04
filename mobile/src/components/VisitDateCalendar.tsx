@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +25,7 @@ export default function VisitDateCalendar({
   onChange: (nextISO: string) => void;
   onClose: () => void;
 }) {
+  const styles=useThemedStyles(lightStyles);
   const today = plusDays(0);
   const [visibleMonth, setVisibleMonth] = useState(() => value.slice(0, 7) || today.slice(0, 7));
 
@@ -107,7 +109,7 @@ export default function VisitDateCalendar({
   </Modal>;
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   overlay: { flex:1, justifyContent:'center', paddingHorizontal:17 },
   scrim: { position:'absolute',top:0,bottom:0,left:0,right:0,backgroundColor:'rgba(20,14,48,.62)' },
   panel: { backgroundColor:'#FFFFFF', borderRadius:26, padding:19, maxWidth:440, width:'100%', alignSelf:'center' },
