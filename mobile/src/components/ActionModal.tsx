@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { colors } from '../theme';
 
-type Variant = 'confirm' | 'success' | 'warning';
+type Variant = 'confirm' | 'success' | 'warning' | 'error';
 export default function ActionModal({
   visible, variant = 'confirm', title, description,
   primaryLabel, secondaryLabel = 'Voltar', onPrimary, onSecondary, busy = false,
@@ -35,6 +35,7 @@ export default function ActionModal({
 
   const success = variant === 'success';
   const warning = variant === 'warning';
+  const danger = variant === 'error';
   const close = onSecondary ?? onPrimary;
 
   return (
@@ -48,18 +49,20 @@ export default function ActionModal({
           transform: [{ scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }],
         }]}>
           <View style={styles.topLine} />
-          <View style={[styles.iconShell, success && styles.iconSuccess, warning && styles.iconWarning]}>
+          <View style={[styles.iconShell, success && styles.iconSuccess, warning && styles.iconWarning, danger && styles.iconError]}>
             <SymbolView
               name={success
                 ? { ios: 'checkmark.circle.fill', android: 'check_circle' }
-                : warning
-                  ? { ios: 'exclamationmark.circle.fill', android: 'warning' }
-                  : { ios: 'checkmark.shield.fill', android: 'verified_user' }}
+                 : danger
+                  ? { ios: 'xmark.octagon.fill', android: 'error' }
+                  : warning
+                    ? { ios: 'exclamationmark.circle.fill', android: 'warning' }
+                    : { ios: 'checkmark.shield.fill', android: 'verified_user' }}
               size={33}
-              tintColor={success ? '#388967' : warning ? '#C5853B' : colors.brand}
+              tintColor={danger ? colors.danger : success ? '#388967' : warning ? '#C5853B' : colors.brand}
             />
           </View>
-          <Text style={styles.eyebrow}>{success ? 'TUDO CERTO' : warning ? 'ATENÇÃO' : 'CONFIRMAÇÃO'}</Text>
+          <Text style={styles.eyebrow}>{danger ? 'PRECISA CORRIGIR' : success ? 'TUDO CERTO' : warning ? 'ATENÇÃO' : 'CONFIRMAÇÃO'}</Text>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.description}>{description}</Text>
           <Pressable style={({ pressed }) => [
@@ -97,6 +100,7 @@ const lightStyles = StyleSheet.create({
   iconShell: { width: 75, height: 75, borderRadius: 26, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
   iconSuccess: { backgroundColor: '#E6F6EF' },
   iconWarning: { backgroundColor: '#FFF1DD' },
+  iconError: { backgroundColor: '#FFF0E9' },
   eyebrow: { marginTop: 19, color: colors.brandDark, fontWeight: '800', letterSpacing: 1.65, fontSize: 10 },
   title: { textAlign: 'center', color: colors.ink, fontWeight: '900', fontSize: 23, lineHeight: 29, marginTop: 9 },
   description: { textAlign: 'center', color: colors.muted, fontSize: 13, lineHeight: 21, marginTop: 11, marginBottom: 25 },
