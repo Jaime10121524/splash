@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable,
@@ -19,6 +20,7 @@ export default function ClientPickerModal({
   onChoose: (client: MobileClient | null) => void;
   onClose: () => void;
 }) {
+  const styles=useThemedStyles(lightStyles);
   const [search,setSearch] = useState('');
   const [clients,setClients] = useState<MobileClient[]>([]);
   const [loading,setLoading] = useState(false);
@@ -74,7 +76,7 @@ export default function ClientPickerModal({
     </KeyboardAvoidingView>
   </Modal>;
 }
-const styles=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   overlay:{flex:1,justifyContent:'flex-end'},
   scrim:{position:'absolute',top:0,bottom:0,left:0,right:0,backgroundColor:'rgba(30,19,61,.54)'},
   sheet:{backgroundColor:'#FFFFFF',borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:'88%',minHeight:340,paddingHorizontal:20},
