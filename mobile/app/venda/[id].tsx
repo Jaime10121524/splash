@@ -161,7 +161,7 @@ export default function VendaMobile(){
       setOpId(res.operacao_id);
       setAmount(decimal(total));
       try{await refresh(res.operacao_id,!!opts?.pode_corrigir_comissao);}
-      catch{setStep('titulo');setError('Título salvo! Reabra esta venda para atualizar os dados.');return;}
+      catch{setStep('titulo');throw new Error('Título salvo! Reabra esta venda para atualizar os dados.');}
       if(stagedPhoto){
         setPhotoBusy(true);
         try{
@@ -169,9 +169,8 @@ export default function VendaMobile(){
           setPhoto(true);setPhotoKey(v=>v+1);setStagedPhoto(null);
         }catch(e){
           setStep('titulo');
-          setError('Título salvo! A foto não foi enviada: '+(e instanceof Error?e.message:'tente novamente')+
+          throw new Error('Título salvo! A foto não foi enviada: '+(e instanceof Error?e.message:'tente novamente')+
             '. Utilize Reenviar foto sem cadastrar o título novamente.');
-          return;
         }finally{setPhotoBusy(false);}
       }
       setStep('pagamento');
