@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Pressable,RefreshControl,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ function dateBR(value:string){const m=value.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\
   return m?m[3]+'/'+m[2]+' às '+m[4]:value;}
 function formatMoney(v:string){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v));}
 export default function Notifications(){
+  const s=useThemedStyles(lightStyles);
   const {token}=useAuth();
   const [data,setData]=useState<Data>({avisos:[],nao_lidas:0});
   const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false);
@@ -117,7 +119,7 @@ export default function Notifications(){
     </ScrollView>
   </SafeAreaView>;
 }
-const s=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   content:{paddingHorizontal:18,paddingTop:15,paddingBottom:60,gap:13},
   heading:{flexDirection:'row',alignItems:'center',gap:12},
