@@ -58,13 +58,25 @@ final class MobileVendasController extends VendasController
         return $visit instanceof ResponseInterface?$visit:$op;
     }
 
-    /** Lista resumida: somente operações visíveis no escopo da conta. */
+    /** Filtros aplicados no servidor antes de paginar, preservando escopo e datas. */
     public function index():ResponseInterface
     {
         $a=$this->actor();if($a instanceof ResponseInterface)return $a;
         $db=db_connect();
+        $planParam=(string)($this->request->getGet('plano')??'');
+        $start=(string)($this->request->getGet('inicio')??'');
+        $end=(string)($this->request->getGet('fim')??'');
+        if($planParam!=='' && (!ctype_digit($planParam)||(int)$planParam<1))
+            return $this->errorResponse(422,'Plano inválido.');
+        foreach([$start,$end] as $date){
+            if($date!=='' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/D',$date)
+                || !checkdate((int)substr($date,5,2),(int)substr($date,8,2),(int)substr($date,0,4))))
+                return $this->errorResponse(422,'Data inválida. Use DD/MM/AAAA.');
+        }
+        if($start!==''&&$end!==''&&$start>$end)
+            return $this->errorResponse(422,'A data inicial não pode superar a final.');
         $query=$db->table('venda_operacoes o')
-            ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.data_venda,o.valor_cobrado,c.nome AS cliente_nome')
+            ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,c.nome AS cliente_nome')
             ->join('clientes c','c.id=o.cliente_id')
             ->join('visitas v','v.id=o.visita_id','left')
             ->where('o.situacao','VENDA');
@@ -74,9 +86,19 @@ final class MobileVendasController extends VendasController
                 ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd()
                 ->where('o.visita_id IS NOT NULL',null,false);
         }
-        $rows=$query->orderBy('o.id','DESC')->limit(100)->get()->getResultArray();
-        return $this->response->setJSON(['vendas'=>$rows])
-            ->setHeader('Cache-Control','no-store');
+        if($planParam!=='')$query->where('o.plano_versao_id',(int)$planParam);
+        if($start!=='')$query->where('o.data_venda >=',$start);
+        if($end!=='')$query->where('o.data_venda <=',$end);
+        $rows=$query->orderBy('o.data_venda','DESC')->orderBy('o.id','DESC')
+            ->limit(151)->get()->getResultArray();
+        $truncated=count($rows)>150;
+        if($truncated)$rows=array_slice($rows,0,150);
+        $plans=$db->table('plano_versoes')
+            ->select('id,codigo,duracao_meses')->orderBy('duracao_meses','ASC')
+            ->get()->getResultArray();
+        return $this->response->setJSON([
+            'vendas'=>$rows,'planos'=>$plans,'limitado'=>$truncated,
+        ])->setHeader('Cache-Control','no-store');
     }
 
     public function opcoes(): ResponseInterface
