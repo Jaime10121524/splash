@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Modal, Pressable, StyleSheet, Text, View,
@@ -21,6 +22,7 @@ export default function ResumeAttendantModal({
   onClose: () => void;
   onConfirm: (mode: 'mesmo', newAttendantId: null) => Promise<void>;
 }) {
+  const styles=useThemedStyles(lightStyles);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -107,7 +109,7 @@ export default function ResumeAttendantModal({
   );
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
   backdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(24,15,51,0.65)' },
   modal: { width: '100%', maxWidth: 410, backgroundColor: '#FFFFFF', borderRadius: 28,
