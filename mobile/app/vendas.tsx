@@ -1,6 +1,7 @@
 import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import ChoiceSheet, {type Choice} from '../src/components/ChoiceSheet';
+import DateRangeCalendar from '../src/components/DateRangeCalendar';
 import ActionModal from '../src/components/ActionModal';
 import {ActivityIndicator,Pressable,RefreshControl,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -24,6 +25,7 @@ export default function Vendas(){
   const [sales,setSales]=useState<Sale[]>([]),[query,setQuery]=useState('');
   const [plans,setPlans]=useState<Plan[]>([]),[limited,setLimited]=useState(false);
   const [filtersOpen,setFiltersOpen]=useState(false),[planOpen,setPlanOpen]=useState(false);
+  const [calendarOpen,setCalendarOpen]=useState(false);
   const [planId,setPlanId]=useState<number|null>(null),[start,setStart]=useState(''),[end,setEnd]=useState('');
   const [applied,setApplied]=useState({plan:null as number|null,start:'',end:''});
   const [filterError,setFilterError]=useState('');
@@ -85,16 +87,10 @@ export default function Vendas(){
           <Text style={s.filterLabel}>Plano</Text>
           <Text style={s.planValue}>{selectedPlan?selectedPlan.codigo+' · '+selectedPlan.duracao_meses+' meses':'Todos os planos'}</Text>
         </Pressable>
-        <View style={s.dateRow}>
-          <View style={s.dateField}><Text style={s.filterLabel}>Data inicial</Text>
-            <TextInput style={s.dateInput} keyboardType="numbers-and-punctuation" value={start}
-              placeholder="DD/MM/AAAA" placeholderTextColor="#8E8CA3" onChangeText={setStart}/></View>
-          <View style={s.dateField}><Text style={s.filterLabel}>Data final</Text>
-            <TextInput style={s.dateInput} keyboardType="numbers-and-punctuation" value={end}
-              placeholder="DD/MM/AAAA" placeholderTextColor="#8E8CA3" onChangeText={setEnd}/></View>
-        </View>
-        <View style={s.dateRow}>{[7,30].map(days=><Pressable key={days} style={s.quick} onPress={()=>quickDays(days)}>
-          <Text style={s.quickText}>Últimos {days} dias</Text></Pressable>)}</View>
+        <Pressable style={s.planPicker} onPress={()=>setCalendarOpen(true)} accessibilityRole="button">
+          <Text style={s.filterLabel}>Período da venda</Text>
+          <Text style={s.planValue}>{start&&end?start+' até '+end:'Selecionar início e fim no calendário  📅'}</Text>
+        </Pressable>
         <View style={s.filterActions}><Pressable style={s.clear} onPress={clearFilters}>
           <Text style={s.clearText}>Limpar</Text></Pressable>
           <Pressable style={s.apply} onPress={applyFilters}>
@@ -120,6 +116,11 @@ export default function Vendas(){
           <Text style={s.emptyText}>Finalize um atendimento como venda para cadastrar o título.</Text>
         </View>}
     </ScrollView>
+    <DateRangeCalendar open={calendarOpen} start={dateISO(start)||''} end={dateISO(end)||''}
+      onClose={()=>setCalendarOpen(false)} onConfirm={(a,b)=>{
+        const format=(v:string)=>v.slice(8,10)+'/'+v.slice(5,7)+'/'+v.slice(0,4);
+        setStart(format(a));setEnd(format(b));setCalendarOpen(false);setFilterError('');
+      }}/>
     <ChoiceSheet open={planOpen} title="Escolha o plano" choices={choices} selected={planId} allowEmpty
       onChoose={setPlanId} onClose={()=>setPlanOpen(false)}/>
     <ActionModal visible={!!filterError} variant="warning" title="Confira os filtros"
