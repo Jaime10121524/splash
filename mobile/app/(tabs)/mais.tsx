@@ -1,3 +1,4 @@
+import {useProtectedPhoto} from '../../src/useProtectedPhoto';
 import ThemeSettings from '../../src/components/ThemeSettings';
 import {useThemedStyles} from '../../src/ThemeContext';
 import {useCallback,useState} from 'react';
@@ -5,7 +6,7 @@ import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,View} from 
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter,useFocusEffect} from 'expo-router';
 import {SymbolView} from 'expo-symbols';
-import {apiRequest,mobileMediaUrl} from '../../src/api';
+import {apiRequest} from '../../src/api';
 import {useAuth} from '../../src/AuthContext';
 import {colors} from '../../src/theme';
 
@@ -26,15 +27,15 @@ export default function Mais(){
   const s=useThemedStyles(lightStyles);
   const {user,token,logout}=useAuth();
   const [unread,setUnread]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [hasPhoto,setHasPhoto]=useState(true),[photoKey,setPhotoKey]=useState(0);
+  const {uri:photoUri,reload:reloadPhoto}=useProtectedPhoto('mobile/me/foto',token);
   useFocusEffect(useCallback(()=>{
     if(!token)return;
-    setHasPhoto(true);setPhotoKey(v=>v+1);
+    void reloadPhoto();
     let active=true;
     void apiRequest<{nao_lidas:number}>('mobile/notificacoes',{token})
       .then(d=>{if(active)setUnread(d.nao_lidas||0);}).catch(()=>{});
     return ()=>{active=false;};
-  },[token]));
+  },[token,reloadPhoto]));
   async function signOut(){
     if(busy)return;
     setBusy(true);setError('');
@@ -53,10 +54,7 @@ export default function Mais(){
       <Text style={s.kicker}>ÁREAS DO APLICATIVO</Text><Text style={s.title}>Mais opções</Text>
       <Text style={s.subtitle}>Tudo o que você precisa em um só lugar.</Text>
       <View style={s.userCard}>
-        <View style={s.avatar}>{hasPhoto&&token?<Image
-          source={{uri:mobileMediaUrl('mobile/me/foto')+'?v='+photoKey,
-            headers:{Authorization:'Bearer '+token}}}
-          style={{width:53,height:53}} onError={()=>setHasPhoto(false)}/>:
+        <View style={s.avatar}>{photoUri?<Image source={{uri:photoUri}} style={{width:53,height:53}}/>:
           <Text style={s.avatarText}>{user?.username?.slice(0,1).toUpperCase()||'?'}</Text>}
         </View>
         <View><Text style={s.userTitle}>{user?.username}</Text><Text style={s.userSub}>Conta conectada</Text></View>
