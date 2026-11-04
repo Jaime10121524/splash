@@ -270,7 +270,7 @@ export default function VendaMobile(){
               onChange={v=>setTitleNumber(v.replace(/\D/g,'').slice(0,4))}/>
             {plan?<Text style={s.helper}>Título: {titleNumber||'____'} {plan.codigo}</Text>:null}
             <Input label="Desconto concedido ao cliente (R$)" value={discount} numeric placeholder="0,00"
-              onChange={v=>{setDiscount(v);setPreview(null);}}/>
+              onChange={v=>{setDiscount(v);}}/>
             <View style={s.total}><Text style={s.label}>Valor cobrado do cliente</Text>
               <Text style={s.totalValue}>{total===null||total<=0?'Inválido':money(decimal(total))}</Text></View>
             <Input label="Data da venda * (DD/MM/AAAA)" value={date} onChange={setDate} numeric placeholder="DD/MM/AAAA"/>
@@ -393,9 +393,9 @@ export default function VendaMobile(){
         choice?.field==='manager'?'Gerente':choice?.field==='person'?'Beneficiário':'Quem distribui'}
       choices={choices} selected={selected??null} allowEmpty={choice?.field==='manager'}
       onClose={()=>setChoice(null)} onChoose={value=>{
-        if(choice?.field==='plan'){setPlanId(value);setPreview(null);}
-        if(choice?.field==='method'){setMethodId(value);setPreview(null);}
-        if(choice?.field==='manager'){setManagerId(value);setPreview(null);}
+        if(choice?.field==='plan'){setPlanId(value);}
+        if(choice?.field==='method'){setMethodId(value);}
+        if(choice?.field==='manager'){setManagerId(value);}
         if(choice?.field==='person'&&choice.index!==undefined)changeRow(choice.index,{beneficiario_pessoa_id:value||0});
         if(choice?.field==='source'&&choice.index!==undefined)changeRow(choice.index,{responsavel_pessoa_id:value||0});
       }}/>
