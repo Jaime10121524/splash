@@ -102,8 +102,27 @@ function transform(value:string,prop:string):string{
       '#FFF0E9':'#402A2C','#FFF0EB':'#402A2C',
       '#F0EDF5':'#252B40','#F0EBFF':dark.pale,
       '#24184E':dark.navy,'#E9F0FF':'#242E46',
+      // Superfícies originalmente muito claras encontradas em notificações,
+      // campos de formulário, seletores e modais.
+      '#FDFBFF':dark.surface,'#F9F8FF':'#252B40',
+      '#F9F7FF':'#252B40','#FAF9FF':'#252B40',
+      '#F5F1FF':dark.pale,'#F6F2FF':dark.pale,
+      '#EBF7F1':'#193A30','#E6F6EF':'#193A30',
+      '#FFF1E8':'#402A2C','#FFF1DD':'#40372A',
+      '#E9F7EF':'#193A30','#EAFBF1':'#193A30',
+      '#E6F8EC':'#193A30',
+      '#F0F3FA':'#252B40',
     };
     if(backgrounds[normalized])return backgrounds[normalized];
+    // Não converter cores intensas (botões, destaques, alertas).
+    // Superfícies pastel e quase brancas não podem continuar ofuscantes no escuro.
+    if(/^#[0-9A-F]{6}$/.test(normalized)){
+      const r=parseInt(normalized.slice(1,3),16),g=parseInt(normalized.slice(3,5),16),
+        b=parseInt(normalized.slice(5,7),16);
+      const low=Math.min(r,g,b);
+      if(low>=224)return dark.surface;
+      if(low>=190&&Math.max(r,g,b)-low<=64)return dark.pale;
+    }
     return value;
   }
   return value;
