@@ -1,4 +1,5 @@
-import {File,UploadType} from 'expo-file-system';
+import {File,Paths,UploadType} from 'expo-file-system';
+import {fetch as expoFetch} from 'expo/fetch';
 export type MobileUser = {
   id: number;
   username: string;
@@ -174,9 +175,38 @@ export function mobileMediaUrl(path:string):string {
     throw new Error('Endereço da foto inválido.');
   return origin+'/api/'+path;
 }
+
+/**
+ * Busca uma foto privada com o token e armazena SOMENTE na área temporária
+ * privada do aplicativo. <Image> recebe o arquivo local, não a URL autenticada.
+ * Null significa foto inexistente (404); outros erros devem ser mostrados.
+ */
+export async function fetchMobilePhoto(path:string,token:string):Promise<string|null>{
+  const url=mobileMediaUrl(path);
+  const response=await expoFetch(url,{headers:{
+    Authorization:'Bearer '+token,Accept:'image/jpeg, image/png, image/webp',
+    'Cache-Control':'no-cache',
+  }});
+  if(response.status===404)return null;
+  if(!response.ok){
+    let detail='Falha ao abrir foto no servidor (HTTP '+response.status+').';
+    try{const err=await response.json();if(typeof err?.message==='string')detail=err.message;}catch{}
+    throw new ApiError(detail,response.status);
+  }
+  const type=(response.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+  const ext=type==='image/jpeg'?'jpg':type==='image/png'?'png':type==='image/webp'?'webp':null;
+  if(!ext)throw new Error('O servidor não retornou uma imagem válida.');
+  const bytes=await response.bytes();
+  if(bytes.length<20||bytes.length>6*1024*1024)throw new Error('Tamanho da imagem recebida é inválido.');
+  const file=new File(Paths.cache,'splash-private-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+ext);
+  await file.write(bytes);
+  if(!file.exists||file.size===0)throw new Error('O telefone não conseguiu preparar a foto para exibição.');
+  return file.uri;
+}
+
 export async function uploadMobilePhoto(path:string,asset:{
   uri:string;mimeType?:string|null;fileName?:string|null;fileSize?:number|null
-},token:string):Promise<{message:string}> {
+},token:string):Promise<{message:string;uri:string}> {
   const url=mobileMediaUrl(path);
   const type=asset.mimeType||'image/jpeg';
   if(!['image/jpeg','image/png','image/webp'].includes(type))
@@ -202,7 +232,9 @@ export async function uploadMobilePhoto(path:string,asset:{
     try{output=JSON.parse(result.body||'{}');}catch{}
     if(result.status<200||result.status>=300)
       throw new Error(output.message||'Falha ao enviar foto (HTTP '+result.status+').');
-    return {message:output.message||'Foto enviada.'};
+    const uri=await fetchMobilePhoto(path,token);
+    if(!uri)throw new Error('O servidor confirmou o upload, mas a foto não está disponível para consulta.');
+    return {message:output.message||'Foto enviada.',uri};
   }catch(e){
     if(controller.signal.aborted)throw new Error('O upload demorou demais. Confira a conexão.');
     throw e;
