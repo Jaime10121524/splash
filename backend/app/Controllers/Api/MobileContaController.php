@@ -16,7 +16,7 @@ final class MobileContaController extends BaseController
         return $this->response->setStatusCode($status)->setJSON(['message'=>$message])
             ->setHeader('Cache-Control','no-store');
     }
-    private function actor():object|ResponseInterface
+    private function actor()
     {
         $u=auth('tokens')->user();
         return $u&&!$u->isBanned()?$u:$this->error(401,'Sessão expirada.');
