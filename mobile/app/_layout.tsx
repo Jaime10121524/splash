@@ -15,6 +15,10 @@ export default function RootLayout() {
         <Stack.Screen name="atendimento/novo" />
         <Stack.Screen name="cliente/[id]" />
         <Stack.Screen name="venda/[id]" />
+        <Stack.Screen name="vendas" />
+        <Stack.Screen name="clientes" />
+        <Stack.Screen name="notificacoes" />
+        <Stack.Screen name="perfil" />
       </Stack>
     </AuthProvider>
   );
