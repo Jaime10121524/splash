@@ -3,7 +3,7 @@ import {useThemedStyles} from '../../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {router,useFocusEffect} from 'expo-router';
+import {useRouter,useFocusEffect} from 'expo-router';
 import {SymbolView} from 'expo-symbols';
 import {apiRequest,mobileMediaUrl} from '../../src/api';
 import {useAuth} from '../../src/AuthContext';
@@ -11,6 +11,7 @@ import {colors} from '../../src/theme';
 
 type Entry={title:string;subtitle:string;ios:string;android:string;route:string;count?:number};
 function MenuLink({entry}:{entry:Entry}){
+  const router=useRouter();
   const s=useThemedStyles(lightStyles);
   return <Pressable style={s.entry} onPress={()=>router.push(entry.route as never)} accessibilityRole="button">
     <View style={s.entryIcon}><SymbolView name={{ios:entry.ios as any,android:entry.android as any}} size={23} tintColor={colors.brandDark}/></View>
@@ -21,6 +22,7 @@ function MenuLink({entry}:{entry:Entry}){
   </Pressable>;
 }
 export default function Mais(){
+  const router=useRouter();
   const s=useThemedStyles(lightStyles);
   const {user,token,logout}=useAuth();
   const [unread,setUnread]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
