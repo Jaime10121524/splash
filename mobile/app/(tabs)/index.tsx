@@ -1,3 +1,4 @@
+import {useProtectedPhoto} from '../../src/useProtectedPhoto';
 import {useThemedStyles,useTheme} from '../../src/ThemeContext';
 import {useCallback,useMemo,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,RefreshControl,ScrollView,StyleSheet,Text,View} from 'react-native';
@@ -6,7 +7,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {SymbolView} from 'expo-symbols';
 import {LinearGradient} from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import {ApiError,Visit,apiRequest,mobileMediaUrl} from '../../src/api';
+import {ApiError,Visit,apiRequest} from '../../src/api';
 import {useAuth} from '../../src/AuthContext';
 import VisitCard from '../../src/components/VisitCard';
 import {colors,shadows} from '../../src/theme';
@@ -61,7 +62,7 @@ export default function HomeScreen(){
   const [data,setData]=useState<Data|null>(null);
   const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false);
   const [error,setError]=useState(''),[forbidden,setForbidden]=useState(false);
-  const [photo,setPhoto]=useState(true),[photoKey,setPhotoKey]=useState(0);
+  const {uri:photoUri,reload:reloadPhoto}=useProtectedPhoto('mobile/me/foto',token);
   const load=useCallback(async()=>{
     if(!token)return;
     try{
@@ -73,8 +74,8 @@ export default function HomeScreen(){
     }finally{setLoading(false);setRefreshing(false);}
   },[token,days]);
   useFocusEffect(useCallback(()=>{
-    void load();setPhoto(true);setPhotoKey(n=>n+1);
-  },[load]));
+    void load();void reloadPhoto();
+  },[load,reloadPhoto]));
   function go(path:'/atendimento/novo'|'/(tabs)/atendimentos'|'/(tabs)/agendamentos'|'/vendas'|'/clientes'|'/notificacoes'|'/perfil'){
     void Haptics.selectionAsync().catch(()=>{});
     router.push(path);
@@ -120,10 +121,7 @@ export default function HomeScreen(){
             </View>}
           </Pressable>
           <Pressable style={s.avatar} onPress={()=>go('/perfil')} accessibilityRole="button">
-            {photo&&token?<Image style={s.avatarImage}
-              source={{uri:mobileMediaUrl('mobile/me/foto')+'?v='+photoKey,
-                headers:{Authorization:'Bearer '+token}}}
-              onError={()=>setPhoto(false)}/>:
+            {photoUri?<Image style={s.avatarImage} source={{uri:photoUri}}/>:
               <Text style={s.avatarText}>{firstName[0]?.toUpperCase()}</Text>}
           </Pressable>
         </View>
