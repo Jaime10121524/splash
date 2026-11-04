@@ -84,6 +84,7 @@ export default function VendaMobile(){
   const [confirm,setConfirm]=useState(false);
   const [photo,setPhoto]=useState(true),[photoKey,setPhotoKey]=useState(0);
   const [photoBusy,setPhotoBusy]=useState(false);
+  const [stagedPhoto,setStagedPhoto]=useState<ImagePicker.ImagePickerAsset|null>(null);
   const plan=opts?.planos.find(x=>x.id===planId),method=opts?.formas.find(x=>x.id===methodId);
   const price=plan?cents(plan.valor):null,discountValue=cents(discount);
   const total=price!==null&&discountValue!==null?price-discountValue:null;
@@ -155,9 +156,25 @@ export default function VendaMobile(){
         segundo_corretor_pessoa_id:visit.segundo_corretor_pessoa_id,
         atendente_pessoa_id:visit.atendente_pessoa_id,atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id,
       }});
-      setOpId(res.operacao_id);await refresh(res.operacao_id,!!opts?.pode_corrigir_comissao);
-      setAmount(decimal(total));setStep('pagamento');
-      setNotice('Título registrado. Agora informe como o cliente pagou.');
+      // A operação já existe: não tentar salvá-la outra vez se a imagem falhar.
+      setOpId(res.operacao_id);
+      setAmount(decimal(total));
+      try{await refresh(res.operacao_id,!!opts?.pode_corrigir_comissao);}
+      catch{setStep('titulo');setError('Título salvo! Reabra esta venda para atualizar os dados.');return;}
+      if(stagedPhoto){
+        setPhotoBusy(true);
+        try{
+          await uploadMobilePhoto('mobile/vendas/'+res.operacao_id+'/foto',stagedPhoto,token!);
+          setPhoto(true);setPhotoKey(v=>v+1);setStagedPhoto(null);
+        }catch(e){
+          setStep('titulo');
+          setError('Título salvo! A foto não foi enviada: '+(e instanceof Error?e.message:'tente novamente')+
+            '. Utilize Reenviar foto sem cadastrar o título novamente.');
+          return;
+        }finally{setPhotoBusy(false);}
+      }
+      setStep('pagamento');
+      setNotice('Venda cadastrada. Agora registre os pagamentos.');
     });
   }
 
@@ -176,25 +193,36 @@ export default function VendaMobile(){
     });
   }
 
-  async function selectPhoto(camera:boolean){
-    if(!opId||!token||photoBusy)return;
-    setError('');setNotice('');
-    const permission=camera
-      ?await ImagePicker.requestCameraPermissionsAsync()
-      :await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if(!permission.granted){setError('Permita o acesso à câmera ou galeria nas configurações do Android.');return;}
-    const params={mediaTypes:['images'] as ['images'],quality:.65,allowsEditing:false};
-    const result=camera
-      ?await ImagePicker.launchCameraAsync(params)
-      :await ImagePicker.launchImageLibraryAsync(params);
-    if(result.canceled||!result.assets.length)return;
+  async function uploadPendingPhoto(id:number,asset:ImagePicker.ImagePickerAsset){
+    if(!token||photoBusy)return;
     setPhotoBusy(true);
     try{
-      await uploadMobilePhoto('mobile/vendas/'+opId+'/foto',result.assets[0],token);
-      setPhoto(true);setPhotoKey(n=>n+1);
+      await uploadMobilePhoto('mobile/vendas/'+id+'/foto',asset,token);
+      setPhoto(true);setPhotoKey(v=>v+1);setStagedPhoto(null);
       setNotice('Foto da venda salva com sucesso.');
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível enviar a foto.');}
     finally{setPhotoBusy(false);}
+  }
+  async function selectPhoto(camera:boolean){
+    if(!token||photoBusy)return;
+    setError('');setNotice('');
+    try{
+      const permission=camera?await ImagePicker.requestCameraPermissionsAsync()
+        :await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if(!permission.granted){
+        setError('Autorize a câmera ou galeria nas configurações do Android.');return;
+      }
+      const params={mediaTypes:['images'] as ['images'],quality:.65,allowsEditing:false};
+      const result=camera?await ImagePicker.launchCameraAsync(params)
+        :await ImagePicker.launchImageLibraryAsync(params);
+      if(result.canceled||!result.assets.length)return;
+      const asset=result.assets[0];
+      if(asset.fileSize&&asset.fileSize>5*1024*1024){
+        setError('A foto ultrapassa 5 MB. Escolha outra imagem.');return;
+      }
+      setStagedPhoto(asset);
+      if(opId)await uploadPendingPhoto(opId,asset);
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível abrir a câmera ou galeria.');}
   }
 
   async function adjustGross(){
@@ -254,7 +282,7 @@ export default function VendaMobile(){
           <View style={{flex:1}}><Text style={s.kicker}>SPLASH / COMERCIAL</Text>
             <Text style={s.title}>Venda e comissionamento</Text></View></View>
         <View style={s.steps}>{(['titulo','pagamento','comissao'] as const).map((v,i)=>
-          <Pressable key={v} disabled={!opId} onPress={()=>setStep(v==='titulo'?'pagamento':v)}
+          <Pressable key={v} disabled={!opId} onPress={()=>setStep(v)}
             style={[s.step,step===v&&s.stepActive]}>
             <Text style={[s.stepText,step===v&&s.stepTextActive]}>
               {i+1}. {['Título','Pagamento','Comissões'][i]}
@@ -284,29 +312,64 @@ export default function VendaMobile(){
               onPress={()=>setChoice({field:'manager'})}/>
             <Text style={s.helper}>Corretor e atendentes são herdados do atendimento. O desconto respeita as regras de comissão do sistema web.</Text>
           </View>
+          <View style={s.card}>
+            <Text style={s.section}>📸 Foto da venda</Text>
+            <Text style={s.helper}>{opId
+              ?'Adicione ou troque a foto do título já cadastrado.'
+              :'Selecione agora. A imagem será enviada automaticamente depois de salvar o título.'}</Text>
+            <View style={s.salePhoto}>
+              {stagedPhoto?<Image source={{uri:stagedPhoto.uri}} style={s.salePhotoImage}
+                resizeMode="cover"/>:
+              opId&&photo&&token?<Image
+                source={{uri:mobileMediaUrl('mobile/vendas/'+opId+'/foto')+'?v='+photoKey,
+                  headers:{Authorization:'Bearer '+token}}}
+                onError={()=>setPhoto(false)} style={s.salePhotoImage} resizeMode="cover"/>:
+                <View style={s.photoPlaceholder}><Text style={s.photoEmoji}>📸</Text>
+                  <Text style={s.photoHint}>Registre esta conquista</Text></View>}
+            </View>
+            <View style={s.photoButtons}>
+              <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(true);}} disabled={photoBusy}>
+                <Text style={s.photoButtonText}>📷 Câmera</Text></Pressable>
+              <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(false);}} disabled={photoBusy}>
+                <Text style={s.photoButtonText}>Galeria</Text></Pressable>
+            </View>
+            {opId&&stagedPhoto&&<Btn text={photoBusy?'Enviando foto...':'Reenviar foto'}
+              disabled={photoBusy} onPress={()=>{void uploadPendingPhoto(opId,stagedPhoto);}}/>}
+            {stagedPhoto&&!opId&&<Pressable onPress={()=>setStagedPhoto(null)}>
+              <Text style={s.remove}>Remover foto selecionada</Text></Pressable>}
+            <Text style={s.helper}>JPG, PNG ou WebP · até 5 MB · armazenamento privado</Text>
+          </View>
           <Btn text={busy?'Salvando...':'Cadastrar título e continuar'} disabled={busy} onPress={()=>setConfirm(true)}/>
         </>}
 
         {!loading&&opId&&detail&&<>
-          <View style={s.card}>
-            <Text style={s.section}>Foto da venda</Text>
+          {step==='titulo'&&<View style={s.card}>
+            <Text style={s.section}>📸 Foto da venda</Text>
+            <Text style={s.helper}>{opId
+              ?'Adicione ou troque a foto do título já cadastrado.'
+              :'Selecione agora. A imagem será enviada automaticamente depois de salvar o título.'}</Text>
             <View style={s.salePhoto}>
-              {photo&&token?<Image
+              {stagedPhoto?<Image source={{uri:stagedPhoto.uri}} style={s.salePhotoImage}
+                resizeMode="cover"/>:
+              opId&&photo&&token?<Image
                 source={{uri:mobileMediaUrl('mobile/vendas/'+opId+'/foto')+'?v='+photoKey,
                   headers:{Authorization:'Bearer '+token}}}
-                onError={()=>setPhoto(false)}
-                style={s.salePhotoImage} resizeMode="cover"/>:
+                onError={()=>setPhoto(false)} style={s.salePhotoImage} resizeMode="cover"/>:
                 <View style={s.photoPlaceholder}><Text style={s.photoEmoji}>📸</Text>
-                  <Text style={s.photoHint}>Guarde o momento desta conquista</Text></View>}
+                  <Text style={s.photoHint}>Registre esta conquista</Text></View>}
             </View>
             <View style={s.photoButtons}>
               <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(true);}} disabled={photoBusy}>
-                <Text style={s.photoButtonText}>📷 Tirar foto</Text></Pressable>
+                <Text style={s.photoButtonText}>📷 Câmera</Text></Pressable>
               <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(false);}} disabled={photoBusy}>
                 <Text style={s.photoButtonText}>Galeria</Text></Pressable>
             </View>
-            <Text style={s.helper}>JPG, PNG ou WebP · até 5 MB. Arquivo protegido no servidor.</Text>
-          </View>
+            {opId&&stagedPhoto&&<Btn text={photoBusy?'Enviando foto...':'Reenviar foto'}
+              disabled={photoBusy} onPress={()=>{void uploadPendingPhoto(opId,stagedPhoto);}}/>}
+            {stagedPhoto&&!opId&&<Pressable onPress={()=>setStagedPhoto(null)}>
+              <Text style={s.remove}>Remover foto selecionada</Text></Pressable>}
+            <Text style={s.helper}>JPG, PNG ou WebP · até 5 MB · armazenamento privado</Text>
+          </View>}
           <View style={s.card}><Text style={s.kicker}>TÍTULO {detail.operacao.numero_titulo} {detail.operacao.sigla_plano}</Text>
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
             <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda}</Text>
