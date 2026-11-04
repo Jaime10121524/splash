@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import {
   Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
@@ -17,6 +18,7 @@ export default function ChoiceSheet({
   onClose: () => void;
   allowEmpty?: boolean;
 }) {
+  const styles=useThemedStyles(lightStyles);
   const all = allowEmpty ? [{ id: 0, label: 'Nenhum' }, ...choices] : choices;
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
@@ -55,7 +57,7 @@ export default function ChoiceSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(20,14,48,.50)' },
   sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 20, maxHeight: '75%', minHeight: 190 },
