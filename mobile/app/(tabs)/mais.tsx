@@ -1,9 +1,9 @@
 import {useCallback,useState} from 'react';
-import {ActivityIndicator,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
+import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router,useFocusEffect} from 'expo-router';
 import {SymbolView} from 'expo-symbols';
-import {apiRequest} from '../../src/api';
+import {apiRequest,mobileMediaUrl} from '../../src/api';
 import {useAuth} from '../../src/AuthContext';
 import {colors} from '../../src/theme';
 
@@ -20,8 +20,10 @@ function MenuLink({entry}:{entry:Entry}){
 export default function Mais(){
   const {user,token,logout}=useAuth();
   const [unread,setUnread]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [hasPhoto,setHasPhoto]=useState(true),[photoKey,setPhotoKey]=useState(0);
   useFocusEffect(useCallback(()=>{
     if(!token)return;
+    setHasPhoto(true);setPhotoKey(v=>v+1);
     let active=true;
     void apiRequest<{nao_lidas:number}>('mobile/notificacoes',{token})
       .then(d=>{if(active)setUnread(d.nao_lidas||0);}).catch(()=>{});
@@ -45,7 +47,12 @@ export default function Mais(){
       <Text style={s.kicker}>ÁREAS DO APLICATIVO</Text><Text style={s.title}>Mais opções</Text>
       <Text style={s.subtitle}>Tudo o que você precisa em um só lugar.</Text>
       <View style={s.userCard}>
-        <View style={s.avatar}><Text style={s.avatarText}>{user?.username?.slice(0,1).toUpperCase()||'?'}</Text></View>
+        <View style={s.avatar}>{hasPhoto&&token?<Image
+          source={{uri:mobileMediaUrl('mobile/me/foto')+'?v='+photoKey,
+            headers:{Authorization:'Bearer '+token}}}
+          style={{width:53,height:53}} onError={()=>setHasPhoto(false)}/>:
+          <Text style={s.avatarText}>{user?.username?.slice(0,1).toUpperCase()||'?'}</Text>}
+        </View>
         <View><Text style={s.userTitle}>{user?.username}</Text><Text style={s.userSub}>Conta conectada</Text></View>
       </View>
       <View style={s.links}>{items.map(i=><MenuLink key={i.title} entry={i}/>)}</View>
@@ -65,7 +72,7 @@ const s=StyleSheet.create({
   title:{fontSize:27,color:colors.ink,fontWeight:'900'},
   subtitle:{color:colors.muted,fontSize:13,marginBottom:11},
   userCard:{backgroundColor:colors.navy,borderRadius:21,marginVertical:8,padding:18,flexDirection:'row',alignItems:'center',gap:14},
-  avatar:{backgroundColor:'#55409D',borderRadius:17,width:53,height:53,alignItems:'center',justifyContent:'center'},
+  avatar:{backgroundColor:'#55409D',borderRadius:17,width:53,height:53,overflow:'hidden',alignItems:'center',justifyContent:'center'},
   avatarText:{color:'#FFFFFF',fontSize:22,fontWeight:'900'},
   userTitle:{color:'#FFFFFF',fontSize:17,fontWeight:'900'},
   userSub:{color:'#D5C8FF',fontSize:12,marginTop:4},
