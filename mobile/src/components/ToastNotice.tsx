@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +14,7 @@ export default function ToastNotice({
   duration?: number;
   kind?: 'info' | 'success' | 'error';
 }) {
+  const styles=useThemedStyles(lightStyles);
   const progress=useRef(new Animated.Value(1)).current;
   const dismiss=useRef(onDismiss);
   dismiss.current=onDismiss;
@@ -52,7 +54,7 @@ export default function ToastNotice({
     </View>
   </View>;
 }
-const styles=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   position:{position:'absolute',top:11,left:15,right:15,zIndex:200},
   toast:{backgroundColor:'#FFFFFF',borderRadius:17,overflow:'hidden',borderWidth:1,borderColor:'#E7E2F5',
     elevation:15,shadowColor:'#251B49',shadowOpacity:.15,shadowOffset:{width:0,height:8},shadowRadius:18},
