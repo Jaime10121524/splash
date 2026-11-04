@@ -24,6 +24,7 @@ $routes->group('api', static function ($routes): void {
             $routes->post('notificacoes/ler-todas', 'Api\MobileNotificacoesController::readAll');
             $routes->post('notificacoes/(:num)/ler', 'Api\MobileNotificacoesController::read/$1');
             $routes->post('logout', 'Api\MobileController::logout');
+            $routes->get('dashboard', 'Api\MobileDashboardController::index');
             $routes->get('atendimentos', 'Api\MobileController::atendimentos');
             // Agendamentos e QR: acesso exclusivo com token Shield mobile.
             $routes->get('agendamentos', 'Api\AgendamentosController::index');
