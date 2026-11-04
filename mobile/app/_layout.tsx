@@ -7,8 +7,7 @@ function AppNavigation(){
   const {resolved,palette}=useTheme();
   return (
     <>
-      <StatusBar barStyle={resolved==='dark'?'light-content':'dark-content'}
-        backgroundColor={palette.background}/>
+      <StatusBar barStyle={resolved==='dark'?'light-content':'dark-content'}/>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background }, animation: 'slide_from_right' }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
