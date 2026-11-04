@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -10,6 +11,7 @@ import VisitCard from '../../src/components/VisitCard';
 import { colors, shadows } from '../../src/theme';
 
 function Metric({ label, number, icon, tint }: { label: string; number: number; icon: 'clock' | 'people' | 'check'; tint: string }) {
+  const styles=useThemedStyles(lightStyles);
   const symbols = {
     clock: { ios: 'clock', android: 'schedule' },
     people: { ios: 'person.2.fill', android: 'groups' },
@@ -25,6 +27,7 @@ function Metric({ label, number, icon, tint }: { label: string; number: number; 
 }
 
 export default function HomeScreen() {
+  const styles=useThemedStyles(lightStyles);
   const { user, token } = useAuth();
   const [data, setData] = useState<VisitData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +120,7 @@ export default function HomeScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 20, paddingBottom: 35 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
