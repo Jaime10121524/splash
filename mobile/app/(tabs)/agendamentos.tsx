@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
@@ -40,6 +41,7 @@ function dateISO(value: string): string | null {
 }
 
 export default function AgendamentosScreen({ initialMode = 'list' }: { initialMode?: 'list' | 'scan' }) {
+  const styles=useThemedStyles(lightStyles);
   const { token } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const lockedScan = useRef(false);
@@ -605,7 +607,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
   </SafeAreaView>;
 }
 
-const styles=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   scrollArea:{flex:1},
   top:{paddingHorizontal:19,paddingTop:18,paddingBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
