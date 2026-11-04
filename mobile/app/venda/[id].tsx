@@ -1,12 +1,15 @@
 import {useProtectedPhoto} from '../../src/useProtectedPhoto';
 import FeedbackPopup from '../../src/components/FeedbackPopup';
-import {useThemedStyles} from '../../src/ThemeContext';
+import {useThemedStyles,useTheme} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import {SymbolView} from 'expo-symbols';
 import { apiRequest, uploadMobilePhoto, VisitDetailsResponse } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet, { Choice } from '../../src/components/ChoiceSheet';
@@ -60,6 +63,7 @@ function Btn({text,onPress,muted=false,disabled=false}:{text:string;onPress:()=>
 
 export default function VendaMobile(){
   const s=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const params=useLocalSearchParams<{id:string;visita?:string}>();
   const rawId=Array.isArray(params.id)?params.id[0]:params.id;
   const rawVisit=Array.isArray(params.visita)?params.visita[0]:params.visita;
@@ -88,6 +92,9 @@ export default function VendaMobile(){
     useProtectedPhoto(opId?'mobile/vendas/'+opId+'/foto':null,token);
   const [photoBusy,setPhotoBusy]=useState(false);
   const [stagedPhoto,setStagedPhoto]=useState<ImagePicker.ImagePickerAsset|null>(null);
+  const [photoExpanded,setPhotoExpanded]=useState(false);
+  const [photoSaving,setPhotoSaving]=useState(false);
+  const photoDisplayUri=stagedPhoto?.uri||photoUri;
   const plan=opts?.planos.find(x=>x.id===planId),method=opts?.formas.find(x=>x.id===methodId);
   const price=plan?cents(plan.valor):null,discountValue=cents(discount);
   const total=price!==null&&discountValue!==null?price-discountValue:null;
@@ -228,6 +235,33 @@ export default function VendaMobile(){
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível abrir a câmera ou galeria.');}
   }
 
+  /** A foto é privada: salvar a cópia local autenticada, jamais expor um link público. */
+  async function downloadPhoto(){
+    if(!photoUri||photoSaving)return;
+    setPhotoSaving(true);setError('');setNotice('');
+    try{
+      const ext=photoUri.toLowerCase().match(/\.(png|webp|jpe?g)(?:$|\?)/)?.[1]||'jpg';
+      const mime=ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg';
+      if(Platform.OS==='android'){
+        const access=await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if(!access.granted)return;
+        const fileName='Splash-venda-'+String(opId||'foto')+'-'+Date.now();
+        const target=await FileSystem.StorageAccessFramework.createFileAsync(access.directoryUri,fileName,mime);
+        try{
+          const data=await FileSystem.readAsStringAsync(photoUri,{encoding:FileSystem.EncodingType.Base64});
+          await FileSystem.writeAsStringAsync(target,data,{encoding:FileSystem.EncodingType.Base64});
+        }catch(e){await FileSystem.deleteAsync(target).catch(()=>{});throw e;}
+        setPhotoExpanded(false);
+        setNotice('Foto baixada na pasta escolhida do celular.');
+      }else{
+        if(!await Sharing.isAvailableAsync())throw Error('Não foi possível abrir as opções de salvar imagem.');
+        await Sharing.shareAsync(photoUri,{mimeType:mime,dialogTitle:'Salvar foto da venda'});
+        setPhotoExpanded(false);
+      }
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível baixar a foto.');}
+    finally{setPhotoSaving(false);}
+  }
+
   async function adjustGross(){
     if(!opId||!opts?.pode_corrigir_comissao)return;
     const n=cents(grossValue);
@@ -280,8 +314,8 @@ export default function VendaMobile(){
   return <SafeAreaView style={s.root} edges={['top']}>
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
-        <View style={s.header}><Pressable style={s.back} onPress={()=>router.back()}>
-          <Text style={s.backText}>‹</Text></Pressable>
+        <View style={s.header}><Pressable style={s.back} onPress={()=>router.back()} accessibilityRole="button" accessibilityLabel="Voltar">
+          <SymbolView name={{ios:'chevron.left',android:'chevron_left'}} size={24} tintColor={palette.ink}/></Pressable>
           <View style={{flex:1}}><Text style={s.kicker}>SPLASH / COMERCIAL</Text>
             <Text style={s.title}>Venda e comissionamento</Text></View></View>
         <View style={s.steps}>{(['titulo','pagamento','comissao'] as const).map((v,i)=>
@@ -320,14 +354,23 @@ export default function VendaMobile(){
               ?'Adicione ou troque a foto do título já cadastrado.'
               :'Selecione agora. A imagem será enviada automaticamente depois de salvar o título.'}</Text>
             <View style={s.salePhoto}>
-              {stagedPhoto?<Image source={{uri:stagedPhoto.uri}} style={s.salePhotoImage}
-                resizeMode="cover"/>:
-              opId&&photoUri?<Image source={{uri:photoUri}}
-                onError={()=>setError('A imagem foi baixada, mas o Android não conseguiu exibi-la.')}
-                style={s.salePhotoImage} resizeMode="cover"/>:
+              {photoDisplayUri?<Pressable style={{flex:1}} onPress={()=>setPhotoExpanded(true)}
+                  accessibilityRole="button" accessibilityLabel="Expandir foto da venda">
+                <Image source={{uri:photoDisplayUri}} style={s.salePhotoImage} resizeMode="contain"
+                  onError={()=>setError('Não foi possível exibir a foto selecionada.')}/>
+              </Pressable>:
                 <View style={s.photoPlaceholder}><Text style={s.photoEmoji}>📸</Text>
                   <Text style={s.photoHint}>Registre esta conquista</Text></View>}
             </View>
+            {!!photoDisplayUri&&<View style={s.photoTools}>
+              <Pressable style={s.photoTool} onPress={()=>setPhotoExpanded(true)} accessibilityRole="button">
+                <Text style={s.photoToolText}>⤢ Expandir</Text>
+              </Pressable>
+              {!!photoUri&&!stagedPhoto&&<Pressable style={s.photoTool} disabled={photoSaving}
+                  onPress={()=>{void downloadPhoto();}} accessibilityRole="button">
+                <Text style={s.photoToolText}>{photoSaving?'Salvando...':'↓ Baixar'}</Text>
+              </Pressable>}
+            </View>}
             <View style={s.photoButtons}>
               <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(true);}} disabled={photoBusy}>
                 <Text style={s.photoButtonText}>📷 Câmera</Text></Pressable>
@@ -351,14 +394,23 @@ export default function VendaMobile(){
               ?'Adicione ou troque a foto do título já cadastrado.'
               :'Selecione agora. A imagem será enviada automaticamente depois de salvar o título.'}</Text>
             <View style={s.salePhoto}>
-              {stagedPhoto?<Image source={{uri:stagedPhoto.uri}} style={s.salePhotoImage}
-                resizeMode="cover"/>:
-              opId&&photoUri?<Image source={{uri:photoUri}}
-                onError={()=>setError('A imagem foi baixada, mas o Android não conseguiu exibi-la.')}
-                style={s.salePhotoImage} resizeMode="cover"/>:
+              {photoDisplayUri?<Pressable style={{flex:1}} onPress={()=>setPhotoExpanded(true)}
+                  accessibilityRole="button" accessibilityLabel="Expandir foto da venda">
+                <Image source={{uri:photoDisplayUri}} style={s.salePhotoImage} resizeMode="contain"
+                  onError={()=>setError('Não foi possível exibir a foto selecionada.')}/>
+              </Pressable>:
                 <View style={s.photoPlaceholder}><Text style={s.photoEmoji}>📸</Text>
                   <Text style={s.photoHint}>Registre esta conquista</Text></View>}
             </View>
+            {!!photoDisplayUri&&<View style={s.photoTools}>
+              <Pressable style={s.photoTool} onPress={()=>setPhotoExpanded(true)} accessibilityRole="button">
+                <Text style={s.photoToolText}>⤢ Expandir</Text>
+              </Pressable>
+              {!!photoUri&&!stagedPhoto&&<Pressable style={s.photoTool} disabled={photoSaving}
+                  onPress={()=>{void downloadPhoto();}} accessibilityRole="button">
+                <Text style={s.photoToolText}>{photoSaving?'Salvando...':'↓ Baixar'}</Text>
+              </Pressable>}
+            </View>}
             <View style={s.photoButtons}>
               <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(true);}} disabled={photoBusy}>
                 <Text style={s.photoButtonText}>📷 Câmera</Text></Pressable>
@@ -374,12 +426,20 @@ export default function VendaMobile(){
           </View>}
           <View style={s.card}>
             {step!=='titulo'&&photoUri&&<View style={s.photoSummary}>
-              <Image source={{uri:photoUri}} style={s.photoSummaryImage} resizeMode="cover"/>
+              <Pressable onPress={()=>setPhotoExpanded(true)} accessibilityLabel="Expandir foto">
+                <Image source={{uri:photoUri}} style={s.photoSummaryImage} resizeMode="contain"/>
+              </Pressable>
               <View style={{flex:1}}><Text style={s.lineTitle}>Foto da venda</Text>
-                <Text style={s.helper}>Imagem salva no servidor</Text></View>
-              <Pressable onPress={()=>setStep('titulo')} accessibilityRole="button">
-                <Text style={s.photoOpen}>Ver foto ›</Text>
-              </Pressable></View>}
+                <Text style={s.helper}>Imagem vertical salva no servidor</Text></View>
+              <View style={s.photoSummaryActions}>
+                <Pressable onPress={()=>setPhotoExpanded(true)} accessibilityRole="button">
+                  <Text style={s.photoOpen}>Expandir</Text>
+                </Pressable>
+                <Pressable disabled={photoSaving} onPress={()=>{void downloadPhoto();}} accessibilityRole="button">
+                  <Text style={s.photoOpen}>{photoSaving?'Salvando...':'↓ Baixar'}</Text>
+                </Pressable>
+              </View>
+            </View>}
             <Text style={s.kicker}>TÍTULO {detail.operacao.numero_titulo} {detail.operacao.sigla_plano}</Text>
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
             <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda}</Text>
@@ -479,6 +539,28 @@ export default function VendaMobile(){
       }}/>
     <FeedbackPopup error={error} success={notice}
       onDismiss={()=>{setError('');setNotice('');}}/>
+
+    <Modal visible={photoExpanded} animationType="fade" onRequestClose={()=>setPhotoExpanded(false)}>
+      <SafeAreaView style={s.photoViewer} edges={['top','bottom']}>
+        <View style={s.viewerHead}>
+          <Text style={s.viewerTitle}>Foto da venda</Text>
+          <Pressable style={s.viewerClose} onPress={()=>setPhotoExpanded(false)}
+            accessibilityRole="button" accessibilityLabel="Fechar imagem">
+            <SymbolView name={{ios:'xmark',android:'close'}} tintColor="#FFFFFF" size={24}/>
+          </Pressable>
+        </View>
+        {!!photoDisplayUri&&<Image source={{uri:photoDisplayUri}} style={s.viewerImage} resizeMode="contain"/>}
+        <View style={s.viewerActions}>
+          {!!photoUri&&!stagedPhoto&&<Pressable style={s.viewerDownload} disabled={photoSaving}
+              onPress={()=>{void downloadPhoto();}} accessibilityRole="button">
+            <Text style={s.viewerDownloadText}>{photoSaving?'Salvando...':'↓ Baixar imagem'}</Text>
+          </Pressable>}
+          <Pressable style={s.viewerCloseButton} onPress={()=>setPhotoExpanded(false)}>
+            <Text style={s.viewerCloseText}>Fechar</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    </Modal>
     <ActionModal visible={confirm} variant="confirm" title="Cadastrar o título?"
       description="Primeiro registramos a venda. Depois os pagamentos e a apuração de comissões serão registrados com auditoria."
       primaryLabel="Sim, cadastrar" secondaryLabel="Revisar" busy={busy}
@@ -489,10 +571,28 @@ const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   photoError:{fontSize:11,color:colors.danger,lineHeight:17},
   photoSummary:{flexDirection:'row',alignItems:'center',gap:10,padding:9,backgroundColor:colors.pale,borderRadius:13},
-  photoSummaryImage:{width:62,height:62,borderRadius:10},
+  photoSummaryImage:{width:55,height:74,borderRadius:10},
+  photoSummaryActions:{gap:10,alignItems:'flex-end'},
   photoOpen:{fontSize:12,color:colors.brandDark,fontWeight:'900'},
-  salePhoto:{height:195,borderRadius:17,backgroundColor:colors.pale,overflow:'hidden'},
+  salePhoto:{height:350,width:'100%',maxWidth:290,alignSelf:'center',borderRadius:17,
+    backgroundColor:colors.pale,overflow:'hidden'},
   salePhotoImage:{height:'100%',width:'100%'},
+  photoTools:{flexDirection:'row',justifyContent:'center',gap:10},
+  photoTool:{minHeight:38,minWidth:105,paddingHorizontal:12,alignItems:'center',justifyContent:'center',
+    backgroundColor:colors.pale,borderRadius:10},
+  photoToolText:{fontSize:12,fontWeight:'900',color:colors.brandDark},
+  photoViewer:{flex:1,backgroundColor:'#0E1020',paddingHorizontal:16},
+  viewerHead:{height:58,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
+  viewerTitle:{fontSize:17,fontWeight:'900',color:'#FFFFFF'},
+  viewerClose:{width:44,height:44,alignItems:'center',justifyContent:'center'},
+  viewerImage:{flex:1,width:'100%',alignSelf:'center'},
+  viewerActions:{flexDirection:'row',gap:10,paddingBottom:12,paddingTop:10},
+  viewerDownload:{flex:1,backgroundColor:'#7861F9',borderRadius:12,minHeight:48,
+    alignItems:'center',justifyContent:'center'},
+  viewerDownloadText:{fontSize:14,color:'#FFFFFF',fontWeight:'900'},
+  viewerCloseButton:{minWidth:95,minHeight:48,borderRadius:12,borderWidth:1,
+    borderColor:'#7B7C8D',alignItems:'center',justifyContent:'center',paddingHorizontal:15},
+  viewerCloseText:{fontSize:13,fontWeight:'800',color:'#FFFFFF'},
   photoPlaceholder:{flex:1,alignItems:'center',justifyContent:'center',gap:8},
   photoEmoji:{fontSize:38},photoHint:{fontSize:12,fontWeight:'800',color:colors.brandDark},
   photoButtons:{flexDirection:'row',gap:10},
@@ -502,7 +602,6 @@ const lightStyles = StyleSheet.create({
   header:{flexDirection:'row',alignItems:'center',gap:12},
   back:{width:42,height:42,backgroundColor:'#FFFFFF',borderRadius:14,borderWidth:1,
     borderColor:colors.line,alignItems:'center',justifyContent:'center'},
-  backText:{fontSize:31,color:colors.ink},
   kicker:{color:colors.brandDark,fontSize:10,fontWeight:'900',letterSpacing:1.1},
   title:{fontSize:22,color:colors.ink,fontWeight:'900'},
   steps:{flexDirection:'row',gap:5},
