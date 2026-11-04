@@ -1,3 +1,4 @@
+import ThemeSettings from '../../src/components/ThemeSettings';
 import {useThemedStyles} from '../../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
@@ -59,6 +60,7 @@ export default function Mais(){
         <View><Text style={s.userTitle}>{user?.username}</Text><Text style={s.userSub}>Conta conectada</Text></View>
       </View>
       <View style={s.links}>{items.map(i=><MenuLink key={i.title} entry={i}/>)}</View>
+      <ThemeSettings/>
       {!!error&&<Text style={s.error}>{error}</Text>}
       <Pressable disabled={busy} style={s.logout} onPress={()=>{void signOut();}}>
         {busy?<ActivityIndicator color={colors.danger}/>:
