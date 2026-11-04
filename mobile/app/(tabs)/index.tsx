@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { ApiError, VisitData, apiRequest, roleName } from '../../src/api';
+import { ApiError, VisitData, apiRequest, mobileMediaUrl, roleName } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import VisitCard from '../../src/components/VisitCard';
 import { colors, shadows } from '../../src/theme';
@@ -31,6 +31,9 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [forbidden, setForbidden] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [photo, setPhoto] = useState(true);
+  const [photoKey, setPhotoKey] = useState(0);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -43,7 +46,12 @@ export default function HomeScreen() {
     } finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    setPhoto(true);setPhotoKey(v=>v+1);
+    if(token)void apiRequest<{nao_lidas:number}>('mobile/notificacoes',{token})
+      .then(n=>setUnread(n.nao_lidas||0)).catch(()=>{});
+  }, [load,token]));
   async function refresh() { setRefreshing(true); await load(); }
   function openVisits() { Haptics.selectionAsync().catch(() => {}); router.push('/(tabs)/atendimentos'); }
 
@@ -59,10 +67,20 @@ export default function HomeScreen() {
           <Text style={styles.title}>Olá, {firstName}! <Text>👋</Text></Text>
           <Text style={styles.date}>{today}</Text>
         </View>
-        <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/perfil')}
-          accessibilityRole="button" accessibilityLabel="Abrir meu perfil">
-          <Text style={styles.avatarText}>{firstName.slice(0, 1).toUpperCase()}</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.bell} onPress={()=>router.push('/(tabs)/notificacoes')}
+            accessibilityRole="button" accessibilityLabel={'Notificações: '+unread+' não lidas'}>
+            <SymbolView name={{ios:'bell.fill',android:'notifications'}} size={22} tintColor={colors.brandDark}/>
+            {!!unread&&<View style={styles.bellCount}><Text style={styles.bellText}>{unread>99?'99+':unread}</Text></View>}
+          </Pressable>
+          <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/perfil')}
+            accessibilityRole="button" accessibilityLabel="Abrir meu perfil">
+            {photo&&token?<Image source={{uri:mobileMediaUrl('mobile/me/foto')+'?v='+photoKey,
+                headers:{Authorization:'Bearer '+token}}} style={styles.avatarImage}
+                onError={()=>setPhoto(false)}/>:
+              <Text style={styles.avatarText}>{firstName.slice(0, 1).toUpperCase()}</Text>}
+          </Pressable>
+        </View>
       </View>
       <View style={styles.hero}>
         <View style={styles.heroCircle} />
@@ -106,7 +124,13 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3, color: colors.brandDark },
   title: { color: colors.ink, fontSize: 27, fontWeight: '900', letterSpacing: -0.6, marginTop: 7 },
   date: { color: colors.muted, fontSize: 13, marginTop: 7 },
-  avatar: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
+  headerActions:{flexDirection:'row',alignItems:'center',gap:8},
+  bell:{width:45,height:45,borderRadius:15,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},
+  bellCount:{position:'absolute',top:-4,right:-4,backgroundColor:'#E43D67',borderRadius:13,
+    minWidth:19,height:19,paddingHorizontal:3,alignItems:'center',justifyContent:'center'},
+  bellText:{color:'#FFFFFF',fontSize:9,fontWeight:'900'},
+  avatarImage:{width:46,height:46,borderRadius:16},
+  avatar: { width: 46, height: 46, borderRadius: 16, overflow:'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
   avatarText: { color: colors.brandDark, fontWeight: '900', fontSize: 20 },
   hero: { backgroundColor: colors.navy, borderRadius: 26, padding: 23, minHeight: 167, overflow: 'hidden' },
   heroCircle: { width: 175, height: 175, borderRadius: 100, backgroundColor: '#4A3889', opacity: 0.5, position: 'absolute', top: -59, right: -67 },
