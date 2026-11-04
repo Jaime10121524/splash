@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView,
@@ -36,6 +37,7 @@ const money=(value:string)=>{
 };
 
 export default function ClientEditor() {
+  const styles=useThemedStyles(lightStyles);
   const {id:rawId,vendaVisita:rawVisit}=useLocalSearchParams<{id:string;vendaVisita?:string}>();
   const saleVisitId=Number(Array.isArray(rawVisit)?rawVisit[0]:rawVisit);
   const continueToSale=Number.isSafeInteger(saleVisitId)&&saleVisitId>0;
@@ -253,7 +255,7 @@ export default function ClientEditor() {
       }}/>
   </SafeAreaView>;
 }
-const styles=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},flex:{flex:1},content:{padding:18,paddingBottom:50},
   header:{flexDirection:'row',alignItems:'center',gap:12,marginBottom:19},
   back:{height:41,width:41,borderRadius:13,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},
