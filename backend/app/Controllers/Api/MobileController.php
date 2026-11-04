@@ -127,8 +127,19 @@ final class MobileController extends BaseController
         }
 
         $periodo = (string) ($this->request->getGet('periodo') ?? 'hoje');
-        if (! in_array($periodo, ['hoje', 'todos'], true)) {
+        if (! in_array($periodo, ['hoje', 'todos', 'intervalo'], true)) {
             return $this->error(422, 'Filtro de período inválido.');
+        }
+        $inicio = (string) ($this->request->getGet('inicio') ?? '');
+        $fim = (string) ($this->request->getGet('fim') ?? '');
+        if ($periodo === 'intervalo') {
+            foreach ([$inicio, $fim] as $date) {
+                if (!preg_match('/^\\d{4}-\\d{2}-\\d{2}$/D', $date)
+                    || !checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4))) {
+                    return $this->error(422, 'Selecione uma data inicial e final válidas.');
+                }
+            }
+            if ($inicio > $fim) return $this->error(422, 'A data inicial deve ser anterior à final.');
         }
 
         $db = db_connect();
@@ -142,7 +153,7 @@ final class MobileController extends BaseController
 
         // Mesma regra de isolamento da API web: corretor só vê visitas suas
         // ou por ele cadastradas; as contas administrativas têm escopo total.
-        $build = static function () use ($db, $scope, $user, $periodo) {
+        $build = static function () use ($db, $scope, $user, $periodo, $inicio, $fim) {
             $query = $db->table('visitas v');
             if ($scope !== null) {
                 $query->groupStart()->where('v.corretor_pessoa_id', $scope)
@@ -152,6 +163,9 @@ final class MobileController extends BaseController
             if ($periodo === 'hoje') {
                 $query->where('v.chegada_em >=', date('Y-m-d') . ' 00:00:00')
                     ->where('v.chegada_em <=', date('Y-m-d') . ' 23:59:59');
+            } elseif ($periodo === 'intervalo') {
+                $query->where('v.chegada_em >=', $inicio . ' 00:00:00')
+                    ->where('v.chegada_em <=', $fim . ' 23:59:59');
             }
             return $query;
         };
