@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { Visit, displayDate, displayTime } from '../api';
@@ -24,6 +25,7 @@ const stateColors: Record<string, { background: string; text: string }> = {
 };
 
 export default function VisitCard({ visit, compact = false, onPress }: { visit: Visit; compact?: boolean; onPress?: () => void }) {
+  const styles=useThemedStyles(lightStyles);
   const state = stateColors[visit.status] ?? { background: '#EFF2F6', text: colors.muted };
   return (
     <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined}
@@ -49,7 +51,7 @@ export default function VisitCard({ visit, compact = false, onPress }: { visit: 
   );
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   card: { backgroundColor: colors.surface, padding: 17, borderRadius: 21, marginBottom: 12, ...shadows.card },
   compact: { marginBottom: 10 },
   pressed: { opacity: 0.83, transform: [{ scale: 0.993 }] },
