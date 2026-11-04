@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api;
 
-use App\Libraries\ComissaoAutomatica;
-use App\Libraries\RateioAutomatico;
 use App\Libraries\VendaMoney;
 use CodeIgniter\HTTP\ResponseInterface;
-use Throwable;
 
 /**
  * A venda web continua com sessão e CSRF. Esta camada autoriza token mobile,
@@ -183,99 +180,5 @@ final class MobileVendasController extends VendasController
         return parent::ajustarComissao($id);
     }
 
-    /** Prévia calculada pelas MESMAS regras automáticas e de rateio do web.
-     * Não grava venda nem realiza pagamento de comissão.
-     */
-    public function previa(): ResponseInterface
-    {
-        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
-        $in=$this->jsonPayload();
-        $visitId=$this->optionalId($in['visita_id']??null);
-        $versionId=$this->optionalId($in['plano_versao_id']??null);
-        if(!$visitId||!$versionId)return $this->errorResponse(422,'Informe visita e plano.');
-        $visit=$this->linkedVisit($visitId,$a);
-        if($visit instanceof ResponseInterface)return $visit;
-        $db=db_connect();
-        try {
-            $plan=$db->table('plano_versoes')->where('id',$versionId)->where('ativo',1)->get()->getRowArray();
-            if(!$plan)return $this->errorResponse(422,'Plano indisponível.');
-            $table=VendaMoney::cents((string)$plan['valor']);
-            $discount=VendaMoney::cents($in['desconto_corretor']??'0',true);
-            if($table===null||$discount===null||$discount>=$table)return $this->errorResponse(422,'Desconto inválido.');
-            $due=$table-$discount;
-            $rows=[];$sum=0;
-            if(!is_array($in['pagamentos']??null)||count($in['pagamentos'])>20)
-                return $this->errorResponse(422,'Informe até 20 pagamentos.');
-            foreach($in['pagamentos'] as $p){
-                if(!is_array($p))return $this->errorResponse(422,'Pagamento inválido.');
-                $id=$this->optionalId($p['forma_id']??null);
-                $amount=VendaMoney::cents($p['valor']??null);
-                $method=$id?$db->table('venda_formas_pagamento')->where('id',$id)
-                    ->where('ativo',1)->where('codigo !=','ABATIMENTO_EMP')->get()->getRowArray():null;
-                if(!$method||$amount===null)return $this->errorResponse(422,'Forma ou valor de pagamento inválido.');
-                $sum+=$amount;
-                $rows[]=['tipo'=>'ENTRADA','valor'=>VendaMoney::decimal($amount),'credito'=>(bool)$method['credito']];
-            }
-            if($sum>$due)return $this->errorResponse(422,'Pagamentos excedem o valor da venda.');
-            $rules=ComissaoAutomatica::configs($db);
-            $calc=ComissaoAutomatica::calculate($rules,$rows,$due,$table,$discount,false);
-            $result=['valor_cobrado'=>VendaMoney::decimal($due),
-                'pagamentos'=>VendaMoney::decimal($sum),
-                'saldo'=>VendaMoney::decimal($due-$sum),
-                'comissao_bruta'=>$a['admin']?$calc['valor']:null,
-                'aviso'=>$calc['aviso'],'participantes'=>[],'comissao_propria'=>null,
-                'regra'=>$a['admin']?($calc['rule']['nome']??null):null];
-            if($calc['valor']!==null && $calc['rule']!==null) {
-                $policy=$db->table('comissao_politicas')->where('id',1)->get()->getRowArray();
-                $date=(string)($in['data_venda']??'');
-                if(!$policy||!$this->validateDate($date,false))
-                    return $this->errorResponse(422,'Informe uma data de venda válida.');
-                $manager=$this->optionalId($in['gerente_pessoa_id']??null);
-                if($manager===false)return $this->errorResponse(422,'Gerente inválido.');
-                $op=[
-                    'comissao_prevista'=>$calc['valor'],'valor_tabela'=>VendaMoney::decimal($table),
-                    'corretor_pessoa_id'=>$visit['corretor_pessoa_id'],
-                    'segundo_corretor_pessoa_id'=>$visit['segundo_corretor_pessoa_id'],
-                    'atendente_pessoa_id'=>$visit['atendente_pessoa_id'],
-                    'atendente_adicional_pessoa_id'=>$visit['atendente_adicional_pessoa_id'],
-                    'gerente_pessoa_id'=>$manager,'data_venda'=>$date,
-                    'duracao_meses'=>(int)$plan['duracao_meses'],
-                    'regra_snapshot'=>json_encode($calc['rule'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
-                    '_regras_especiais'=>$db->table('comissao_excecoes_plano')
-                        ->where('plano_versao_id',$versionId)->get()->getResultArray(),
-                ];
-                $holiday=(bool)$db->table('comissao_feriados')->where('data',$date)->countAllResults();
-                $client=$db->table('clientes c')->select('o.nome AS origem_nome')
-                    ->join('lead_origens o','o.id=c.origem_id','left')
-                    ->where('c.id',$visit['cliente_id'])->get()->getRowArray();
-                $renewal=!!$visit['segundo_corretor_pessoa_id']
-                    && mb_stripos((string)($client['origem_nome']??''),'renova')!==false;
-                $proposal=RateioAutomatico::propose($op,$policy,$holiday,$renewal);
-                $out=0;
-                foreach($proposal['rateios'] as $item){
-                    if((int)$item['origem']===(int)$visit['corretor_pessoa_id'])$out+=$item['valor'];
-                }
-                $own=VendaMoney::cents($calc['valor'])-$out;
-                if($a['admin']){
-                    $ids=array_unique(array_column($proposal['rateios'],'destino'));
-                    $names=[];
-                    if($ids)foreach($db->table('pessoas')->select('id,nome')->whereIn('id',$ids)->get()->getResultArray() as $p)
-                        $names[(int)$p['id']]=$p['nome'];
-                    foreach($proposal['rateios'] as $item)$result['participantes'][]=[
-                        'pessoa_id'=>(int)$item['destino'],'nome'=>$names[(int)$item['destino']]??'Participante',
-                        'papel'=>$item['papel'],'valor'=>VendaMoney::decimal($item['valor']),
-                    ];
-                    $result['comissao_propria']=VendaMoney::decimal(max(0,$own));
-                }elseif($a['scope']!==null
-                    && (int)$visit['corretor_pessoa_id']===(int)$a['scope']){
-                    $result['comissao_propria']=VendaMoney::decimal(max(0,$own));
-                }
-                $result['aviso']=implode(' ',array_merge([$calc['aviso']],$proposal['avisos']));
-            }
-            return $this->response->setJSON($result)->setHeader('Cache-Control','no-store');
-        }catch(Throwable $e){
-            log_message('error','SPLASH prévia mobile de venda: {error}',['error'=>$e->getMessage()]);
-            return $this->errorResponse(500,'Não foi possível calcular o comissionamento.');
-        }
-    }
+
 }
