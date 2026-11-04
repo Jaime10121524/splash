@@ -1,7 +1,7 @@
 import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -27,6 +27,7 @@ function Metric({ label, number, icon, tint }: { label: string; number: number; 
 }
 
 export default function HomeScreen() {
+  const router=useRouter();
   const styles=useThemedStyles(lightStyles);
   const { user, token } = useAuth();
   const [data, setData] = useState<VisitData | null>(null);
