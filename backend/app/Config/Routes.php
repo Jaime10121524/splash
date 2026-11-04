@@ -49,7 +49,6 @@ $routes->group('api', static function ($routes): void {
             // Vendas do aplicativo: regras financeiras compartilhadas com o web, acesso por token.
             $routes->get('vendas/opcoes', 'Api\MobileVendasController::opcoes');
             $routes->get('vendas', 'Api\MobileVendasController::index');
-            $routes->post('vendas/previa', 'Api\MobileVendasController::previa');
             $routes->post('vendas', 'Api\MobileVendasController::create');
             $routes->get('vendas/(:num)', 'Api\MobileVendasController::detalhe/$1');
             $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaMobile/$1');
