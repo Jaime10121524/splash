@@ -1,3 +1,4 @@
+import FeedbackPopup from '../../src/components/FeedbackPopup';
 import {useThemedStyles} from '../../src/ThemeContext';
 import { useEffect, useState } from 'react';
 import {
@@ -443,6 +444,7 @@ export default function NewVisitScreen() {
         router.replace({ pathname: '/atendimento/[id]', params: { id: String(id) } });
       }}
       onSecondary={() => { setRegisteredVisit(null); router.back(); }} />
+    <FeedbackPopup error={error} onDismiss={()=>setError('')}/>
   </SafeAreaView>;
 }
 
