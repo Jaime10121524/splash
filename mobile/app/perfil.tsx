@@ -1,3 +1,4 @@
+import ThemeSettings from '../src/components/ThemeSettings';
 import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
@@ -112,6 +113,7 @@ export default function ProfileScreen(){
       </View>
       {!!notice&&<View style={s.success}><Text style={s.successText}>{notice}</Text></View>}
       {!!error&&<View style={s.error}><Text style={s.errorText}>{error}</Text></View>}
+      <ThemeSettings/>
       <Pressable style={[s.logout,busy&&s.faded]} onPress={()=>{void signOut();}} disabled={busy}>
         <SymbolView name={{ios:'rectangle.portrait.and.arrow.right',android:'logout'}} size={20} tintColor={colors.danger}/>
         <Text style={s.logoutText}>Sair da conta</Text>
