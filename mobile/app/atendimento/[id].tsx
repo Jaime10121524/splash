@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable,
@@ -48,6 +49,7 @@ function parseReturnDate(input: string): string | null {
 }
 
 function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+  const styles=useThemedStyles(lightStyles);
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -59,6 +61,7 @@ function DetailRow({ label, value }: { label: string; value: string | number | n
 function PickerField({ label, value, hint, onPress }: {
   label: string; value?: string; hint: string; onPress: () => void;
 }) {
+  const styles=useThemedStyles(lightStyles);
   return <View style={styles.formField}>
     <Text style={styles.fieldLabel}>{label}</Text>
     <Pressable onPress={onPress} accessibilityRole="button" style={styles.picker}>
@@ -69,6 +72,7 @@ function PickerField({ label, value, hint, onPress }: {
 }
 
 export default function AtendimentoDetailScreen() {
+  const styles=useThemedStyles(lightStyles);
   const params = useLocalSearchParams<{ id: string }>();
   const id = Number(Array.isArray(params.id) ? params.id[0] : params.id);
   const { token } = useAuth();
@@ -471,7 +475,7 @@ export default function AtendimentoDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   saleOverlay: { flex:1,backgroundColor:'rgba(21,15,43,.65)',justifyContent:'center',padding:23 },
   saleModal: { backgroundColor:'#FFFFFF',borderRadius:24,padding:24,gap:13 },
