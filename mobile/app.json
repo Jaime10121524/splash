@@ -35,6 +35,13 @@
             "com.whatsapp.w4b"
           ]
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que o Splash escolha fotos para o perfil e o registro de vendas.",
+          "cameraPermission": "Permitir que o Splash tire fotos do perfil e das vendas."
+        }
       ]
     ],
     "experiments": {
