@@ -4,23 +4,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { useAuth } from '../../src/AuthContext';
 import { colors } from '../../src/theme';
+import {useTheme,useThemedStyles} from '../../src/ThemeContext';
 
 export default function TabsLayout() {
   const { user, ready } = useAuth();
+  const {palette}=useTheme();
+  const styles=useThemedStyles(lightStyles);
   const insets = useSafeAreaInsets();
   if (ready && !user) return <Redirect href="/login" />;
   return (
     <Tabs screenOptions={{
       headerShown: false,
       tabBarHideOnKeyboard: true,
-      tabBarActiveTintColor: colors.brandDark,
-      tabBarInactiveTintColor: '#948AAE',
+      tabBarActiveTintColor: palette.brandDark,
+      tabBarInactiveTintColor: palette.muted,
       // Reserva a área da barra de gestos/navegação Android. O texto do menu
       // fica acima dela inclusive com edge-to-edge ativo.
       tabBarStyle: {
         height: 67 + insets.bottom,
         paddingTop: 5, paddingBottom: insets.bottom + 5,
-        borderTopWidth: 0, backgroundColor: '#FFFFFF', elevation: 6,
+        borderTopWidth: 0, backgroundColor: palette.surface, elevation: 6,
         overflow: 'visible',
       },
       tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginTop: 3 },
@@ -63,7 +66,7 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   scanSlot: {
     flex: 1, alignItems: 'center', justifyContent: 'flex-start',
     overflow: 'visible',
