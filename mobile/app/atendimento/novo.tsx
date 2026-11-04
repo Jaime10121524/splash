@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
@@ -19,6 +20,7 @@ import { colors } from '../../src/theme';
 type BrokerField = 'main' | 'second' | 'origin' | 'owner' | null;
 
 export default function NewVisitScreen() {
+  const styles=useThemedStyles(lightStyles);
   const { token, user } = useAuth();
   const admin = !!user?.groups?.includes('admin');
   const [options, setOptions] = useState<MobileVisitOptions | null>(null);
@@ -444,7 +446,7 @@ export default function NewVisitScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   content: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 40, flexGrow: 1 },
