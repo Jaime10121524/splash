@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {router,useFocusEffect} from 'expo-router';
@@ -10,6 +11,7 @@ import {colors} from '../src/theme';
 
 type Profile={perfil:{username:string;email:string;foto_disponivel:boolean}};
 export default function ProfileScreen(){
+  const s=useThemedStyles(lightStyles);
   const {user,token,logout}=useAuth();
   const [email,setEmail]=useState(''),[username,setUsername]=useState('');
   const [current,setCurrent]=useState(''),[next,setNext]=useState(''),[confirm,setConfirm]=useState('');
@@ -118,7 +120,7 @@ export default function ProfileScreen(){
     </ScrollView>
   </SafeAreaView>;
 }
-const s=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   content:{padding:19,paddingBottom:65,gap:15},
   heading:{flexDirection:'row',alignItems:'center',gap:13,marginBottom:6},
