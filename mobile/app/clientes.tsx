@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView,
@@ -18,6 +19,7 @@ type ClientRow = {
 };
 
 export default function ClientesScreen() {
+  const styles=useThemedStyles(lightStyles);
   const { token } = useAuth();
   const [query, setQuery] = useState('');
   const [actual, setActual] = useState('');
@@ -124,7 +126,7 @@ export default function ClientesScreen() {
   </SafeAreaView>;
 }
 
-const styles=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   content:{padding:19,paddingBottom:40,flexGrow:1},
   eyebrow:{color:colors.brandDark,fontWeight:'900',fontSize:10,letterSpacing:1.4},
