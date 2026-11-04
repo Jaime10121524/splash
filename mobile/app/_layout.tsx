@@ -1,13 +1,15 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'react-native';
 import { AuthProvider } from '../src/AuthContext';
-import { colors } from '../src/theme';
+import {ThemeProvider,useTheme} from '../src/ThemeContext';
 
-export default function RootLayout() {
+function AppNavigation(){
+  const {resolved,palette}=useTheme();
   return (
-    <AuthProvider>
-      <StatusBar barStyle="dark-content" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background }, animation: 'slide_from_right' }}>
+    <>
+      <StatusBar barStyle={resolved==='dark'?'light-content':'dark-content'}
+        backgroundColor={palette.background}/>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background }, animation: 'slide_from_right' }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
@@ -20,6 +22,9 @@ export default function RootLayout() {
         <Stack.Screen name="notificacoes" />
         <Stack.Screen name="perfil" />
       </Stack>
-    </AuthProvider>
+    </>
   );
+}
+export default function RootLayout(){
+  return <ThemeProvider><AuthProvider><AppNavigation/></AuthProvider></ThemeProvider>;
 }
