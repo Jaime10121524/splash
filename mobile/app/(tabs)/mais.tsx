@@ -10,7 +10,7 @@ import {colors} from '../../src/theme';
 type Entry={title:string;subtitle:string;ios:string;android:string;route:string;count?:number};
 function MenuLink({entry}:{entry:Entry}){
   return <Pressable style={s.entry} onPress={()=>router.push(entry.route as never)} accessibilityRole="button">
-    <View style={s.entryIcon}><SymbolView name={{ios:entry.ios,android:entry.android}} size={23} tintColor={colors.brandDark}/></View>
+    <View style={s.entryIcon}><SymbolView name={{ios:entry.ios as any,android:entry.android as any}} size={23} tintColor={colors.brandDark}/></View>
     <View style={{flex:1}}><Text style={s.entryTitle}>{entry.title}</Text>
       <Text style={s.entrySub}>{entry.subtitle}</Text></View>
     {!!entry.count&&<View style={s.count}><Text style={s.countText}>{entry.count>99?'99+':entry.count}</Text></View>}
