@@ -74,7 +74,7 @@ export default function HomeScreen() {
         <View style={styles.headerActions}>
           <Pressable style={styles.bell} onPress={()=>router.push('/notificacoes')}
             accessibilityRole="button" accessibilityLabel={'Notificações: '+unread+' não lidas'}>
-            <SymbolView name={{ios:'bell.fill',android:'notifications'}} size={22} tintColor={colors.brandDark}/>
+            <Text style={styles.bellGlyph}>🔔</Text>
             {!!unread&&<View style={styles.bellCount}><Text style={styles.bellText}>{unread>99?'99+':unread}</Text></View>}
           </Pressable>
           <Pressable style={styles.avatar} onPress={() => router.push('/perfil')}
@@ -129,7 +129,8 @@ const lightStyles = StyleSheet.create({
   title: { color: colors.ink, fontSize: 27, fontWeight: '900', letterSpacing: -0.6, marginTop: 7 },
   date: { color: colors.muted, fontSize: 13, marginTop: 7 },
   headerActions:{flexDirection:'row',alignItems:'center',gap:8},
-  bell:{width:45,height:45,borderRadius:15,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},
+  bell:{width:45,height:45,borderRadius:15,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:colors.line},
+  bellGlyph:{fontSize:23,lineHeight:30,textAlign:'center'},
   bellCount:{position:'absolute',top:-4,right:-4,backgroundColor:'#E43D67',borderRadius:13,
     minWidth:19,height:19,paddingHorizontal:3,alignItems:'center',justifyContent:'center'},
   bellText:{color:'#FFFFFF',fontSize:9,fontWeight:'900'},
