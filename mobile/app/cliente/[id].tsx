@@ -1,3 +1,4 @@
+import FeedbackPopup from '../../src/components/FeedbackPopup';
 import {useThemedStyles} from '../../src/ThemeContext';
 import { useEffect, useState } from 'react';
 import {
@@ -253,6 +254,7 @@ export default function ClientEditor() {
           params:{id:'novo',visita:String(saleVisitId)}});
         else router.back();
       }}/>
+    <FeedbackPopup error={error} onDismiss={()=>setError('')}/>
   </SafeAreaView>;
 }
 const lightStyles = StyleSheet.create({
