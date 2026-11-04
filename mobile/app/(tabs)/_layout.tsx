@@ -59,10 +59,6 @@ export default function TabsLayout() {
         title: 'Mais',
         tabBarIcon: ({color}) => <SymbolView name={{ios:'square.grid.2x2.fill',android:'apps'}} size={23} tintColor={color}/>,
       }}/>
-      <Tabs.Screen name="clientes" options={{ href: null }} />
-      <Tabs.Screen name="vendas" options={{ href: null }} />
-      <Tabs.Screen name="notificacoes" options={{ href: null }} />
-      <Tabs.Screen name="perfil" options={{ href: null }} />
     </Tabs>
   );
 }
