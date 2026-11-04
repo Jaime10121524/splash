@@ -2,7 +2,7 @@ import ThemeSettings from '../src/components/ThemeSettings';
 import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
-import {router,useFocusEffect} from 'expo-router';
+import {useRouter,useFocusEffect} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {SymbolView} from 'expo-symbols';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,6 +12,7 @@ import {colors} from '../src/theme';
 
 type Profile={perfil:{username:string;email:string;foto_disponivel:boolean}};
 export default function ProfileScreen(){
+  const router=useRouter();
   const s=useThemedStyles(lightStyles);
   const {user,token,logout}=useAuth();
   const [email,setEmail]=useState(''),[username,setUsername]=useState('');
