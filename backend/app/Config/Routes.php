@@ -16,6 +16,13 @@ $routes->group('api', static function ($routes): void {
         $routes->post('login', 'Api\MobileController::login');
         $routes->group('', ['filter' => 'tokens:mobile'], static function ($routes): void {
             $routes->get('me', 'Api\MobileController::me');
+            $routes->get('me/perfil', 'Api\MobileContaController::show');
+            $routes->post('me/perfil', 'Api\MobileContaController::update');
+            $routes->get('me/foto', 'Api\MidiasSplashController::avatarMobile');
+            $routes->post('me/foto', 'Api\MidiasSplashController::uploadAvatarMobile');
+            $routes->get('notificacoes', 'Api\MobileNotificacoesController::index');
+            $routes->post('notificacoes/ler-todas', 'Api\MobileNotificacoesController::readAll');
+            $routes->post('notificacoes/(:num)/ler', 'Api\MobileNotificacoesController::read/$1');
             $routes->post('logout', 'Api\MobileController::logout');
             $routes->get('atendimentos', 'Api\MobileController::atendimentos');
             // Agendamentos e QR: acesso exclusivo com token Shield mobile.
@@ -41,9 +48,12 @@ $routes->group('api', static function ($routes): void {
             $routes->post('atendimentos/(:num)/retomar', 'Api\MobileVisitasController::resume/$1');
             // Vendas do aplicativo: regras financeiras compartilhadas com o web, acesso por token.
             $routes->get('vendas/opcoes', 'Api\MobileVendasController::opcoes');
+            $routes->get('vendas', 'Api\MobileVendasController::index');
             $routes->post('vendas/previa', 'Api\MobileVendasController::previa');
             $routes->post('vendas', 'Api\MobileVendasController::create');
             $routes->get('vendas/(:num)', 'Api\MobileVendasController::detalhe/$1');
+            $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaMobile/$1');
+            $routes->post('vendas/(:num)/foto', 'Api\MidiasSplashController::uploadVendaMobile/$1');
             $routes->post('vendas/(:num)/receber', 'Api\MobileVendasController::receber/$1');
             $routes->post('vendas/(:num)/ajustar-comissao', 'Api\MobileVendasController::ajustarComissao/$1');
             $routes->get('vendas/(:num)/rateios', 'Api\MobileRateiosController::rateiosVenda/$1');
@@ -63,6 +73,8 @@ $routes->group('api', static function ($routes): void {
     $routes->post('notificacoes/nativo/remover', 'Api\\NotificacoesController::removerNativo', ['filter'=>'csrf']);
     $routes->post('notificacoes/dispositivos/remover', 'Api\\NotificacoesController::removerDispositivo', ['filter'=>'csrf']);
     $routes->get('conta/perfil', 'Api\\ContaController::perfil');
+    $routes->get('conta/foto', 'Api\MidiasSplashController::avatarWeb');
+    $routes->post('conta/foto', 'Api\MidiasSplashController::uploadAvatarWeb', ['filter'=>'csrf']);
     $routes->post('conta/perfil', 'Api\\ContaController::atualizar', ['filter'=>'csrf']);
     $routes->post('conta/recuperar', 'Api\\ContaController::solicitarRecuperacao', ['filter'=>'csrf']);
     $routes->post('conta/redefinir', 'Api\\ContaController::redefinirSenha', ['filter'=>'csrf']);
@@ -124,6 +136,8 @@ $routes->group('api', static function ($routes): void {
     $routes->get('vendas/resumo', 'Api\VendasController::resumo');
     $routes->get('vendas', 'Api\VendasController::index');
     $routes->get('vendas/(:num)', 'Api\VendasController::detalhe/$1');
+    $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaWeb/$1');
+    $routes->post('vendas/(:num)/foto', 'Api\MidiasSplashController::uploadVendaWeb/$1', ['filter'=>'csrf']);
     $routes->post('vendas', 'Api\VendasController::create', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/converter', 'Api\VendasController::converter/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/editar', 'Api\VendasController::editar/$1', ['filter'=>'csrf']);
