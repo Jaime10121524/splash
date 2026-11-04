@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import { useEffect, useRef } from 'react';
 import {
   ActivityIndicator, Animated, Modal, Pressable, StyleSheet, Text, View,
@@ -21,6 +22,7 @@ export default function ActionModal({
   onSecondary?: () => void;
   busy?: boolean;
 }) {
+  const styles=useThemedStyles(lightStyles);
   const entrance = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (visible) {
@@ -84,7 +86,7 @@ export default function ActionModal({
   );
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 23 },
   backdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(23,16,50,0.62)' },
   sheet: { width: '100%', maxWidth: 390, backgroundColor: '#FFFFFF', borderRadius: 29, paddingTop: 25,
