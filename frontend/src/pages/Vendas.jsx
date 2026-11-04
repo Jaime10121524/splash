@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ClientFinder, SurfaceModal } from '../components/ComercialForms.jsx'
 import { FormControl } from '../components/UiFields.jsx'
-import { comercialGet, comercialPost, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
+import { comercialGet, comercialPost, comercialUpload, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
 import WhatsAppLink from '../components/WhatsAppLink.jsx'
 import RateiosVenda from './RateiosVenda.jsx'
+import {apiUrl} from '../lib/nativeApi.js'
 import './ComercialPages.css'
 import './Vendas.css'
 
@@ -51,6 +52,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [applying,setApplying]=useState({codigo:'',regra_comissao_id:''})
   const [adjustment,setAdjustment]=useState({valor:'',justificativa:''})
   const [showRateios,setShowRateios]=useState(false)
+  const [salePhotoRevision,setSalePhotoRevision]=useState(0)
+  const [salePhotoFailed,setSalePhotoFailed]=useState(false)
+  const [salePhotoBusy,setSalePhotoBusy]=useState(false)
+  const salePhotoRef=useRef(null)
 
   async function loadOptions() {
     const [opt,catalogs,visitsResponse]=await Promise.all([
@@ -157,6 +162,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   }
   async function openDetail(op,type='details'){
     setShowRateios(false)
+    setSalePhotoFailed(false)
     setBusy(true);setFormError('')
     try{
       const data=await comercialGet('/api/vendas/'+op.id)
@@ -165,6 +171,22 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       setDialog({type,op})
     }catch(e){setError(e.message)}
     finally{setBusy(false)}
+  }
+  async function uploadSalePhoto(event){
+    const photo=event.target.files?.[0]
+    if(!photo||!detail?.operacao?.id)return
+    setFormError('');setNotice('')
+    if(!['image/jpeg','image/png','image/webp'].includes(photo.type)||photo.size>5*1024*1024){
+      setFormError('Use uma foto JPG, PNG ou WebP de até 5 MB.')
+      event.target.value='';return
+    }
+    setSalePhotoBusy(true)
+    try{
+      await comercialUpload('/api/vendas/'+detail.operacao.id+'/foto',photo)
+      setSalePhotoRevision(v=>v+1);setSalePhotoFailed(false)
+      setNotice('Foto da venda atualizada com sucesso.')
+    }catch(error){setFormError(error.message)}
+    finally{setSalePhotoBusy(false);event.target.value=''}
   }
   async function refresh(){
     await loadList()
@@ -525,6 +547,24 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       </form>}
 
       {dialog.type==='details'&&detail&&<div className="cm-form">
+        <div className="vd-sale-photo">
+          <div className="vd-sale-photo-preview">
+            {!salePhotoFailed&&<img key={detail.operacao.id+'-'+salePhotoRevision}
+              src={apiUrl('/api/vendas/'+detail.operacao.id+'/foto')+'?rev='+salePhotoRevision}
+              alt={'Foto da venda '+detail.operacao.numero_titulo}
+              onError={()=>setSalePhotoFailed(true)}/>}
+            {salePhotoFailed&&<span role="img" aria-label="Foto não cadastrada">📷</span>}
+          </div>
+          <div className="vd-sale-photo-content">
+            <strong>Foto da venda</strong>
+            <p>Registre o momento da conquista. A imagem fica protegida no servidor, fora do banco de dados.</p>
+            <button type="button" className="vd-outline" onClick={()=>salePhotoRef.current?.click()}
+              disabled={salePhotoBusy}>{salePhotoBusy?'Enviando...':'Adicionar / trocar foto'}</button>
+            <small>JPG, PNG ou WebP, até 5 MB.</small>
+            <input ref={salePhotoRef} type="file" accept="image/jpeg,image/png,image/webp"
+              onChange={uploadSalePhoto} style={{display:'none'}} aria-label="Selecionar foto da venda"/>
+          </div>
+        </div>
         <div className="vd-overview"><div><span>Preço cobrado pelo título</span><strong>{currency(detail.operacao.valor_cobrado)}</strong></div>
           <div><span>Cliente já pagou</span><strong>{currency(detail.recebido)}</strong></div>
           <div><span>Falta o cliente pagar</span><strong>{currency(detail.saldo)}</strong></div></div>
