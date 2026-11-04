@@ -169,7 +169,6 @@ export default function VendaMobile(){
         try{
           const saved=await uploadMobilePhoto('mobile/vendas/'+res.operacao_id+'/foto',stagedPhoto,token!);
           setPhotoUri(saved.uri);setStagedPhoto(null);
-          void reloadPhoto();
         }catch(e){
           setStep('titulo');
           throw new Error('Título salvo! A foto não foi enviada: '+(e instanceof Error?e.message:'tente novamente')+
