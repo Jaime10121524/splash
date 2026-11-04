@@ -1,3 +1,4 @@
+import {useProtectedPhoto} from '../../src/useProtectedPhoto';
 import FeedbackPopup from '../../src/components/FeedbackPopup';
 import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
@@ -6,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { apiRequest, mobileMediaUrl, uploadMobilePhoto, VisitDetailsResponse } from '../../src/api';
+import { apiRequest, uploadMobilePhoto, VisitDetailsResponse } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet, { Choice } from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
@@ -83,7 +84,8 @@ export default function VendaMobile(){
   const [editingRateio,setEditingRateio]=useState(false),[editingGross,setEditingGross]=useState(false);
   const [grossValue,setGrossValue]=useState(''),[reason,setReason]=useState('');
   const [confirm,setConfirm]=useState(false);
-  const [photo,setPhoto]=useState(true),[photoKey,setPhotoKey]=useState(0);
+  const {uri:photoUri,error:photoError,reload:reloadPhoto,setUri:setPhotoUri}=
+    useProtectedPhoto(opId?'mobile/vendas/'+opId+'/foto':null,token);
   const [photoBusy,setPhotoBusy]=useState(false);
   const [stagedPhoto,setStagedPhoto]=useState<ImagePicker.ImagePickerAsset|null>(null);
   const plan=opts?.planos.find(x=>x.id===planId),method=opts?.formas.find(x=>x.id===methodId);
@@ -165,8 +167,9 @@ export default function VendaMobile(){
       if(stagedPhoto){
         setPhotoBusy(true);
         try{
-          await uploadMobilePhoto('mobile/vendas/'+res.operacao_id+'/foto',stagedPhoto,token!);
-          setPhoto(true);setPhotoKey(v=>v+1);setStagedPhoto(null);
+          const saved=await uploadMobilePhoto('mobile/vendas/'+res.operacao_id+'/foto',stagedPhoto,token!);
+          setPhotoUri(saved.uri);setStagedPhoto(null);
+          void reloadPhoto();
         }catch(e){
           setStep('titulo');
           throw new Error('Título salvo! A foto não foi enviada: '+(e instanceof Error?e.message:'tente novamente')+
@@ -197,9 +200,10 @@ export default function VendaMobile(){
     if(!token||photoBusy)return;
     setPhotoBusy(true);
     try{
-      await uploadMobilePhoto('mobile/vendas/'+id+'/foto',asset,token);
-      setPhoto(true);setPhotoKey(v=>v+1);setStagedPhoto(null);
-      setNotice('Foto da venda salva com sucesso.');
+      const saved=await uploadMobilePhoto('mobile/vendas/'+id+'/foto',asset,token);
+      setPhotoUri(saved.uri);setStagedPhoto(null);
+      void reloadPhoto();
+      setNotice('Foto salva e confirmada. Você já pode visualizá-la.');
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível enviar a foto.');}
     finally{setPhotoBusy(false);}
   }
@@ -319,10 +323,9 @@ export default function VendaMobile(){
             <View style={s.salePhoto}>
               {stagedPhoto?<Image source={{uri:stagedPhoto.uri}} style={s.salePhotoImage}
                 resizeMode="cover"/>:
-              opId&&photo&&token?<Image
-                source={{uri:mobileMediaUrl('mobile/vendas/'+opId+'/foto')+'?v='+photoKey,
-                  headers:{Authorization:'Bearer '+token}}}
-                onError={()=>setPhoto(false)} style={s.salePhotoImage} resizeMode="cover"/>:
+              opId&&photoUri?<Image source={{uri:photoUri}}
+                onError={()=>setError('A imagem foi baixada, mas o Android não conseguiu exibi-la.')}
+                style={s.salePhotoImage} resizeMode="cover"/>:
                 <View style={s.photoPlaceholder}><Text style={s.photoEmoji}>📸</Text>
                   <Text style={s.photoHint}>Registre esta conquista</Text></View>}
             </View>
@@ -337,6 +340,7 @@ export default function VendaMobile(){
             {stagedPhoto&&!opId&&<Pressable onPress={()=>setStagedPhoto(null)}>
               <Text style={s.remove}>Remover foto selecionada</Text></Pressable>}
             <Text style={s.helper}>JPG, PNG ou WebP · até 5 MB · armazenamento privado</Text>
+            {!!photoError&&<Text style={s.photoError}>{photoError}</Text>}
           </View>
           <Btn text={busy?'Salvando...':'Cadastrar título e continuar'} disabled={busy} onPress={()=>setConfirm(true)}/>
         </>}
@@ -350,10 +354,9 @@ export default function VendaMobile(){
             <View style={s.salePhoto}>
               {stagedPhoto?<Image source={{uri:stagedPhoto.uri}} style={s.salePhotoImage}
                 resizeMode="cover"/>:
-              opId&&photo&&token?<Image
-                source={{uri:mobileMediaUrl('mobile/vendas/'+opId+'/foto')+'?v='+photoKey,
-                  headers:{Authorization:'Bearer '+token}}}
-                onError={()=>setPhoto(false)} style={s.salePhotoImage} resizeMode="cover"/>:
+              opId&&photoUri?<Image source={{uri:photoUri}}
+                onError={()=>setError('A imagem foi baixada, mas o Android não conseguiu exibi-la.')}
+                style={s.salePhotoImage} resizeMode="cover"/>:
                 <View style={s.photoPlaceholder}><Text style={s.photoEmoji}>📸</Text>
                   <Text style={s.photoHint}>Registre esta conquista</Text></View>}
             </View>
@@ -368,8 +371,17 @@ export default function VendaMobile(){
             {stagedPhoto&&!opId&&<Pressable onPress={()=>setStagedPhoto(null)}>
               <Text style={s.remove}>Remover foto selecionada</Text></Pressable>}
             <Text style={s.helper}>JPG, PNG ou WebP · até 5 MB · armazenamento privado</Text>
+            {!!photoError&&<Text style={s.photoError}>{photoError}</Text>}
           </View>}
-          <View style={s.card}><Text style={s.kicker}>TÍTULO {detail.operacao.numero_titulo} {detail.operacao.sigla_plano}</Text>
+          <View style={s.card}>
+            {step!=='titulo'&&photoUri&&<View style={s.photoSummary}>
+              <Image source={{uri:photoUri}} style={s.photoSummaryImage} resizeMode="cover"/>
+              <View style={{flex:1}}><Text style={s.lineTitle}>Foto da venda</Text>
+                <Text style={s.helper}>Imagem salva no servidor</Text></View>
+              <Pressable onPress={()=>setStep('titulo')} accessibilityRole="button">
+                <Text style={s.photoOpen}>Ver foto ›</Text>
+              </Pressable></View>}
+            <Text style={s.kicker}>TÍTULO {detail.operacao.numero_titulo} {detail.operacao.sigla_plano}</Text>
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
             <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda}</Text>
             <View style={s.two}><View><Text style={s.label}>Recebido do cliente</Text>
@@ -476,6 +488,10 @@ export default function VendaMobile(){
 }
 const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
+  photoError:{fontSize:11,color:colors.danger,lineHeight:17},
+  photoSummary:{flexDirection:'row',alignItems:'center',gap:10,padding:9,backgroundColor:colors.pale,borderRadius:13},
+  photoSummaryImage:{width:62,height:62,borderRadius:10},
+  photoOpen:{fontSize:12,color:colors.brandDark,fontWeight:'900'},
   salePhoto:{height:195,borderRadius:17,backgroundColor:colors.pale,overflow:'hidden'},
   salePhotoImage:{height:'100%',width:'100%'},
   photoPlaceholder:{flex:1,alignItems:'center',justifyContent:'center',gap:8},
