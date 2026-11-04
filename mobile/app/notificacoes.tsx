@@ -2,7 +2,7 @@ import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Pressable,RefreshControl,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {router,useFocusEffect} from 'expo-router';
+import {useRouter,useFocusEffect} from 'expo-router';
 import {SymbolView} from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import {apiRequest} from '../src/api';
@@ -17,6 +17,7 @@ function dateBR(value:string){const m=value.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\
   return m?m[3]+'/'+m[2]+' às '+m[4]:value;}
 function formatMoney(v:string){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v));}
 export default function Notifications(){
+  const router=useRouter();
   const s=useThemedStyles(lightStyles);
   const {token}=useAuth();
   const [data,setData]=useState<Data>({avisos:[],nao_lidas:0});
