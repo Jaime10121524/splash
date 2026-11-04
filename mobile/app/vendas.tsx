@@ -1,4 +1,4 @@
-import {useThemedStyles} from '../src/ThemeContext';
+import {useThemedStyles,useTheme} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import ChoiceSheet, {type Choice} from '../src/components/ChoiceSheet';
 import DateRangeCalendar from '../src/components/DateRangeCalendar';
@@ -21,6 +21,7 @@ const money=(v:string)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency
 export default function Vendas(){
   const router=useRouter();
   const s=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const {token}=useAuth();
   const [sales,setSales]=useState<Sale[]>([]),[query,setQuery]=useState('');
   const [plans,setPlans]=useState<Plan[]>([]),[limited,setLimited]=useState(false);
@@ -63,8 +64,9 @@ export default function Vendas(){
     <ScrollView contentContainerStyle={s.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}
         tintColor={colors.brand}/>}>
-      <View style={s.heading}><Pressable style={s.back} onPress={()=>router.back()} accessibilityLabel="Voltar">
-        <SymbolView name={{ios:'arrow.left',android:'arrow_back'}} size={21} tintColor={colors.ink}/>
+      <View style={s.heading}><Pressable style={s.back} onPress={()=>router.back()}
+        accessibilityRole="button" accessibilityLabel="Voltar">
+        <SymbolView name={{ios:'chevron.left',android:'chevron_left'}} size={24} tintColor={palette.ink}/>
       </Pressable><View><Text style={s.kicker}>COMERCIAL / SPLASH</Text><Text style={s.title}>Vendas</Text></View></View>
       <View style={s.hero}><Text style={s.heroTitle}>Cada conquista conta.</Text>
         <Text style={s.heroSubtitle}>Consulte títulos, recebimentos e comissões.</Text>
