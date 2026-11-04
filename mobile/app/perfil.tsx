@@ -1,3 +1,4 @@
+import {useProtectedPhoto} from '../src/useProtectedPhoto';
 import FeedbackPopup from '../src/components/FeedbackPopup';
 import ThemeSettings from '../src/components/ThemeSettings';
 import {useThemedStyles} from '../src/ThemeContext';
@@ -8,7 +9,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {SymbolView} from 'expo-symbols';
 import * as ImagePicker from 'expo-image-picker';
 import {useAuth} from '../src/AuthContext';
-import {apiRequest,mobileMediaUrl,roleName,uploadMobilePhoto} from '../src/api';
+import {apiRequest,roleName,uploadMobilePhoto} from '../src/api';
 import {colors} from '../src/theme';
 
 type Profile={perfil:{username:string;email:string;foto_disponivel:boolean}};
@@ -18,7 +19,7 @@ export default function ProfileScreen(){
   const {user,token,logout}=useAuth();
   const [email,setEmail]=useState(''),[username,setUsername]=useState('');
   const [current,setCurrent]=useState(''),[next,setNext]=useState(''),[confirm,setConfirm]=useState('');
-  const [photo,setPhoto]=useState(false),[photoKey,setPhotoKey]=useState(0);
+  const {uri:photoUri,error:photoError,reload:reloadPhoto,setUri:setPhotoUri}=useProtectedPhoto('mobile/me/foto',token);
   const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
   const [error,setError]=useState(''),[notice,setNotice]=useState('');
   const load=useCallback(async()=>{
@@ -30,7 +31,7 @@ export default function ProfileScreen(){
     }catch(e){setError(e instanceof Error?e.message:'Erro ao carregar perfil.');}
     finally{setLoading(false);}
   },[token]);
-  useFocusEffect(useCallback(()=>{void load();},[load]));
+  useFocusEffect(useCallback(()=>{void load();void reloadPhoto();},[load,reloadPhoto]));
 
   async function choosePhoto(){
     if(!token||busy)return;
@@ -43,8 +44,9 @@ export default function ProfileScreen(){
     if(picked.canceled||!picked.assets.length)return;
     setBusy(true);
     try{
-      await uploadMobilePhoto('mobile/me/foto',picked.assets[0],token);
-      setPhoto(true);setPhotoKey(v=>v+1);setNotice('Sua foto foi atualizada!');
+      const result=await uploadMobilePhoto('mobile/me/foto',picked.assets[0],token);
+      setPhotoUri(result.uri);
+      setNotice('Foto enviada e conferida! Ela já aparece no perfil.');
     }catch(e){setError(e instanceof Error?e.message:'Erro ao enviar foto.');}
     finally{setBusy(false);}
   }
@@ -68,7 +70,6 @@ export default function ProfileScreen(){
     catch(e){setError(e instanceof Error?e.message:'Falha ao sair.');}
     finally{setBusy(false);}
   }
-  const photoUri=token?mobileMediaUrl('mobile/me/foto')+'?v='+photoKey:'';
   return <SafeAreaView style={s.root} edges={['top']}>
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.heading}>
@@ -79,8 +80,8 @@ export default function ProfileScreen(){
       {loading?<ActivityIndicator color={colors.brand} style={{marginVertical:45}}/>:null}
       <View style={s.card}>
         <View style={s.avatar}>
-          {photo&&token?<Image source={{uri:photoUri,headers:{Authorization:'Bearer '+token}}}
-            style={s.photo} onError={()=>setPhoto(false)}/>:
+          {photoUri?<Image source={{uri:photoUri}} style={s.photo}
+            onError={()=>setError('O arquivo da foto foi baixado, mas o Android não conseguiu exibi-lo.')}/>:
             <Text style={s.avatarLetter}>{username.slice(0,1).toUpperCase()||'?'}</Text>}
         </View>
         <Text style={s.username}>{username||user?.username}</Text>
@@ -90,6 +91,7 @@ export default function ProfileScreen(){
           <Text style={s.photoButtonText}>Alterar foto de perfil</Text>
         </Pressable>
         <Text style={s.caption}>JPG, PNG ou WebP · até 2 MB</Text>
+        {!!photoError&&<Text style={[s.caption,{color:colors.danger}]}>{photoError}</Text>}
       </View>
       <View style={s.card}>
         <Text style={s.section}>Dados de acesso</Text>
