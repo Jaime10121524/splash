@@ -27,7 +27,7 @@ export default function ProfileScreen(){
     try{
       const result=await apiRequest<Profile>('mobile/me/perfil',{token});
       setUsername(result.perfil.username);setEmail(result.perfil.email);
-      setPhoto(result.perfil.foto_disponivel);setError('');
+      setError('');
     }catch(e){setError(e instanceof Error?e.message:'Erro ao carregar perfil.');}
     finally{setLoading(false);}
   },[token]);
