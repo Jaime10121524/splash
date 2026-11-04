@@ -1,3 +1,4 @@
+import {File,UploadType} from 'expo-file-system';
 export type MobileUser = {
   id: number;
   username: string;
@@ -183,16 +184,24 @@ export async function uploadMobilePhoto(path:string,asset:{
   const limit=path==='mobile/me/foto'?2*1024*1024:5*1024*1024;
   if(asset.fileSize && asset.fileSize>limit)
     throw new Error('Foto muito grande. Limite: '+(limit/1048576)+' MB.');
-  const ext=type==='image/png'?'png':type==='image/webp'?'webp':'jpg';
-  const form=new FormData();
-  form.append('foto',{uri:asset.uri,name:'splash-photo.'+ext,type} as unknown as Blob);
+  // SDK 58 / React Native 0.88: objetos {uri,name,type} não são mais
+  // FormDataParts válidos para o fetch padrão do RN. O Expo envia multipart
+  // diretamente por sua API nativa de arquivos, preservando nome "foto".
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),30000);
   try{
-    const response=await fetch(url,{method:'POST',headers:{Accept:'application/json',
-      Authorization:'Bearer '+token},body:form,signal:controller.signal});
-    const output: {message?:string}=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(output.message||'Falha ao enviar foto (HTTP '+response.status+').');
+    const file=new File(asset.uri);
+    if(!file.exists)throw new Error('A foto selecionada não está mais disponível. Selecione novamente.');
+    const result=await file.upload(url,{
+      uploadType:UploadType.MULTIPART,fieldName:'foto',
+      httpMethod:'POST',mimeType:type,
+      headers:{Accept:'application/json',Authorization:'Bearer '+token},
+      signal:controller.signal,
+    });
+    let output:{message?:string}={};
+    try{output=JSON.parse(result.body||'{}');}catch{}
+    if(result.status<200||result.status>=300)
+      throw new Error(output.message||'Falha ao enviar foto (HTTP '+result.status+').');
     return {message:output.message||'Foto enviada.'};
   }catch(e){
     if(controller.signal.aborted)throw new Error('O upload demorou demais. Confira a conexão.');
