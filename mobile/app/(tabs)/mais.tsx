@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -9,6 +10,7 @@ import {colors} from '../../src/theme';
 
 type Entry={title:string;subtitle:string;ios:string;android:string;route:string;count?:number};
 function MenuLink({entry}:{entry:Entry}){
+  const s=useThemedStyles(lightStyles);
   return <Pressable style={s.entry} onPress={()=>router.push(entry.route as never)} accessibilityRole="button">
     <View style={s.entryIcon}><SymbolView name={{ios:entry.ios as any,android:entry.android as any}} size={23} tintColor={colors.brandDark}/></View>
     <View style={{flex:1}}><Text style={s.entryTitle}>{entry.title}</Text>
@@ -18,6 +20,7 @@ function MenuLink({entry}:{entry:Entry}){
   </Pressable>;
 }
 export default function Mais(){
+  const s=useThemedStyles(lightStyles);
   const {user,token,logout}=useAuth();
   const [unread,setUnread]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [hasPhoto,setHasPhoto]=useState(true),[photoKey,setPhotoKey]=useState(0);
@@ -65,7 +68,7 @@ export default function Mais(){
     </ScrollView>
   </SafeAreaView>;
 }
-const s=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   content:{padding:20,paddingBottom:60,gap:10},
   kicker:{fontSize:10,letterSpacing:1.25,color:colors.brandDark,fontWeight:'900'},
