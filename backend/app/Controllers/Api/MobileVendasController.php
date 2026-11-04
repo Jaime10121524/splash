@@ -78,6 +78,7 @@ final class MobileVendasController extends VendasController
         $query=$db->table('venda_operacoes o')
             ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,c.nome AS cliente_nome')
             ->join('clientes c','c.id=o.cliente_id')
+            ->join('plano_versoes pv','pv.id=o.plano_versao_id')
             ->join('visitas v','v.id=o.visita_id','left')
             ->where('o.situacao','VENDA');
         if($a['scope']!==null){
@@ -86,16 +87,25 @@ final class MobileVendasController extends VendasController
                 ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd()
                 ->where('o.visita_id IS NOT NULL',null,false);
         }
-        if($planParam!=='')$query->where('o.plano_versao_id',(int)$planParam);
+        if($planParam!=='')$query->where('pv.plano_id',(int)$planParam);
         if($start!=='')$query->where('o.data_venda >=',$start);
         if($end!=='')$query->where('o.data_venda <=',$end);
         $rows=$query->orderBy('o.data_venda','DESC')->orderBy('o.id','DESC')
             ->limit(151)->get()->getResultArray();
         $truncated=count($rows)>150;
         if($truncated)$rows=array_slice($rows,0,150);
-        $plans=$db->table('plano_versoes')
-            ->select('id,codigo,duracao_meses')->orderBy('duracao_meses','ASC')
-            ->get()->getResultArray();
+        $versions=$db->table('plano_versoes')->select('plano_id,codigo,duracao_meses')
+            ->orderBy('id','DESC')->get()->getResultArray();
+        $planMap=[];
+        foreach($versions as $version){
+            $id=(int)$version['plano_id'];
+            if(!isset($planMap[$id]))$planMap[$id]=[
+                'id'=>$id,'codigo'=>$version['codigo'],
+                'duracao_meses'=>(int)$version['duracao_meses'],
+            ];
+        }
+        $plans=array_values($planMap);
+        usort($plans,static fn($a,$b)=>$a['duracao_meses']<=>$b['duracao_meses']);
         return $this->response->setJSON([
             'vendas'=>$rows,'planos'=>$plans,'limitado'=>$truncated,
         ])->setHeader('Cache-Control','no-store');
