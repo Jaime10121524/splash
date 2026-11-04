@@ -95,6 +95,16 @@ final class AvisosSplash
                     'criado_em'=>$stamp,
                 ]);
             }
+            // O administrador que centraliza os fechamentos também recebe
+            // aviso de nova venda, mesmo quando não é participante do título.
+            if(!$apurada){
+                foreach($db->table('auth_groups_users')->select('user_id')
+                    ->where('group','admin')->get()->getResultArray() as $admin){
+                    self::alertaUsuario((int)$admin['user_id'],'VENDA_REGISTRADA:'.$operationId,
+                        'VENDA_REGISTRADA','🎉 Nova venda · '.$titulo,
+                        'Uma nova venda foi cadastrada no Splash. Confira o título e os pagamentos.','vendas');
+                }
+            }
         }catch(Throwable $e){
             log_message('error','Aviso SPLASH venda: {message}',['message'=>$e->getMessage()]);
         }
