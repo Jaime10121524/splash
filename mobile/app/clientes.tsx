@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView,
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { useAuth } from '../src/AuthContext';
@@ -19,6 +19,7 @@ type ClientRow = {
 };
 
 export default function ClientesScreen() {
+  const router=useRouter();
   const styles=useThemedStyles(lightStyles);
   const { token } = useAuth();
   const [query, setQuery] = useState('');
