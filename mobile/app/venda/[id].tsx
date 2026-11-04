@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { apiRequest, VisitDetailsResponse } from '../../src/api';
+import * as ImagePicker from 'expo-image-picker';
+import { apiRequest, mobileMediaUrl, uploadMobilePhoto, VisitDetailsResponse } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet, { Choice } from '../../src/components/ChoiceSheet';
 import ActionModal from '../../src/components/ActionModal';
@@ -16,7 +17,6 @@ type Options={planos:Plan[];formas:Method[];gerentes:{id:number;nome:string}[];p
 type Detail={operacao:{id:number;visita_id:number;numero_titulo:string;sigla_plano:string;valor_cobrado:string;data_venda:string;comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
 type Allocation={responsavel_pessoa_id:number;beneficiario_pessoa_id:number;papel:string;valor:string;observacoes:string};
 type Rateios={corretor_pessoa_id:number;comissao_bruta:string|null;editavel:boolean;quitada:boolean;aviso:string;rateios:(Allocation & {id:number;beneficiario_nome:string})[]};
-type Preview={valor_cobrado:string;pagamentos:string;saldo:string;comissao_bruta:string|null;comissao_propria:string|null;regra:string|null;aviso:string;participantes:{nome:string;papel:string;valor:string}[]};
 
 const money=(v:string|number|null|undefined)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
 function cents(input:string):number|null {
@@ -65,7 +65,6 @@ export default function VendaMobile(){
   const [detail,setDetail]=useState<Detail|null>(null);
   const [rateios,setRateios]=useState<Rateios|null>(null);
   const [rateioRows,setRateioRows]=useState<Allocation[]>([]);
-  const [preview,setPreview]=useState<Preview|null>(null);
   const [step,setStep]=useState<'titulo'|'pagamento'|'comissao'>(isNew?'titulo':'pagamento');
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
   const [error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -74,11 +73,12 @@ export default function VendaMobile(){
   const [titleNumber,setTitleNumber]=useState(''),[discount,setDiscount]=useState('0,00');
   const [date,setDate]=useState(nowBR),[startDate,setStartDate]=useState(nowBR);
   const [methodId,setMethodId]=useState<number|null>(null),[amount,setAmount]=useState('');
-  const [planned,setPlanned]=useState<{forma_id:number;valor:string}[]>([]);
   const [holder,setHolder]=useState<'CORRETOR'|'EMPRESA'>('CORRETOR');
   const [editingRateio,setEditingRateio]=useState(false),[editingGross,setEditingGross]=useState(false);
   const [grossValue,setGrossValue]=useState(''),[reason,setReason]=useState('');
   const [confirm,setConfirm]=useState(false);
+  const [photo,setPhoto]=useState(true),[photoKey,setPhotoKey]=useState(0);
+  const [photoBusy,setPhotoBusy]=useState(false);
   const plan=opts?.planos.find(x=>x.id===planId),method=opts?.formas.find(x=>x.id===methodId);
   const price=plan?cents(plan.valor):null,discountValue=cents(discount);
   const total=price!==null&&discountValue!==null?price-discountValue:null;
@@ -135,31 +135,6 @@ export default function VendaMobile(){
       detentor:method?.codigo==='PIX'?'CORRETOR':method?.credito?'EMPRESA':holder};
   }
 
-  function addPlanned(){
-    const n=cents(amount);
-    const sum=planned.reduce((v,p)=>v+(cents(p.valor)||0),0);
-    if(!methodId||!n||!total||sum+n>total){
-      setError('Selecione forma, valor positivo e não ultrapasse o valor do título.');return;
-    }
-    setPlanned(old=>[...old,{forma_id:methodId,valor:decimal(n)}]);
-    setAmount('');setPreview(null);setError('');
-  }
-
-  async function simulate(){
-    if(!visit||!planId||total===null||total<=0||!iso(date)){setError('Informe plano, valor e data válidos.');return;}
-    const entered=cents(amount);
-    if(amount.trim()&&(!methodId||!entered)){setError('Confira a forma e o valor digitados.');return;}
-    const payments=[...planned,...(methodId&&entered?[{forma_id:methodId,valor:decimal(entered)}]:[])];
-    const sum=payments.reduce((n,p)=>n+(cents(p.valor)||0),0);
-    if(sum>total){setError('Os valores informados ultrapassam o título.');return;}
-    await action(async()=>{
-      const result=await apiRequest<Preview>('mobile/vendas/previa',{method:'POST',token,
-        body:{visita_id:visit.id,plano_versao_id:planId,desconto_corretor:decimal(discountValue||0),
-          data_venda:iso(date),gerente_pessoa_id:managerId,pagamentos:payments}});
-      setPreview(result);setNotice('Simulação atualizada. Nenhum pagamento foi registrado.');
-    });
-  }
-
   async function saveTitle(){
     if(!visit||!planId||total===null||total<=0||!iso(date)||!iso(startDate)){
       setError('Confira plano, datas e valores.');setConfirm(false);return;
@@ -176,9 +151,7 @@ export default function VendaMobile(){
         atendente_pessoa_id:visit.atendente_pessoa_id,atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id,
       }});
       setOpId(res.operacao_id);await refresh(res.operacao_id,!!opts?.pode_corrigir_comissao);
-      if(planned.length){setMethodId(planned[0].forma_id);setAmount(planned[0].valor);}
-      else setAmount(decimal(total));
-      setStep('pagamento');
+      setAmount(decimal(total));setStep('pagamento');
       setNotice('Título registrado. Agora informe como o cliente pagou.');
     });
   }
@@ -190,16 +163,33 @@ export default function VendaMobile(){
     await action(async()=>{
       await apiRequest('mobile/vendas/'+opId+'/receber',{method:'POST',token,body:makePayment(paid)});
       await refresh(opId,!!opts?.pode_corrigir_comissao);
-      if(planned.length&&planned[0].forma_id===methodId&&cents(planned[0].valor)===paid){
-        setPlanned(old=>old.slice(1));
-        if(planned.length>1){setMethodId(planned[1].forma_id);setAmount(planned[1].valor);}
-        else setAmount('');
-      }else setAmount('');
+      setAmount('');
       setStep(balance-paid===0?'comissao':'pagamento');
       setNotice(balance-paid===0
         ?'Título quitado! Comissão e participações apuradas pelo servidor.'
         :'Pagamento registrado. Lance a próxima forma para concluir a quitação.');
     });
+  }
+
+  async function selectPhoto(camera:boolean){
+    if(!opId||!token||photoBusy)return;
+    setError('');setNotice('');
+    const permission=camera
+      ?await ImagePicker.requestCameraPermissionsAsync()
+      :await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if(!permission.granted){setError('Permita o acesso à câmera ou galeria nas configurações do Android.');return;}
+    const params={mediaTypes:['images'] as ['images'],quality:.65,allowsEditing:false};
+    const result=camera
+      ?await ImagePicker.launchCameraAsync(params)
+      :await ImagePicker.launchImageLibraryAsync(params);
+    if(result.canceled||!result.assets.length)return;
+    setPhotoBusy(true);
+    try{
+      await uploadMobilePhoto('mobile/vendas/'+opId+'/foto',result.assets[0],token);
+      setPhoto(true);setPhotoKey(n=>n+1);
+      setNotice('Foto da venda salva com sucesso.');
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível enviar a foto.');}
+    finally{setPhotoBusy(false);}
   }
 
   async function adjustGross(){
@@ -289,31 +279,29 @@ export default function VendaMobile(){
               onPress={()=>setChoice({field:'manager'})}/>
             <Text style={s.helper}>Corretor e atendentes são herdados do atendimento. O desconto respeita as regras de comissão do sistema web.</Text>
           </View>
-          <View style={s.card}><Text style={s.section}>Simular pagamento e comissão</Text>
-            <Select label="Forma de pagamento prevista" value={method?.nome||'Selecionar forma'}
-              onPress={()=>setChoice({field:'method'})}/>
-            <Input label="Valor previsto (R$)" value={amount} onChange={setAmount} numeric
-              placeholder={total===null?'0,00':money(decimal(total))}/>
-            <Btn text="+ Adicionar forma ao planejamento" muted onPress={addPlanned}/>
-            {planned.map((p,i)=><View style={s.row} key={i}>
-              <Text style={s.helper}>{opts?.formas.find(f=>f.id===p.forma_id)?.nome||'Forma'} · {money(p.valor)}</Text>
-              <Pressable onPress={()=>{setPlanned(old=>old.filter((_,j)=>i!==j));setPreview(null);}}>
-                <Text style={s.remove}>Remover</Text>
-              </Pressable>
-            </View>)}
-            <Text style={s.helper}>Você pode combinar PIX, dinheiro e cartão. Os valores serão apresentados novamente para confirmar cada recebimento.</Text>
-            <Btn text={busy?'Calculando...':'Calcular prévia de comissões'} muted disabled={busy} onPress={()=>{void simulate();}}/>
-            {preview&&<View style={s.panel}><Text style={s.section}>Prévia · Não registrada</Text>
-              <Text style={s.helper}>Pago: {money(preview.pagamentos)} | Saldo: {money(preview.saldo)}</Text>
-              {opts?.pode_corrigir_comissao?<Text style={s.lineTitle}>Comissão bruta: {preview.comissao_bruta===null?'A apurar':money(preview.comissao_bruta)}</Text>:null}
-              {preview.comissao_propria!==null?<Text style={s.lineTitle}>Parte do corretor: {money(preview.comissao_propria)}</Text>:null}
-              {preview.participantes.map((r,i)=><Text key={i} style={s.helper}>{roles[r.papel]||r.papel}: {r.nome} · {money(r.valor)}</Text>)}
-              <Text style={s.helper}>{preview.aviso}</Text></View>}
-          </View>
           <Btn text={busy?'Salvando...':'Cadastrar título e continuar'} disabled={busy} onPress={()=>setConfirm(true)}/>
         </>}
 
         {!loading&&opId&&detail&&<>
+          <View style={s.card}>
+            <Text style={s.section}>Foto da venda</Text>
+            <View style={s.salePhoto}>
+              {photo&&token?<Image
+                source={{uri:mobileMediaUrl('mobile/vendas/'+opId+'/foto')+'?v='+photoKey,
+                  headers:{Authorization:'Bearer '+token}}}
+                onError={()=>setPhoto(false)}
+                style={s.salePhotoImage} resizeMode="cover"/>:
+                <View style={s.photoPlaceholder}><Text style={s.photoEmoji}>📸</Text>
+                  <Text style={s.photoHint}>Guarde o momento desta conquista</Text></View>}
+            </View>
+            <View style={s.photoButtons}>
+              <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(true);}} disabled={photoBusy}>
+                <Text style={s.photoButtonText}>📷 Tirar foto</Text></Pressable>
+              <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(false);}} disabled={photoBusy}>
+                <Text style={s.photoButtonText}>Galeria</Text></Pressable>
+            </View>
+            <Text style={s.helper}>JPG, PNG ou WebP · até 5 MB. Arquivo protegido no servidor.</Text>
+          </View>
           <View style={s.card}><Text style={s.kicker}>TÍTULO {detail.operacao.numero_titulo} {detail.operacao.sigla_plano}</Text>
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
             <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda}</Text>
@@ -419,6 +407,13 @@ export default function VendaMobile(){
 }
 const s=StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
+  salePhoto:{height:195,borderRadius:17,backgroundColor:colors.pale,overflow:'hidden'},
+  salePhotoImage:{height:'100%',width:'100%'},
+  photoPlaceholder:{flex:1,alignItems:'center',justifyContent:'center',gap:8},
+  photoEmoji:{fontSize:38},photoHint:{fontSize:12,fontWeight:'800',color:colors.brandDark},
+  photoButtons:{flexDirection:'row',gap:10},
+  photoButton:{flex:1,backgroundColor:colors.pale,borderRadius:12,padding:13,alignItems:'center'},
+  photoButtonText:{color:colors.brandDark,fontSize:12,fontWeight:'900'},
   content:{paddingHorizontal:18,paddingTop:12,paddingBottom:50,gap:14},
   header:{flexDirection:'row',alignItems:'center',gap:12},
   back:{width:42,height:42,backgroundColor:'#FFFFFF',borderRadius:14,borderWidth:1,
