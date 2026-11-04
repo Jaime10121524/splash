@@ -1,3 +1,4 @@
+import DateRangeCalendar from '../../src/components/DateRangeCalendar';
 import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -26,7 +27,9 @@ const filters = [
 export default function AtendimentosScreen() {
   const styles=useThemedStyles(lightStyles);
   const { token } = useAuth();
-  const [periodo, setPeriodo] = useState<'hoje' | 'todos'>('hoje');
+  const [periodo, setPeriodo] = useState<'hoje' | 'todos' | 'intervalo'>('hoje');
+  const [dateRange,setDateRange]=useState({start:'',end:''});
+  const [calendarOpen,setCalendarOpen]=useState(false);
   const [status, setStatus] = useState('');
   const [query, setQuery] = useState('');
   const [visitas, setVisitas] = useState<Visit[]>([]);
@@ -38,14 +41,16 @@ export default function AtendimentosScreen() {
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const data = await apiRequest<VisitData>('mobile/atendimentos?periodo=' + periodo, { token });
+      const range=periodo==='intervalo' && dateRange.start && dateRange.end
+        ? '&inicio='+dateRange.start+'&fim='+dateRange.end:'';
+      const data = await apiRequest<VisitData>('mobile/atendimentos?periodo=' + periodo + range, { token });
       setVisitas(data.visitas);
       setError(''); setForbidden(false);
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) setForbidden(true);
       else setError(e instanceof Error ? e.message : 'Erro ao carregar atendimentos.');
     } finally { setLoading(false); setRefreshing(false); }
-  }, [token, periodo]);
+  }, [token, periodo, dateRange]);
 
   useFocusEffect(useCallback(() => { setLoading(true); void load(); }, [load]));
   const results = useMemo(() => visitas.filter(v =>
@@ -85,11 +90,23 @@ export default function AtendimentosScreen() {
           {query ? <Pressable onPress={() => setQuery('')} accessibilityLabel="Limpar busca"><SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel' }} size={18} tintColor={colors.muted} /></Pressable> : null}
         </View>
         <View style={styles.periods}>
-          {(['hoje', 'todos'] as const).map(value => <Pressable key={value} onPress={() => setPeriodo(value)}
-            style={[styles.period, periodo === value && styles.periodActive]}>
-            <Text style={[styles.periodText, periodo === value && styles.periodTextActive]}>{value === 'hoje' ? 'Hoje' : 'Todas as visitas'}</Text>
-          </Pressable>)}
+          {(['hoje','todos'] as const).map(value=><Pressable key={value} onPress={()=>setPeriodo(value)}
+            style={[styles.period,periodo===value&&styles.periodActive]}>
+            <Text style={[styles.periodText,periodo===value&&styles.periodTextActive]}>
+              {value==='hoje'?'Hoje':'Todas'}</Text></Pressable>)}
+          <Pressable style={[styles.period,periodo==='intervalo'&&styles.periodActive]}
+            onPress={()=>setCalendarOpen(true)} accessibilityRole="button">
+            <Text style={[styles.periodText,periodo==='intervalo'&&styles.periodTextActive]}>📅 Período</Text>
+          </Pressable>
         </View>
+        {periodo==='intervalo'&&<Pressable onPress={()=>setCalendarOpen(true)} style={styles.rangeInfo}>
+          <Text style={styles.rangeInfoText}>
+            {dateRange.start.slice(8,10)+'/'+dateRange.start.slice(5,7)+'/'+dateRange.start.slice(0,4)}
+            {'  até  '}
+            {dateRange.end.slice(8,10)+'/'+dateRange.end.slice(5,7)+'/'+dateRange.end.slice(0,4)}
+          </Text>
+          <Text style={styles.rangeInfoIcon}>✎</Text>
+        </Pressable>}
         <FlatList
           horizontal data={filters} keyExtractor={item => item.value}
           showsHorizontalScrollIndicator={false}
@@ -114,6 +131,9 @@ export default function AtendimentosScreen() {
         </View>}
       keyboardShouldPersistTaps="handled"
     />
+    <DateRangeCalendar open={calendarOpen} start={dateRange.start} end={dateRange.end}
+      onClose={()=>setCalendarOpen(false)}
+      onConfirm={(start,end)=>{setDateRange({start,end});setPeriodo('intervalo');setCalendarOpen(false);}}/>
   </SafeAreaView>;
 }
 
@@ -127,6 +147,10 @@ const lightStyles = StyleSheet.create({
   newVisitText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', flex: 1 },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, borderColor: colors.line, backgroundColor: '#FFFFFF', borderWidth: 1, marginTop: 24, paddingHorizontal: 15, height: 53 },
   search: { flex: 1, color: colors.ink, fontSize: 13, height: '100%' },
+  rangeInfo:{marginBottom:12,padding:12,borderRadius:13,backgroundColor:'#FFFFFF',
+    flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderWidth:1,borderColor:colors.line},
+  rangeInfoText:{fontSize:12,fontWeight:'900',color:colors.brandDark},
+  rangeInfoIcon:{color:colors.brandDark,fontSize:16},
   periods: { backgroundColor: '#E9EDF4', padding: 4, flexDirection: 'row', borderRadius: 14, marginTop: 15, marginBottom: 14 },
   period: { flex: 1, borderRadius: 11, height: 37, alignItems: 'center', justifyContent: 'center' },
   periodActive: { backgroundColor: '#FFFFFF' },
