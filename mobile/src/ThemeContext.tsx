@@ -82,6 +82,7 @@ function transform(value:string,prop:string):string{
     return value;
   }
   if(prop==='borderColor'||prop==='borderTopColor'||prop==='borderBottomColor'||prop==='borderLeftColor'||prop==='borderRightColor'){
+    if(!/^#[0-9A-F]{6}$/.test(normalized))return value;
     if(normalized==='#FFFFFF')return dark.line;
     if(normalized==='#F3CFD7'||normalized==='#F7D8DE'||normalized==='#F3D8DD')return '#75465A';
     return dark.line;
