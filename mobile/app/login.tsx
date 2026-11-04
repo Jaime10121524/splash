@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../src/ThemeContext';
 import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -31,6 +32,7 @@ const subdued = '#79829A';
 type ErrorKind = 'credentials' | 'connection' | 'server';
 
 function Mark({ size = 39 }: { size?: number }) {
+  const styles=useThemedStyles(lightStyles);
   return (
     <View style={[styles.mark, { width: size, height: size, borderRadius: Math.round(size * 0.32) }]}>
       <View style={styles.markLines}>
@@ -44,6 +46,7 @@ function Mark({ size = 39 }: { size?: number }) {
 }
 
 function InputSymbol({ kind, color }: { kind: 'user' | 'lock'; color: string }) {
+  const styles=useThemedStyles(lightStyles);
   return (
     <SymbolView
       name={kind === 'user'
@@ -56,6 +59,7 @@ function InputSymbol({ kind, color }: { kind: 'user' | 'lock'; color: string }) 
 }
 
 export default function LoginScreen() {
+  const styles=useThemedStyles(lightStyles);
   const { user, ready, login } = useAuth();
   const { height } = useWindowDimensions();
   const smallerDisplay = height < 740;
@@ -341,7 +345,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: navy },
   flex: { flex: 1 },
   scroll: { flex: 1, backgroundColor: background },
