@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../ThemeContext';
 import { type ComponentRef, useRef, useState } from 'react';
 import {
   ActivityIndicator, Dimensions, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View,
@@ -67,6 +68,7 @@ export default function BookingInvite({ booking, onClose }: {
   booking: Booking | null;
   onClose: () => void;
 }) {
+  const styles=useThemedStyles(lightStyles);
   const card = useRef<ComponentRef<typeof View>>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState('');
@@ -282,7 +284,7 @@ export default function BookingInvite({ booking, onClose }: {
   </Modal>;
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 12 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   close: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
