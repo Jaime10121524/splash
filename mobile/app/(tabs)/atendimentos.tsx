@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator, FlatList, Pressable, RefreshControl,
@@ -23,6 +24,7 @@ const filters = [
 ];
 
 export default function AtendimentosScreen() {
+  const styles=useThemedStyles(lightStyles);
   const { token } = useAuth();
   const [periodo, setPeriodo] = useState<'hoje' | 'todos'>('hoje');
   const [status, setStatus] = useState('');
@@ -115,7 +117,7 @@ export default function AtendimentosScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: 20, paddingTop: 21, paddingBottom: 35, flexGrow: 1 },
   eyebrow: { color: colors.brandDark, fontSize: 10, letterSpacing: 1.3, fontWeight: '900' },
