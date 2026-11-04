@@ -1,3 +1,4 @@
+import {useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Pressable,RefreshControl,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ type Sale={id:number;visita_id:number|null;situacao:string;numero_titulo:string;
   sigla_plano:string;data_venda:string;valor_cobrado:string;cliente_nome:string};
 const money=(v:string)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
 export default function Vendas(){
+  const s=useThemedStyles(lightStyles);
   const {token}=useAuth();
   const [sales,setSales]=useState<Sale[]>([]),[query,setQuery]=useState('');
   const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false);
@@ -64,7 +66,7 @@ export default function Vendas(){
     </ScrollView>
   </SafeAreaView>;
 }
-const s=StyleSheet.create({
+const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   content:{padding:18,paddingBottom:45,gap:13},
   heading:{flexDirection:'row',alignItems:'center',gap:12},
