@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\VendaMoney;
+use App\Libraries\ProtecaoVendaFechada;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
@@ -179,6 +180,7 @@ final class MobileVendasController extends VendasController
         if($a['admin'])return parent::detalhe($id);
         // Corretores não recebem rateios, dados pessoais ou pagamentos de terceiros.
         $db=db_connect();
+        $fechamento=ProtecaoVendaFechada::fechamento($db,(int)$id);
         $moves=$db->table('venda_recebimentos')->select('tipo,valor')
             ->where('operacao_id',(int)$id)->get()->getResultArray();
         $paid=0;
@@ -212,6 +214,10 @@ final class MobileVendasController extends VendasController
             ],
             'recebido'=>VendaMoney::decimal($paid),
             'saldo'=>VendaMoney::decimal(max(0,(VendaMoney::cents((string)$op['valor_cobrado'])??0)-$paid)),
+            // Mesmo bloqueio do web, sem expor outras contas ao perfil limitado.
+            'fechamento'=>$fechamento?[
+                'id'=>(int)$fechamento['id'],'status'=>$fechamento['status'],
+            ]:null,
             'comissoes'=>['bruta'=>null,'propria'=>$own===null?null:VendaMoney::decimal(max(0,$own)),
                 'participantes'=>[],'status'=>$own===null?'AGUARDANDO_APURACAO':'A_RECEBER'],
             'pode_corrigir_comissao'=>false,
