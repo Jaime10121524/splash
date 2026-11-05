@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {AppState,Platform} from 'react-native';
 import * as Notifications from 'expo-notifications';
-import * as Camera from 'expo-camera';
+import {useCameraPermissions} from 'expo-camera';
 import * as SecureStore from 'expo-secure-store';
 import {router} from 'expo-router';
 import {useAuth} from './AuthContext';
@@ -40,7 +40,10 @@ async function channels(){
  * Dispara os dois pedidos na primeira abertura, um depois do outro.
  * A recusa de qualquer um NÃO impede login, vendas, consultas e cadastros.
  */
-async function startupPermissions(){
+async function startupPermissions(
+  getCameraPermission:()=>Promise<{granted:boolean;canAskAgain:boolean}>,
+  requestCameraPermission:()=>Promise<{granted:boolean;canAskAgain:boolean}>,
+){
   await channels().catch(()=>{});
   try{
     const prior=await SecureStore.getItemAsync(NOTIFICATION_ASKED);
@@ -52,10 +55,10 @@ async function startupPermissions(){
   }catch{/* Funcionalidades sem permissão permanecem disponíveis. */}
   try{
     const prior=await SecureStore.getItemAsync(CAMERA_ASKED);
-    const existing=await Camera.getCameraPermissionsAsync();
+    const existing=await getCameraPermission();
     if(!prior&&!existing.granted&&existing.canAskAgain){
       await SecureStore.setItemAsync(CAMERA_ASKED,'1');
-      await Camera.requestCameraPermissionsAsync();
+      await requestCameraPermission();
     }
   }catch{/* O app continua funcionando sem câmera. */}
 }
@@ -67,12 +70,17 @@ async function startupPermissions(){
 export default function NativePermissionsAndPush(){
   const {user,token,ready}=useAuth();
   const [asked,setAsked]=useState(false);
+  const [,requestCameraPermission,getCameraPermission]=useCameraPermissions();
+  const permissionFlowStarted=useRef(false);
   const lastToken=useRef('');
   useEffect(()=>{
+    if(permissionFlowStarted.current)return;
+    permissionFlowStarted.current=true;
     let mounted=true;
-    void startupPermissions().finally(()=>{if(mounted)setAsked(true);});
+    void startupPermissions(getCameraPermission,requestCameraPermission)
+      .finally(()=>{if(mounted)setAsked(true);});
     return()=>{mounted=false;};
-  },[]);
+  },[getCameraPermission,requestCameraPermission]);
 
   useEffect(()=>{
     if(!ready||!user||!token||!asked||Platform.OS!=='android')return;
