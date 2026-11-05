@@ -20,7 +20,7 @@ const stateOptions=[
 ]
 const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,venda:0,canceladas:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
 
-export default function Atendimentos({initialClient=null,onClientAccepted=()=>{},navigate=()=>{},admin=false}) {
+export default function Atendimentos({initialClient=null,onClientAccepted=()=>{},navigate=()=>{},admin=false,gestor=false}) {
   const [catalogs,setCatalogs]=useState({origens:[],motivos:[],pessoas:[]})
   const [visits,setVisits]=useState([])
   const [stats,setStats]=useState(initialStats)
@@ -247,10 +247,12 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
                   onClick={()=>navigate(v.operacao_situacao==='VENDA'?'vendas':'pendencias',v)}>
                   {v.operacao_situacao==='VENDA'?'Ver título':'Ver pendência'}
                 </button>}
-                {admin&&!v.operacao_id&&['VENDA','PENDENCIA'].includes(v.status)&&<button type="button"
+                {(admin||gestor&&v.status==='VENDA')&&!v.operacao_id&&['VENDA','PENDENCIA'].includes(v.status)&&<button type="button"
                   className="primary" onClick={()=>navigate(v.status==='VENDA'?'vendas':'pendencias',v)}>
                   {v.status==='VENDA'?'Registrar título':'Abrir pendência financeira'}
                 </button>}
+                {gestor&&v.operacao_id&&v.operacao_situacao==='VENDA'&&<button type="button"
+                  className="primary" onClick={()=>navigate('vendas')}>Ver vendas da gestão</button>}
                 {v.status==='AGUARDANDO'&&<button type="button" className="primary" onClick={()=>openStart(v)}>Iniciar atendimento</button>}
                 {v.status==='ATENDENDO'&&<button type="button" className="primary" onClick={()=>openFinish(v)}>Encerrar atendimento</button>}
                 {canResume&&<button type="button" className="primary"
