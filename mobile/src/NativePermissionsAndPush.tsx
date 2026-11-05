@@ -6,6 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import {router} from 'expo-router';
 import {useAuth} from './AuthContext';
 import {apiRequest} from './api';
+import {getNativePushToken} from './pushDevice';
 
 /**
  * As notificações precisam aparecer mesmo com o aplicativo aberto.
@@ -59,21 +60,6 @@ async function startupPermissions(){
   }catch{/* O app continua funcionando sem câmera. */}
 }
 
-async function nativeToken():Promise<string|null>{
-  if(Platform.OS!=='android')return null;
-  try{
-    const granted=await Notifications.getPermissionsAsync();
-    if(!granted.granted)return null;
-    // Token FCM nativo, NÃO o ExpoPushToken. O backend usa FCM HTTP v1.
-    const result=await Notifications.getDevicePushTokenAsync();
-    const value=result.data;
-    return typeof value==='string'&&value.length>60?value:null;
-  }catch{
-    // Firebase/google-services.json ainda não configurado ou Play Services ausente.
-    return null;
-  }
-}
-
 /**
  * Vincula o token FCM à identidade autenticada. Quando o usuário troca de
  * conta no mesmo aparelho, o backend move o mesmo token para a nova conta.
@@ -92,7 +78,7 @@ export default function NativePermissionsAndPush(){
     if(!ready||!user||!token||!asked||Platform.OS!=='android')return;
     let mounted=true;
     const register=async(force=false)=>{
-      const fcm=await nativeToken();
+      const fcm=await getNativePushToken();
       if(!mounted||!fcm)return;
       const id=String(user.id)+':'+fcm;
       if(!force&&lastToken.current===id)return;
@@ -143,10 +129,3 @@ export default function NativePermissionsAndPush(){
   return null;
 }
 
-export async function unregisterAndroidPush(token:string){
-  const value=await nativeToken();
-  if(!value)return;
-  await apiRequest('mobile/notificacoes/dispositivo/remover',{
-    method:'POST',token,body:{token:value},
-  });
-}
