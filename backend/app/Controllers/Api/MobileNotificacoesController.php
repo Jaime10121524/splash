@@ -65,6 +65,36 @@ final class MobileNotificacoesController extends BaseController
             ->setHeader('Cache-Control','private, no-store');
     }
 
+    /** Envia um push de teste apenas ao próprio usuário autenticado. */
+    public function testDevice():ResponseInterface
+    {
+        $uid=$this->userId();if($uid instanceof ResponseInterface)return $uid;
+        if(!service('throttler')->check('splash-push-test-'.$uid,2,MINUTE)){
+            return $this->response->setStatusCode(429)
+                ->setJSON(['message'=>'Aguarde antes de solicitar outro teste.']);
+        }
+        $db=db_connect();
+        $count=$db->table('splash_push_nativo_dispositivos')
+            ->where('user_id',$uid)->where('ativo',1)->countAllResults();
+        if($count===0)return $this->response->setStatusCode(409)
+            ->setJSON(['message'=>'Nenhum Android registrado. Autorize notificações e reabra o aplicativo.']);
+        if(!\App\Libraries\EnvioPushNativoSplash::disponivel()){
+            return $this->response->setStatusCode(503)
+                ->setJSON(['message'=>'Firebase do servidor ainda não está configurado. Confira a conta de serviço no backend.']);
+        }
+        $success=\App\Libraries\EnvioPushNativoSplash::enviar([
+            'user_id'=>$uid,'categoria'=>'TESTE','titulo'=>'Splash Next',
+            'mensagem'=>'As notificações do Splash estão funcionando no Android.',
+            'rota'=>'notificacoes','chave_evento'=>'TESTE_ANDROID',
+        ]);
+        if($success<1)return $this->response->setStatusCode(502)
+            ->setJSON(['message'=>'Firebase não confirmou o envio. Confira o log do servidor e a configuração FCM.']);
+        return $this->response->setJSON([
+            'message'=>'Notificação enviada pelo Firebase. Confira a barra de notificações do Android.',
+            'dispositivos_enviados'=>$success,
+        ])->setHeader('Cache-Control','private, no-store');
+    }
+
     public function index():ResponseInterface
     {
         $uid=$this->userId();if($uid instanceof ResponseInterface)return $uid;
