@@ -55,6 +55,7 @@ jobs:
           php -l backend/app/Config/Routes.php
           php -l backend/app/Config/AuthGroups.php
           php -l backend/app/Controllers/Api/FechamentosController.php
+          php -l backend/app/Controllers/Api/FinanceiroPessoalController.php
           php -l backend/app/Controllers/Api/GestorVendasController.php
           php -l backend/app/Controllers/Api/MinhasVendasController.php
           php -l backend/app/Controllers/Api/MobileNotificacoesController.php
