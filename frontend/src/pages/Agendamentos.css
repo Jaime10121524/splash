@@ -125,3 +125,57 @@
 .agenda-reader-placeholder span{font-size:64px;color:#a99bff}
 .agenda-reader-placeholder small{font-size:11px;color:#d4d2e9;line-height:1.6}
 .agenda-reader-preview .agenda-reader-video{border:0;border-radius:0;max-height:310px}
+
+/* Reformulação das janelas: cartão limpo, hierarquia de textos e respiro.
+   Usa os tokens globais do tema e não interfere nas demais telas. */
+.agenda-page .cm-overlay{padding:clamp(12px,3vw,24px)}
+.agenda-page .cm-dialog{width:min(630px,100%);border:1px solid var(--border);
+  border-radius:25px;box-shadow:0 30px 85px rgba(5,9,30,.3)}
+.agenda-page .cm-dialog-header{padding:26px 30px 17px;
+  background:linear-gradient(125deg,var(--surface) 0%,var(--surface-alt) 100%);
+  border-bottom:1px solid var(--border)}
+.agenda-page .cm-dialog-header h2{font-size:23px;line-height:1.2;letter-spacing:-.035em}
+.agenda-page .cm-dialog-header p{font-size:12px;line-height:1.6}
+.agenda-page .agenda-form{padding:22px 30px 26px;gap:16px}
+.agenda-page .agenda-form label{gap:7px;font-size:12px;line-height:1.45}
+.agenda-page .agenda-form :is(.ui-input,.agenda-form>label>input,
+  .agenda-form>label>textarea){min-height:47px;border-radius:12px}
+.agenda-page .agenda-form textarea{padding:13px;line-height:1.5;min-height:76px}
+.agenda-page .agenda-form :is(.ui-input,.agenda-form>label>input,
+  .agenda-form>label>textarea):focus-visible{outline:none;
+  border-color:var(--brand);box-shadow:0 0 0 3px rgba(120,97,249,.14)}
+.agenda-page .agenda-form .ui-select-trigger{display:flex;align-items:center;
+  justify-content:space-between;text-align:left;padding:0 13px;min-width:0}
+.agenda-page .agenda-form .ui-date-wrap{min-width:0}
+.agenda-page .agenda-form .ui-date-wrap .ui-input{padding-right:45px}
+.agenda-page .agenda-form .agenda-form-intro{border:0;border-radius:14px;
+  padding:13px 14px;background:var(--brand-light)}
+.agenda-page .agenda-form-intro>span{background:var(--surface);box-shadow:0 2px 7px rgba(30,20,70,.07)}
+.agenda-page .agenda-form-intro strong{font-size:13px}
+.agenda-page .agenda-form-intro small{font-size:11px}
+.agenda-page .agenda-form-actions{position:sticky;bottom:-26px;z-index:1;
+  margin:5px -30px -26px;padding:15px 30px 18px;background:var(--surface);
+  border-top:1px solid var(--border);align-items:center}
+.agenda-page .agenda-form-actions button{min-height:44px;font-size:12px}
+.agenda-page .agenda-form-actions .agenda-primary{box-shadow:0 8px 20px rgba(120,97,249,.18)}
+.agenda-page .agenda-linkclient{background:var(--surface-alt);
+  padding:16px;border-color:var(--border)}
+.agenda-page .agenda-reader{border:0;padding:0;background:transparent}
+.agenda-page .agenda-reader-header{background:var(--surface-alt);
+  border:1px solid var(--border);border-radius:14px;padding:12px}
+.agenda-page .agenda-reader-preview{border:1px solid var(--border);min-height:188px;
+  background:linear-gradient(135deg,#24233f,#141629)}
+.agenda-page .agenda-reader-icon{font-size:24px}
+.agenda-page .agenda-reader-actions button{background:var(--brand);color:white;
+  min-height:44px;border:0}
+.agenda-page .agenda-reader-actions button:hover{background:var(--brand-dark)}
+.agenda-page .agenda-reader-status{background:var(--surface-alt);
+  border-radius:10px;padding:10px 12px;margin:0;line-height:1.65}
+.agenda-page .agenda-scanner{gap:14px}
+@media(max-width:650px){
+  .agenda-page .cm-dialog-header{padding:21px 18px 15px}
+  .agenda-page .agenda-form{padding:18px 17px 23px}
+  .agenda-page .agenda-form-actions{bottom:-23px;margin:4px -17px -23px;
+    padding:13px 17px 15px}
+  .agenda-page .agenda-form-actions button{flex:1}
+}
