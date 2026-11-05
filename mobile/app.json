@@ -3,7 +3,7 @@
     "name": "Splash Next",
     "slug": "splash-mobile",
     "scheme": "splashmobile",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -20,7 +20,7 @@
         "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 4
+      "versionCode": 5
     },
     "plugins": [
       "expo-router",
