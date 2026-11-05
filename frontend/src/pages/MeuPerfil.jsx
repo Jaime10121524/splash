@@ -32,7 +32,9 @@ export default function MeuPerfil(){
    setPhotoBusy(true)
    try{
      await comercialUpload('/api/conta/foto',file)
-     setRev(v=>v+1);setImageFailed(false);setNotice('Foto de perfil atualizada!')
+     setRev(v=>v+1);setImageFailed(false)
+     window.dispatchEvent(new Event('splash:avatar-updated'))
+     setNotice('Foto de perfil atualizada!')
    }catch(err){setError(err.message)}
    finally{setPhotoBusy(false);e.target.value=''}
  }
