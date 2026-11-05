@@ -1,10 +1,11 @@
 import {Platform} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import {apiRequest} from './api';
+import {isExpoGo} from './runtime';
 
 /** Token FCM direto (nao Expo Push), vinculado ao Firebase do APK. */
 export async function getNativePushToken():Promise<string|null>{
-  if(Platform.OS!=='android')return null;
+  if(Platform.OS!=='android'||isExpoGo)return null;
   try{
     const granted=await Notifications.getPermissionsAsync();
     if(!granted.granted)return null;
