@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { comercialGet, comercialPost, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
 import { baixarConvite, linkWhatsAppAgendamento } from '../lib/agendamentoQr.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
@@ -32,6 +32,76 @@ export default function Agendamentos({navigate=()=>{}}) {
   const [clientId,setClientId]=useState('')
   const [clients,setClients]=useState([])
   const [lookup,setLookup]=useState('')
+  const videoRef=useRef(null)
+  const cameraStream=useRef(null)
+  const cameraTimer=useRef(null)
+  const scanning=useRef(false)
+  const [cameraActive,setCameraActive]=useState(false)
+  const [cameraError,setCameraError]=useState('')
+
+  function stopCamera(){
+    if(cameraTimer.current){clearInterval(cameraTimer.current);cameraTimer.current=null}
+    if(cameraStream.current){
+      cameraStream.current.getTracks().forEach(track=>track.stop())
+      cameraStream.current=null
+    }
+    if(videoRef.current)videoRef.current.srcObject=null
+    scanning.current=false
+    setCameraActive(false)
+  }
+  useEffect(()=>{
+    if(modal?.type!=='scan')stopCamera()
+    return ()=>{
+      if(cameraTimer.current){clearInterval(cameraTimer.current);cameraTimer.current=null}
+      if(cameraStream.current)cameraStream.current.getTracks().forEach(track=>track.stop())
+      cameraStream.current=null
+      scanning.current=false
+    }
+  },[modal?.type])
+
+  async function startCamera(){
+    setCameraError('')
+    if(!navigator.mediaDevices?.getUserMedia){
+      setCameraError('Câmera indisponível neste navegador ou sem HTTPS. Use o leitor USB ou cole o código abaixo.')
+      return
+    }
+    if(!('BarcodeDetector' in window)){
+      setCameraError('Este navegador não suporta a leitura automática. Use o leitor USB ou cole o QR abaixo.')
+      return
+    }
+    try{
+      stopCamera()
+      const stream=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{ideal:'environment'}},audio:false,
+      })
+      cameraStream.current=stream
+      if(!videoRef.current){stopCamera();return}
+      videoRef.current.srcObject=stream
+      await videoRef.current.play()
+      const detector=new window.BarcodeDetector({formats:['qr_code']})
+      setCameraActive(true)
+      cameraTimer.current=setInterval(async()=>{
+        if(scanning.current||!videoRef.current||videoRef.current.readyState<2)return
+        scanning.current=true
+        try{
+          const codes=await detector.detect(videoRef.current)
+          const value=codes.find(item=>String(item.rawValue||'').trim())?.rawValue?.trim()
+          if(value){
+            stopCamera()
+            setScan(value)
+            await inspect(value)
+          }
+        }catch{
+          // Falha eventual de frame não deve impedir uma leitura posterior.
+        }finally{scanning.current=false}
+      },350)
+    }catch(err){
+      stopCamera()
+      setCameraError(err?.name==='NotAllowedError'
+        ?'Permissão da câmera negada. Libere o acesso no navegador ou cole o código.'
+        :'Não foi possível iniciar a câmera. Use o leitor USB ou cole o código do voucher.')
+    }
+  }
 
   async function reload(){
     const r=await comercialGet('/api/agendamentos?q='+encodeURIComponent(q))
@@ -169,7 +239,7 @@ export default function Agendamentos({navigate=()=>{}}) {
 
     <section className="agenda-panel">
       <div className="agenda-headrow"><div><h2>Agenda e leads</h2><p>Consulte, entregue o voucher ou registre a chegada por QR Code.</p></div>
-        <button className="agenda-scan" onClick={()=>{setError('');setScan('');setModal({type:'scan'})}}>▣ Registrar chegada</button>
+        <button className="agenda-scan" onClick={()=>{setError('');setCameraError('');setScan('');setModal({type:'scan'})}}>▣ Registrar chegada</button>
       </div>
       <input type="search" className="agenda-search" value={q} onChange={e=>setQ(e.target.value)}
         placeholder="Buscar por nome, telefone ou número do agendamento..." />
@@ -240,13 +310,38 @@ export default function Agendamentos({navigate=()=>{}}) {
       </form>
     </SurfaceModal>}
 
-    {modal?.type==='scan'&&<SurfaceModal title="Registrar chegada por QR" subtitle="Use o leitor USB ou cole o conteúdo do QR Code."
-      busy={busy} onClose={()=>setModal(null)}>
-      <form className="agenda-form" onSubmit={e=>{e.preventDefault();inspect(scan)}}>
-        <label>Código do agendamento<input autoFocus required value={scan} onChange={e=>setScan(e.target.value)}
-          placeholder="Aponte o leitor ou cole o QR" /></label>
-        <div className="agenda-form-actions"><button type="button" onClick={()=>setModal(null)}>Cancelar</button>
-          <button className="agenda-primary" disabled={busy}>Conferir código</button></div>
+    {modal?.type==='scan'&&<SurfaceModal title="Registrar chegada por QR"
+      subtitle="Leia o voucher pela câmera ou utilize seu leitor USB."
+      busy={busy} onClose={()=>{stopCamera();setModal(null)}}>
+      <form className="agenda-form agenda-scanner" onSubmit={e=>{
+        e.preventDefault();stopCamera();void inspect(scan)
+      }}>
+        <div className="agenda-reader">
+          <div className="agenda-reader-header">
+            <span className="agenda-reader-icon" aria-hidden="true">▣</span>
+            <div><strong>Leitor de QR Code</strong>
+              <small>Aponte a câmera para o QR Code do convite.</small></div>
+          </div>
+          <video ref={videoRef} className="agenda-reader-video" autoPlay muted playsInline
+            aria-label="Câmera para leitura do QR Code"/>
+          <div className="agenda-reader-actions">
+            {cameraActive?<button type="button" onClick={stopCamera}>Parar câmera</button>:
+              <button type="button" onClick={()=>{void startCamera()}}>Ativar câmera</button>}
+          </div>
+          {cameraError?<p role="status" className="agenda-reader-error">{cameraError}</p>:
+            <p className="agenda-reader-status">
+              {cameraActive?'Aguardando QR Code no enquadramento…':
+                'A câmera precisa de HTTPS e de um navegador compatível. O leitor USB também funciona.'}
+            </p>}
+        </div>
+        <label>Código do agendamento (leitor USB ou colagem)
+          <input autoFocus required value={scan} onChange={e=>setScan(e.target.value)}
+            placeholder="Cole o código SPLASH:AG:1:... ou leia com o scanner"/>
+        </label>
+        <div className="agenda-form-actions">
+          <button type="button" onClick={()=>{stopCamera();setModal(null)}}>Cancelar</button>
+          <button className="agenda-primary" disabled={busy||!scan.trim()}>Conferir chegada</button>
+        </div>
       </form>
     </SurfaceModal>}
 
