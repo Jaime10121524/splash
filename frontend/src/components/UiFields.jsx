@@ -197,7 +197,7 @@ export function SearchSelectInput({value='',onChange,options=[],placeholder='Pes
     {open&&createPortal(<div className="ui-floating ui-search-menu" ref={popup}
       role="listbox" aria-label={ariaLabel}
       style={{top:position.top,left:position.left,width:position.width,
-        maxHeight:Math.min(320,Math.max(190,position.maxHeight)),
+        maxHeight:Math.min(320,position.maxHeight),
         transform:position.above?'translateY(-100%)':undefined}}>
       <div className="ui-search-head"><input ref={input} type="search" className="ui-input"
         placeholder="Digite para encontrar..." aria-label="Pesquisar opções"
