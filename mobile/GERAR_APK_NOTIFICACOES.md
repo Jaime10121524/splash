@@ -32,6 +32,29 @@ if ($LASTEXITCODE -ne 0) { throw 'Erro TypeScript. Não gere APK ainda.' }
 
 O arquivo `google-services.json` é necessário para compilar o APK com Firebase.
 
+## 2.1 Testar o APK com servidor HTTP do PC (apenas perfil preview)
+
+O perfil `preview` autoriza explicitamente **somente IP privado de rede local**
+(`192.168.x.x`, `10.x.x.x` ou `172.16-31.x.x`). O Android libera
+cleartext somente nesse perfil de build. O perfil `production` mantém HTTPS obrigatório.
+
+1. Descubra o IPv4 do PC com `ipconfig`. Por exemplo: `192.168.1.105`.
+2. No **Expo > Environment variables > preview**, configure
+   `EXPO_PUBLIC_SPLASH_API_URL=http://192.168.1.105:8080` (substitua pelo IP real).
+   `EXPO_PUBLIC_SPLASH_ALLOW_LAN_HTTP=true` já está definido automaticamente no
+   `mobile/eas.json`; não é necessário cadastrá-lo na tela do Expo.
+3. Suba o backend no PC: `cd D:\Ahritech\Sistemas\Web\splash\backend` e
+   `php spark serve --host 0.0.0.0 --port 8080`. Deixe esse terminal aberto.
+4. No navegador do celular na mesma rede Wi-Fi, confira
+   `http://192.168.1.105:8080/api/mobile/ping`. Deve responder com JSON.
+5. Gere o APK com o perfil `preview`, instale no celular e faça login com
+   **credenciais de teste**, nunca senhas reais.
+
+**Atenção:** HTTP não tem criptografia. Use apenas em rede Wi-Fi privada confiável,
+com contas e dados fictícios. O PC precisa estar ligado e com o PHP rodando.
+Ao mudar o IPv4 do PC, é preciso compilar outro APK ou atualizar a configuração.
+Para produção, use HTTPS.
+
 ## 3. EAS Build (APK instalável)
 
 ```powershell
