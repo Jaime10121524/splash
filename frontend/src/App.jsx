@@ -368,10 +368,17 @@ function Dashboard({ user, navigate }) {
             {label:'Financeiro',detail:'Despesas e empréstimos',id:'financeiro',icon:'receipt'},
           ]:operator?[
             {label:'Atendimentos',detail:'Acompanhar visitantes',id:'atendimentos',icon:'clipboard'},
+          ]:user.role==='vendedor'?[
+            {label:'Minhas vendas',detail:'Consultar minhas comissões',id:'vendas',icon:'bag'},
+            {label:'Meu financeiro',detail:'Recebidos e a receber',id:'financeiro',icon:'wallet'},
+          ]:user.role==='gerente'?[
+            {label:'Atendimentos',detail:'Acompanhar a operação',id:'atendimentos',icon:'clipboard'},
+            {label:'Gestão de vendas',detail:'Consultar e cadastrar títulos',id:'vendas',icon:'bag'},
+            {label:'Meu financeiro',detail:'Minhas comissões e recebimentos',id:'financeiro',icon:'wallet'},
           ]:[
             {label:'Atendimentos',detail:'Minhas visitas e retornos',id:'atendimentos',icon:'clipboard'},
-             {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
-            ...(user.role==='corretor'?[{label:'Meus fechamentos',detail:'Recebimentos e repasses por período',id:'fechamentos',icon:'arrows'}]:[]),
+            {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
+            {label:'Meus fechamentos',detail:'Recebimentos e repasses por período',id:'fechamentos',icon:'arrows'},
             {label:'Minhas despesas',detail:'Registrar gastos',id:'despesas',icon:'receipt'},
             {label:'Empréstimos',detail:'Consultar saldos',id:'emprestimos',icon:'arrows'},
           ]).map(item=><button key={item.id} type="button" className="quick-link" onClick={()=>navigate(item.id)}>
