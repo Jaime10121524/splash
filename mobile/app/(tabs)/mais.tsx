@@ -44,7 +44,9 @@ export default function Mais(){
     finally{setBusy(false);}
   }
   const items:Entry[]=[
-    {title:'Vendas',subtitle:'Títulos, pagamentos e comissões',ios:'bag.fill',android:'shopping_bag',route:'/vendas'},
+    ...(user?.role==='operador'?[]:[{title:'Vendas',
+      subtitle:user?.role==='vendedor'?'Minhas comissões':'Títulos, pagamentos e comissões',
+      ios:'bag.fill',android:'shopping_bag',route:'/vendas'}]),
     {title:'Clientes',subtitle:'Carteira, contatos e cadastros',ios:'person.2.fill',android:'contacts',route:'/clientes'},
     {title:'Notificações',subtitle:'Novas vendas e alertas comerciais',ios:'bell.badge.fill',android:'notifications_active',route:'/notificacoes',count:unread},
     {title:'Meu perfil',subtitle:'Foto, e-mail e senha',ios:'person.crop.circle',android:'account_circle',route:'/perfil'},
