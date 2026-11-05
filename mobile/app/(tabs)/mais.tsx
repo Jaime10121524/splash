@@ -66,6 +66,11 @@ export default function Mais(){
       subtitle:user?.role==='vendedor'?'Minhas comissões':'Títulos, pagamentos e comissões',
       ios:'bag.fill',android:'shopping_bag',route:'/vendas'}]),
     ...(user?.role==='vendedor'?[]:[{title:'Clientes',subtitle:'Carteira, contatos e cadastros',ios:'person.2.fill',android:'contacts',route:'/clientes'}]),
+    ...(user?.role==='operador'||user?.role==='restrito'?[]:
+      [{title:'Financeiro',subtitle:user?.role==='admin'
+        ?'Comissões a pagar, a receber e já pagas':'Minhas comissões e recebimentos por período',
+        ios:'banknote',android:'account_balance_wallet',route:'/financeiro'}]),
+
     {title:'Notificações',subtitle:'Novas vendas e alertas comerciais',ios:'bell.badge.fill',android:'notifications_active',route:'/notificacoes',count:unread},
     {title:'Meu perfil',subtitle:'Foto, e-mail e senha',ios:'person.crop.circle',android:'account_circle',route:'/perfil'},
   ];
