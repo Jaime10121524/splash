@@ -96,12 +96,12 @@ export default function FinanceiroMobile(){
       </View>
       <Text style={s.section}>Lançamentos financeiros</Text>
       <View style={s.quickActions}>
-        <Pressable style={s.quickAction} onPress={()=>router.push('/gastos')} accessibilityRole="button">
+        <Pressable style={s.quickAction} onPress={()=>router.push('/gastos' as never)} accessibilityRole="button">
           <View style={s.quickIcon}><Text style={s.quickEmoji}>🧾</Text></View>
           <Text style={s.quickTitle}>Gastos</Text>
           <Text style={s.quickDescription}>Registrar despesas e consultar valores</Text>
         </Pressable>
-        <Pressable style={s.quickAction} onPress={()=>router.push('/emprestimos')} accessibilityRole="button">
+        <Pressable style={s.quickAction} onPress={()=>router.push('/emprestimos' as never)} accessibilityRole="button">
           <View style={s.quickIcon}><Text style={s.quickEmoji}>💸</Text></View>
           <Text style={s.quickTitle}>Empréstimos</Text>
           <Text style={s.quickDescription}>Registrar e acompanhar saldos</Text>
