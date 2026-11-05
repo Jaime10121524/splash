@@ -133,7 +133,7 @@ export default function NativePermissionsAndPush(){
     const changed=Notifications.addPushTokenListener(event=>{
       // O token ja vem no evento: NAO chamar getDevicePushTokenAsync de novo
       // no listener (isso pode gerar nova notificacao e ciclos de registro).
-      if(event.type==='fcm'&&typeof event.data==='string'){
+      if(event.type==='android'&&typeof event.data==='string'){
         void registerValue(event.data,true);
       }
     });
