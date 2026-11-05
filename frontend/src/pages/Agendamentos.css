@@ -44,3 +44,67 @@
 @media(max-width:630px){.agenda-heading{align-items:stretch;flex-direction:column}.agenda-heading .agenda-primary{align-self:stretch}
 .agenda-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.agenda-panel{padding:15px}.agenda-headrow{align-items:stretch;flex-direction:column}
 .agenda-item{align-items:flex-start}.agenda-actions{width:100%}.agenda-cols{grid-template-columns:1fr}}
+
+
+/* Cores locais sempre ligadas ao tema global do aplicativo.
+   Nenhuma superficie ou texto fica branco/escuro fora de contexto. */
+.agenda-page{color:var(--text)}
+.agenda-heading h1,.agenda-headrow h2,.agenda-title strong{color:var(--text)}
+.agenda-heading p,.agenda-panel p,.agenda-empty,.agenda-main>small,
+.agenda-title span{color:var(--muted-dark)}
+.agenda-metric,.agenda-panel,.agenda-item{
+  background:var(--surface);border-color:var(--border);color:var(--text)
+}
+.agenda-metric span{color:var(--muted-dark)}
+.agenda-metric strong{color:var(--text)}
+.agenda-metric.highlight{background:var(--brand-light)}
+.agenda-metric.highlight strong{color:var(--brand)}
+.agenda-search,.agenda-form input,.agenda-form select,.agenda-form textarea,
+.agenda-linkclient select,.agenda-actions button,.agenda-form-actions button,
+.agenda-inline button{
+  background:var(--surface-alt);border-color:var(--border);color:var(--text)
+}
+.agenda-search::placeholder,.agenda-form input::placeholder,
+.agenda-form textarea::placeholder{color:var(--muted-dark)}
+.agenda-form input:focus-visible,.agenda-form textarea:focus-visible,
+.agenda-form select:focus-visible,.agenda-search:focus-visible{
+  border-color:var(--brand);outline:2px solid rgba(120,97,249,.25);outline-offset:1px
+}
+.agenda-form label,.agenda-linkclient strong{color:var(--text)}
+.agenda-hint{color:var(--muted-dark)}
+.agenda-avatar,.agenda-booking-info{background:var(--brand-light)}
+.agenda-booking-info strong,.agenda-booking-info span,
+.agenda-booking-info small{color:var(--text)}
+.agenda-linkclient{border-color:var(--border)}
+.agenda-scan{background:var(--brand-light);color:var(--brand);border-color:var(--border)}
+.agenda-actions button,.agenda-form-actions button,.agenda-inline button{color:var(--brand)}
+.agenda-actions button.accent,.agenda-form-actions .agenda-primary{color:#fff;background:var(--brand);border-color:var(--brand)}
+.agenda-status{background:var(--brand-light);color:var(--brand)}
+.agenda-warning{color:#e27b8b}
+.agenda-feedback.error{background:#432531;color:#ffd6dd}
+.agenda-feedback.success{background:#173d31;color:#bbffdb}
+.agenda-heading small{color:var(--brand)}
+
+/* Leitor de QR da versão web: câmera opcional e fallback por leitor/colagem. */
+.agenda-scanner{display:grid;gap:14px}
+.agenda-reader{background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:18px;padding:15px;display:grid;gap:13px}
+.agenda-reader-header{display:flex;align-items:center;gap:11px}
+.agenda-reader-icon{width:44px;height:44px;display:grid;place-items:center;
+  border-radius:13px;background:var(--brand-light);color:var(--brand);
+  font-size:23px;flex-shrink:0}
+.agenda-reader-header strong{display:block;color:var(--text);font-size:13px}
+.agenda-reader-header small{display:block;color:var(--muted-dark);font-size:11px;line-height:1.6;margin-top:3px}
+.agenda-reader-video{width:100%;max-height:290px;aspect-ratio:4/3;object-fit:cover;
+  background:#101322;border:1px solid var(--border);border-radius:13px}
+.agenda-reader-actions{display:flex;gap:9px;flex-wrap:wrap}
+.agenda-reader-actions button{flex:1;min-width:125px;min-height:42px;
+  background:var(--brand-light);color:var(--brand);
+  border-radius:12px;border:1px solid var(--border);font-weight:800}
+.agenda-reader-status{font-size:11px;line-height:1.5;color:var(--muted-dark)}
+.agenda-reader-error{font-size:11px;color:#df6477;line-height:1.55}
+:root[data-theme="dark"] .agenda-form input,
+:root[data-theme="dark"] .agenda-form select,
+:root[data-theme="dark"] .agenda-form textarea{color-scheme:dark}
+:root[data-theme="dark"] .agenda-status.compareceu{background:#173d31;color:#91e8bc}
+:root[data-theme="dark"] .agenda-status.cancelado{background:#4c2a35;color:#ffc4cf}
