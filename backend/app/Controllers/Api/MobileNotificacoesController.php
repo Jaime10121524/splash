@@ -31,9 +31,19 @@ final class MobileNotificacoesController extends BaseController
            !preg_match('/^[A-Za-z0-9:_-]{60,512}$/D',$token)){
             return $this->response->setStatusCode(422)->setJSON(['message'=>'Token FCM Android inválido.']);
         }
+        if(!service('throttler')->check('splash-fcm-register-'.$uid,20,MINUTE)){
+            return $this->response->setStatusCode(429)
+                ->setJSON(['message'=>'Muitas tentativas de registro de notificacoes. Tente mais tarde.']);
+        }
         $db=db_connect();$hash=hash('sha256',$token);
         $current=$db->table('splash_push_nativo_dispositivos')
             ->where('token_hash',$hash)->get()->getRowArray();
+        // Reenvios do mesmo token nao geram UPDATEs nem reabrem fila de avisos.
+        if($current && (int)$current['user_id']===$uid && (int)$current['ativo']===1
+           && strtotime((string)$current['atualizado_em'])>time()-600){
+            return $this->response->setJSON(['message'=>'Dispositivo ja cadastrado.'])
+                ->setHeader('Cache-Control','private, no-store');
+        }
         $values=[
             'user_id'=>$uid,'token'=>$token,'plataforma'=>'android',
             'ativo'=>1,'atualizado_em'=>date('Y-m-d H:i:s'),
