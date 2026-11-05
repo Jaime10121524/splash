@@ -37,7 +37,7 @@ export default function MinhasVendasMobile(){
     try{
       const params=new URLSearchParams({pagina:String(page)});
       if(applied)params.set('q',applied);
-      const result=await apiRequest<OwnResult>('mobile/minhas-vendas?'+params.toString(),{token});
+      const result=await apiRequest<OwnResult>('mobile/minhas-vendas?'+params.toString().replace(/\+/g,'%20'),{token});
       setData(result);setError('');
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível consultar suas comissões.');}
     finally{setLoading(false);setRefreshing(false);}
