@@ -3,13 +3,14 @@
     "name": "Splash Next",
     "slug": "splash-mobile",
     "scheme": "splashmobile",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.ahritech.splashnext",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "icon": "./assets/icon.png"
     },
     "android": {
       "package": "com.ahritech.splashnext",
@@ -20,7 +21,11 @@
         "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 5
+      "versionCode": 6,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F7F4FF"
+      }
     },
     "plugins": [
       "expo-router",
@@ -59,6 +64,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F4FF"
     }
   }
 }
