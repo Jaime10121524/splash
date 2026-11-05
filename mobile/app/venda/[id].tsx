@@ -20,7 +20,7 @@ type Plan={id:number;nome:string;codigo:string;valor:string;duracao_meses:number
 type Method={id:number;nome:string;codigo:string;credito:boolean};
 type Person={id:number;nome:string;papeis:string[]};
 type Options={planos:Plan[];formas:Method[];gerentes:{id:number;nome:string}[];pessoas:Person[];pode_corrigir_comissao:boolean};
-type Detail={operacao:{id:number;visita_id:number;numero_titulo:string;sigla_plano:string;valor_cobrado:string;data_venda:string;comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
+type Detail={operacao:{id:number;visita_id:number;numero_titulo:string;sigla_plano:string;valor_cobrado:string;data_venda:string;comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
 type Allocation={responsavel_pessoa_id:number;beneficiario_pessoa_id:number;papel:string;valor:string;observacoes:string};
 type Rateios={corretor_pessoa_id:number;comissao_bruta:string|null;editavel:boolean;quitada:boolean;aviso:string;rateios:(Allocation & {id:number;beneficiario_nome:string})[]};
 
@@ -188,6 +188,7 @@ export default function VendaMobile(){
   }
 
   async function savePayment(){
+    if(detail?.fechamento){setError('Venda bloqueada pelo fechamento #'+detail.fechamento.id+'.');return;}
     if(!opId||!detail||!methodId||!iso(date)){setError('Selecione forma de pagamento e data válida.');return;}
     const paid=cents(amount),balance=cents(detail.saldo);
     if(!paid||!balance||paid>balance){setError('O recebimento precisa ser positivo e não pode exceder o saldo.');return;}
@@ -203,6 +204,7 @@ export default function VendaMobile(){
   }
 
   async function uploadPendingPhoto(id:number,asset:ImagePicker.ImagePickerAsset){
+    if(detail?.fechamento){setError('Foto bloqueada pelo fechamento #'+detail.fechamento.id+'.');return;}
     if(!token||photoBusy)return;
     setPhotoBusy(true);
     try{
@@ -214,6 +216,7 @@ export default function VendaMobile(){
     finally{setPhotoBusy(false);}
   }
   async function selectPhoto(camera:boolean){
+    if(detail?.fechamento){setError('A venda está vinculada ao fechamento #'+detail.fechamento.id+'.');return;}
     if(!token||photoBusy)return;
     setError('');setNotice('');
     try{
@@ -263,6 +266,7 @@ export default function VendaMobile(){
   }
 
   async function adjustGross(){
+    if(saleLocked){setError('Comissão bloqueada por fechamento.');return;}
     if(!opId||!opts?.pode_corrigir_comissao)return;
     const n=cents(grossValue);
     if(n===null||reason.trim().length<5){setError('Valor e justificativa de 5 caracteres são obrigatórios.');return;}
@@ -274,6 +278,7 @@ export default function VendaMobile(){
   }
 
   async function adjustRateios(){
+    if(saleLocked){setError('Rateios bloqueados por fechamento.');return;}
     if(!opId||!rateios?.editavel)return;
     if(reason.trim().length<5){setError('Informe o motivo da correção (mínimo 5 caracteres).');return;}
     const clean:Allocation[]=[];
@@ -305,6 +310,7 @@ export default function VendaMobile(){
     choice?.field==='manager'?managerId:choice?.field==='person'?rateioRows[rowIndex]?.beneficiario_pessoa_id:
     choice?.field==='source'?rateioRows[rowIndex]?.responsavel_pessoa_id:null;
   function changeRow(i:number,patch:Partial<Allocation>){setRateioRows(old=>old.map((r,index)=>index===i?{...r,...patch}:r));}
+  const saleLocked=!!detail?.fechamento;
   const ownTotal=detail?.comissoes.propria;
   const gross=detail?.comissoes.bruta;
   const left=rateios?.comissao_bruta===null?null:
@@ -388,6 +394,13 @@ export default function VendaMobile(){
         </>}
 
         {!loading&&opId&&detail&&<>
+          {saleLocked&&<View style={{padding:16,borderRadius:16,
+            borderWidth:1,borderColor:'#B38B4B',backgroundColor:'#FFF4DE',gap:7}}>
+            <Text style={{fontSize:14,fontWeight:'900',color:'#755121'}}>Venda bloqueada · Fechamento #{detail.fechamento?.id}</Text>
+            <Text style={{fontSize:12,lineHeight:18,color:'#755121'}}>
+              Apenas consulta: recebimentos, foto e comissões não podem ser alterados nesta venda.
+            </Text>
+          </View>}
           {step==='titulo'&&<View style={s.card}>
             <Text style={s.section}>📸 Foto da venda</Text>
             <Text style={s.helper}>{opId
@@ -411,13 +424,13 @@ export default function VendaMobile(){
                 <Text style={s.photoToolText}>{photoSaving?'Salvando...':'↓ Baixar'}</Text>
               </Pressable>}
             </View>}
-            <View style={s.photoButtons}>
+            {!saleLocked&&<View style={s.photoButtons}>
               <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(true);}} disabled={photoBusy}>
                 <Text style={s.photoButtonText}>📷 Câmera</Text></Pressable>
               <Pressable style={s.photoButton} onPress={()=>{void selectPhoto(false);}} disabled={photoBusy}>
                 <Text style={s.photoButtonText}>Galeria</Text></Pressable>
-            </View>
-            {opId&&stagedPhoto&&<Btn text={photoBusy?'Enviando foto...':'Reenviar foto'}
+            </View>}
+            {opId&&!saleLocked&&stagedPhoto&&<Btn text={photoBusy?'Enviando foto...':'Reenviar foto'}
               disabled={photoBusy} onPress={()=>{void uploadPendingPhoto(opId,stagedPhoto);}}/>}
             {stagedPhoto&&!opId&&<Pressable onPress={()=>setStagedPhoto(null)}>
               <Text style={s.remove}>Remover foto selecionada</Text></Pressable>}
@@ -447,9 +460,9 @@ export default function VendaMobile(){
               <Text style={s.lineTitle}>{money(detail.recebido)}</Text></View>
               <View><Text style={s.label}>Saldo do cliente</Text>
                 <Text style={s.lineTitle}>{money(detail.saldo)}</Text></View></View></View>
-          {step==='pagamento'&&<View style={s.card}><Text style={s.section}>Registrar recebimento</Text>
+          {step==='pagamento'&&<View style={s.card}><Text style={s.section}>{saleLocked?'Recebimentos registrados':'Registrar recebimento'}</Text>
             <Text style={s.helper}>Registre cada forma separadamente. O sistema só apura a comissão automática após a quitação total.</Text>
-            {Number(detail.saldo)>0?<>
+            {!saleLocked&&Number(detail.saldo)>0?<>
               <Select label="Forma de pagamento *" value={method?.nome||'Selecionar'} onPress={()=>setChoice({field:'method'})}/>
               <Input label="Valor recebido (R$) *" value={amount} onChange={setAmount} numeric placeholder={money(detail.saldo)}/>
               {!method?.credito&&method?.codigo!=='PIX'?
@@ -459,7 +472,7 @@ export default function VendaMobile(){
                 </Pressable>)}</View>:
                 <Text style={s.helper}>{method?.credito?'Cartão: valor com a empresa.':method?.codigo==='PIX'?'PIX: valor com o corretor.':''}</Text>}
               <Btn text={busy?'Registrando...':'Registrar pagamento'} disabled={busy} onPress={()=>{void savePayment();}}/>
-            </>:<Text style={s.done}>Título quitado. Comissão calculada pelo servidor.</Text>}
+            </>:<Text style={s.done}>{saleLocked?'Venda protegida pelo fechamento. Não é possível registrar novos recebimentos.':'Título quitado. Comissão calculada pelo servidor.'}</Text>}
             {(detail.movimentos||[]).map(r=><View key={r.id} style={s.row}>
               <Text style={s.helper}>{r.forma_nome} · {r.data_movimento}</Text>
               <Text style={s.lineTitle}>{r.tipo==='ENTRADA'?'+':'−'} {money(r.valor)}</Text></View>)}
@@ -478,7 +491,7 @@ export default function VendaMobile(){
               <View style={{flex:1}}><Text style={s.lineTitle}>{p.nome}</Text>
                 <Text style={s.helper}>{roles[p.papel]||p.papel}</Text></View>
               <Text style={s.lineTitle}>{money(p.devido)}</Text></View>)}
-            {opts?.pode_corrigir_comissao&&Number(detail.saldo)>0&&!editingGross?
+            {opts?.pode_corrigir_comissao&&!saleLocked&&Number(detail.saldo)>0&&!editingGross?
               <Btn text="Corrigir comissão bruta" muted onPress={()=>{setEditingGross(true);setGrossValue(gross||'');setReason('');}}/>:null}
             {editingGross&&<View style={s.panel}><Input label="Nova comissão bruta (R$)" value={grossValue} onChange={setGrossValue} numeric placeholder="0,00"/>
               <Input label="Justificativa *" value={reason} onChange={setReason} placeholder="Motivo da correção"/>
@@ -515,7 +528,7 @@ export default function VendaMobile(){
                   <View style={{flex:1}}><Text style={s.lineTitle}>{r.beneficiario_nome}</Text>
                     <Text style={s.helper}>{roles[r.papel]||r.papel}</Text></View>
                   <Text style={s.lineTitle}>{money(r.valor)}</Text></View>)}
-                {rateios.editavel?<Btn text="Conferir / corrigir participações" muted
+                {!saleLocked&&rateios.editavel?<Btn text="Conferir / corrigir participações" muted
                   onPress={()=>{setEditingRateio(true);setReason('');}}/>:null}
               </>}
             </View>}
