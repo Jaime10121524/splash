@@ -71,39 +71,59 @@ export default function NativePermissionsAndPush(){
   const {user,token,ready}=useAuth();
   const [asked,setAsked]=useState(false);
   const [,requestCameraPermission,getCameraPermission]=useCameraPermissions();
+  const permissionJob=useRef<Promise<void>|null>(null);
   const lastToken=useRef('');
+  const lastRegisterAt=useRef(0);
+  const pushBusy=useRef(false);
   useEffect(()=>{
+    // Uma unica solicitação, mesmo se o hook da câmera trocar callbacks
+    // ou o React remontar efeitos em desenvolvimento.
     let mounted=true;
-    void startupPermissions(getCameraPermission,requestCameraPermission)
-      .finally(()=>{if(mounted)setAsked(true);});
+    if(!permissionJob.current){
+      permissionJob.current=startupPermissions(getCameraPermission,requestCameraPermission);
+    }
+    void permissionJob.current.finally(()=>{if(mounted)setAsked(true);});
     return()=>{mounted=false;};
   },[getCameraPermission,requestCameraPermission]);
 
   useEffect(()=>{
     if(!ready||!user||!token||!asked||Platform.OS!=='android')return;
     let mounted=true;
-    const register=async(force=false)=>{
-      const fcm=await getNativePushToken();
-      if(!mounted||!fcm)return;
+    // Cada telefone sincroniza com a API apenas ao entrar na conta, quando
+    // seu token muda ou apos 15 minutos no primeiro plano. Falhas aguardam
+    // pelo menos 2 minutos. Sem chamadas concorrentes.
+    const registerValue=async(fcm:string,changed=false)=>{
+      if(!mounted||!fcm||pushBusy.current)return;
       const id=String(user.id)+':'+fcm;
-      if(!force&&lastToken.current===id)return;
+      const elapsed=Date.now()-lastRegisterAt.current;
+      if(!changed && lastToken.current===id && elapsed<15*60*1000)return;
+      if(!changed && elapsed<2*60*1000)return;
+      pushBusy.current=true;
+      lastRegisterAt.current=Date.now();
       try{
         await apiRequest('mobile/notificacoes/dispositivo',{
           method:'POST',token,body:{plataforma:'android',token:fcm},
         });
         if(mounted)lastToken.current=id;
       }catch{
-        // Erros de conexão/Firebase não bloqueiam o aplicativo.
-        // O próximo retorno ao primeiro plano tenta novamente.
-      }
+        // Sem loop de tentativas; o app continua mesmo sem Firebase.
+      }finally{pushBusy.current=false;}
+    };
+    const register=async()=>{
+      if(pushBusy.current)return;
+      const value=await getNativePushToken();
+      if(mounted&&value)await registerValue(value);
     };
     void register();
     const foreground=AppState.addEventListener('change',state=>{
-      if(state==='active')void register(true);
+      if(state==='active')void register();
     });
-    const changed=Notifications.addPushTokenListener(()=>{
-      lastToken.current='';
-      void register(true);
+    const changed=Notifications.addPushTokenListener(event=>{
+      // O token ja vem no evento: NAO chamar getDevicePushTokenAsync de novo
+      // no listener (isso pode gerar nova notificacao e ciclos de registro).
+      if(event.type==='fcm'&&typeof event.data==='string'){
+        void registerValue(event.data,true);
+      }
     });
     return()=>{
       mounted=false;
