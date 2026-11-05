@@ -9,9 +9,14 @@ import {useAuth} from '../src/AuthContext';
 import {useThemedStyles,useTheme} from '../src/ThemeContext';
 import {colors} from '../src/theme';
 
+type FinanceItem={
+  operacao_id:number;titulo:string;data_venda:string;descricao:string;
+  total:string;recebidas:string;abatidas:string;a_receber:string;
+};
 type FinanceAccount={
   pessoa_id:number;nome:string;total:string;a_receber:string;recebidas:string;
   abatidas:string;liquidadas:string;participacoes:number;
+  detalhes:FinanceItem[];detalhes_limitados:boolean;
 };
 type FinanceData={
   inicio:string;fim:string;admin:boolean;
@@ -43,6 +48,7 @@ export default function FinanceiroMobile(){
   const [loading,setLoading]=useState(true);
   const [refreshing,setRefreshing]=useState(false);
   const [error,setError]=useState('');
+  const [expanded,setExpanded]=useState<number|null>(null);
   const requestNumber=useRef(0);
   const load=useCallback(async()=>{
     if(!token)return;
@@ -119,10 +125,14 @@ export default function FinanceiroMobile(){
         </View>
         <Text style={s.section}>{data.admin?'Por pessoa':'Minha conta'}</Text>
         {data.contas.length?data.contas.map(account=><View key={account.pessoa_id} style={s.account}>
-          <View style={s.accountHeader}>
+          <Pressable style={s.accountHeader}
+            accessibilityRole="button"
+            accessibilityLabel={'Detalhar comissões de '+account.nome}
+            onPress={()=>setExpanded(v=>v===account.pessoa_id?null:account.pessoa_id)}>
             <Text style={s.accountName}>{account.nome}</Text>
-            <Text style={s.accountCount}>{account.participacoes} participações</Text>
-          </View>
+            <Text style={s.accountCount}>{account.participacoes} participações
+              {expanded===account.pessoa_id?' ▴':' ▾'}</Text>
+          </Pressable>
           <View style={s.line}><Text style={s.lineName}>Comissões apuradas</Text>
             <Text style={s.lineValue}>{money(account.total)}</Text></View>
           <View style={s.line}><Text style={s.lineName}>A receber</Text>
@@ -131,7 +141,23 @@ export default function FinanceiroMobile(){
             <Text style={s.lineValue}>{money(account.recebidas)}</Text></View>
           <View style={s.line}><Text style={s.lineName}>Abatimentos</Text>
             <Text style={s.lineValue}>{money(account.abatidas)}</Text></View>
-        </View>):<View style={s.empty}><Text style={s.emptyTitle}>Sem comissões no período</Text>
+          {expanded===account.pessoa_id&&<View style={s.detailContainer}>
+            <Text style={s.detailHeader}>Participações por título</Text>
+            {account.detalhes.map((item,index)=><View key={item.operacao_id+'-'+index} style={s.detailItem}>
+              <Text style={s.detailTitle}>{item.titulo}</Text>
+              <Text style={s.detailMeta}>{formatDate(item.data_venda)} · {item.descricao}</Text>
+              <View style={s.line}><Text style={s.lineName}>Direito</Text>
+                <Text style={s.lineValue}>{money(item.total)}</Text></View>
+              <View style={s.line}><Text style={s.lineName}>Recebido</Text>
+                <Text style={s.lineValue}>{money(item.recebidas)}</Text></View>
+              <View style={s.line}><Text style={s.lineName}>A receber</Text>
+                <Text style={s.lineValue}>{money(item.a_receber)}</Text></View>
+            </View>)}
+            {account.detalhes_limitados&&<Text style={s.note}>
+              Exibindo até 30 participações. Escolha um período menor para consultar as restantes.
+            </Text>}
+          </View>}
+        </View>)}:<View style={s.empty}><Text style={s.emptyTitle}>Sem comissões no período</Text>
           <Text style={s.emptyText}>Não existem direitos apurados nas vendas selecionadas.</Text></View>}
         {data.possivel_truncamento&&<View style={s.warning}>
           <Text style={s.warningText}>Há muitas vendas no período. Reduza o intervalo para consultar todos os resultados.</Text>
@@ -186,4 +212,9 @@ const styles=StyleSheet.create({
   warning:{backgroundColor:'#FFF0E9',padding:14,borderRadius:12},
   warningText:{color:colors.danger,fontSize:12},
   note:{color:colors.muted,fontSize:11,lineHeight:18},
+  detailContainer:{paddingTop:12,borderTopWidth:1,borderTopColor:colors.line,gap:12},
+  detailHeader:{fontSize:13,fontWeight:'900',color:colors.brandDark},
+  detailItem:{padding:12,gap:8,borderRadius:12,backgroundColor:colors.pale},
+  detailTitle:{fontSize:13,fontWeight:'900',color:colors.ink},
+  detailMeta:{fontSize:11,color:colors.muted},
 });
