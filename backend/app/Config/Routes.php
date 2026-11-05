@@ -48,6 +48,8 @@ $routes->group('api', static function ($routes): void {
             $routes->post('atendimentos/(:num)/finalizar', 'Api\MobileVisitasController::finish/$1');
             $routes->post('atendimentos/(:num)/retomar', 'Api\MobileVisitasController::resume/$1');
             // Vendas do aplicativo: regras financeiras compartilhadas com o web, acesso por token.
+            // Extrato estritamente pessoal (corretor, vendedor e gerente).
+            $routes->get('minhas-vendas', 'Api\MinhasVendasController::index');
             $routes->get('vendas/opcoes', 'Api\MobileVendasController::opcoes');
             $routes->get('vendas', 'Api\MobileVendasController::index');
             $routes->post('vendas', 'Api\MobileVendasController::create');
