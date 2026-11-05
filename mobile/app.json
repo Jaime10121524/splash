@@ -54,7 +54,8 @@
           "color": "#7861F9",
           "defaultChannel": "splash_avisos"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true
