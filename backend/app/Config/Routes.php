@@ -126,6 +126,12 @@ $routes->group('api', static function ($routes): void {
     $routes->get('titulos/(:num)/historico', 'Api\\TitulosController::historico/$1');
     $routes->post('titulos/(:num)/movimentar', 'Api\\TitulosController::movimentar/$1', ['filter'=>'csrf']);
 
+    // Gestor/gerente: vendas gerenciadas e cadastro operacional, sem abrir rotas
+    // administrativas de recebimento, estorno ou rateio.
+    $routes->get('gestor/vendas', 'Api\\GestorVendasController::index');
+    $routes->get('gestor/vendas/opcoes', 'Api\\GestorVendasController::opcoes');
+    $routes->post('gestor/vendas', 'Api\\GestorVendasController::create', ['filter'=>'csrf']);
+
     // Consulta individual exclusivamente pela pessoa vinculada ao login Shield.
     // Nunca aceita pessoa_id do navegador nem expõe dados de associados.
     $routes->get('minhas-vendas', 'Api\\MinhasVendasController::index');
