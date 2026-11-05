@@ -18,17 +18,19 @@ final class MobileVendasController extends VendasController
     {
         $u=auth('tokens')->user();
         if (!$u || $u->isBanned()) return $this->errorResponse(401,'Sua sessão expirou.');
-        if (!$u->inGroup('admin','operador','gerente','corretor'))
-            return $this->errorResponse(403,'Perfil sem permissão para registrar vendas.');
+        // Operador e vendedor não podem consultar pagamentos ou valores de vendas.
+        if (!$u->inGroup('admin','gerente','corretor'))
+            return $this->errorResponse(403,'Seu perfil não pode consultar ou registrar vendas comerciais.');
         $admin=$u->inGroup('admin');
+        $manager=!$admin && $u->inGroup('gerente');
         $scope=null;
-        if (!$admin && $u->inGroup('corretor') && !$u->inGroup('operador','gerente')) {
+        if (!$admin) {
             $p=db_connect()->table('pessoas')->select('id')->where('user_id',(int)$u->id)
                 ->where('ativo',1)->get()->getRowArray();
-            if (!$p) return $this->errorResponse(403,'Conta sem corretor vinculado.');
+            if (!$p) return $this->errorResponse(403,'Conta sem pessoa ativa vinculada.');
             $scope=(int)$p['id'];
         }
-        return ['user'=>$u,'admin'=>$admin,'scope'=>$scope];
+        return ['user'=>$u,'admin'=>$admin,'manager'=>$manager,'scope'=>$scope];
     }
 
     protected function guard(): ?ResponseInterface
@@ -41,7 +43,7 @@ final class MobileVendasController extends VendasController
     {
         $visit=db_connect()->table('visitas')->where('id',$id)->get()->getRowArray();
         if (!$visit || $visit['status']!=='VENDA') return $this->errorResponse(404,'Visita com venda fechada não encontrada.');
-        if ($a['scope']!==null && !in_array($a['scope'],[(int)$visit['corretor_pessoa_id'],(int)($visit['segundo_corretor_pessoa_id']??0)],true)
+        if ($a['scope']!==null && !$a['manager'] && !in_array($a['scope'],[(int)$visit['corretor_pessoa_id'],(int)($visit['segundo_corretor_pessoa_id']??0)],true)
             && (int)$visit['criado_por_usuario_id']!==(int)$a['user']->id)
             return $this->errorResponse(404,'Visita não encontrada.');
         return $visit;
@@ -51,7 +53,12 @@ final class MobileVendasController extends VendasController
     {
         $op=db_connect()->table('venda_operacoes')->where('id',$id)->get()->getRowArray();
         if (!$op) return $this->errorResponse(404,'Venda não encontrada.');
-        if ($a['admin'] || $a['scope']===null) return $op;
+        if ($a['admin']) return $op;
+        if ($a['manager']) {
+            if ((int)($op['gerente_pessoa_id']??0)===$a['scope']
+                || (int)($op['criado_por_usuario_id']??0)===(int)$a['user']->id) return $op;
+            return $this->errorResponse(404,'Venda não encontrada entre as vendas da sua gestão.');
+        }
         $visitId=(int)($op['visita_id']??0);
         if ($visitId<1) return $this->errorResponse(404,'Venda não encontrada.');
         $visit=$this->linkedVisit($visitId,$a);
@@ -82,10 +89,15 @@ final class MobileVendasController extends VendasController
             ->join('visitas v','v.id=o.visita_id','left')
             ->where('o.situacao','VENDA');
         if($a['scope']!==null){
-            $query->groupStart()->where('o.corretor_pessoa_id',$a['scope'])
-                ->orWhere('o.segundo_corretor_pessoa_id',$a['scope'])
-                ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd()
-                ->where('o.visita_id IS NOT NULL',null,false);
+            if($a['manager']){
+                $query->groupStart()->where('o.gerente_pessoa_id',$a['scope'])
+                    ->orWhere('o.criado_por_usuario_id',(int)$a['user']->id)->groupEnd();
+            }else{
+                $query->groupStart()->where('o.corretor_pessoa_id',$a['scope'])
+                    ->orWhere('o.segundo_corretor_pessoa_id',$a['scope'])
+                    ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd()
+                    ->where('o.visita_id IS NOT NULL',null,false);
+            }
         }
         if($planParam!=='')$query->where('pv.plano_id',(int)$planParam);
         if($start!=='')$query->where('o.data_venda >=',$start);
@@ -174,12 +186,22 @@ final class MobileVendasController extends VendasController
         $base=$op['comissao_ajustada']??$op['comissao_prevista'];
         $gross=$base===null?null:VendaMoney::cents((string)$base,true);
         $own=null;
-        if ($gross!==null && (int)$op['corretor_pessoa_id']===(int)$a['scope']) {
+        if ($gross!==null && !$a['manager'] && (int)$op['corretor_pessoa_id']===(int)$a['scope']) {
             $out=$db->table('comissao_rateios')->select('valor')
                 ->where('operacao_id',(int)$id)
                 ->where('responsavel_pessoa_id',(int)$a['scope'])->get()->getResultArray();
             $own=$gross;
             foreach($out as $m)$own-=VendaMoney::cents((string)$m['valor'],true)??0;
+        }
+        // Comissões do gerente vêm apenas dos rateios cujo beneficiário é o login.
+        if ($a['manager']) {
+            $myRows=$db->table('comissao_rateios')->select('valor')
+                ->where('operacao_id',(int)$id)->where('beneficiario_pessoa_id',$a['scope'])
+                ->get()->getResultArray();
+            if ($myRows) {
+                $own=0;
+                foreach($myRows as $row)$own+=VendaMoney::cents((string)$row['valor'],true)??0;
+            }
         }
         return $this->response->setJSON([
             'operacao'=>[
