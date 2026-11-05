@@ -3,6 +3,7 @@ import { comercialGet, comercialPost, dateBR, localDateISO, personOptions } from
 import { baixarConvite, linkWhatsAppAgendamento } from '../lib/agendamentoQr.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
 import { SurfaceModal } from '../components/ComercialForms.jsx'
+import { DateInput, SearchSelectInput } from '../components/UiFields.jsx'
 import './Agendamentos.css'
 import TransientNotice from '../components/TransientNotice.jsx'
 
@@ -128,7 +129,10 @@ export default function Agendamentos({navigate=()=>{}}) {
   const set=(key,v)=>setForm(f=>({...f,[key]:v}))
 
   async function create(e){
-    e.preventDefault();setBusy(true);setError('')
+    e.preventDefault();setError('')
+    if(form.data_visita<localDateISO()||!form.data_visita)return setError('Selecione uma data de visita válida a partir de hoje.')
+    if(!form.captador_pessoa_id)return setError('Selecione o corretor que captou a visita.')
+    setBusy(true)
     try{
       const r=await comercialPost('/api/agendamentos',{
         ...form,telefone:cleanPhone(form.telefone),
@@ -152,6 +156,7 @@ export default function Agendamentos({navigate=()=>{}}) {
   async function saveEdit(e){
     e.preventDefault()
     if(!editing)return
+    if(!editing.data_visita||editing.data_visita<localDateISO())return setError('Selecione uma data de visita válida a partir de hoje.')
     setBusy(true);setError('')
     try{
       const data={
@@ -280,7 +285,7 @@ export default function Agendamentos({navigate=()=>{}}) {
         <label>Nome completo *<input required maxLength={160} value={form.nome_completo} onChange={e=>set('nome_completo',e.target.value)} /></label>
         <label>WhatsApp / telefone com DDD *<input required inputMode="tel" value={formatPhone(form.telefone)} onChange={e=>set('telefone',cleanPhone(e.target.value))} /></label>
         <div className="agenda-cols">
-          <label>Data da visita *<input required type="date" min={localDateISO()} value={form.data_visita} onChange={e=>set('data_visita',e.target.value)} /></label>
+          <label>Data da visita *<DateInput ariaLabel="Data da visita" value={form.data_visita} minDate={localDateISO()} onChange={v=>set("data_visita",v)}/></label>
           <label>Nº de pessoas *<input required type="number" min="1" max="100" value={form.quantidade_pessoas} onChange={e=>set('quantidade_pessoas',e.target.value)} /></label>
         </div>
         <div className="agenda-form-intro">
@@ -288,10 +293,9 @@ export default function Agendamentos({navigate=()=>{}}) {
           <div><strong>Responsável e convite</strong>
             <small>O voucher com QR Code será gerado após salvar.</small></div>
         </div>
-        <label>Corretor que captou *<select required value={form.captador_pessoa_id} onChange={e=>set('captador_pessoa_id',e.target.value)}>
-          <option value="">Selecionar corretor</option>
-          {brokers.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
-        </select></label>
+        <label>Corretor que captou *<SearchSelectInput ariaLabel="Corretor que captou"
+          placeholder="Buscar corretor pelo nome" value={form.captador_pessoa_id}
+          onChange={v=>set('captador_pessoa_id',String(v))} options={brokers}/></label>
         <label>Observações (opcional)<textarea maxLength={500} value={form.observacoes} onChange={e=>set('observacoes',e.target.value)} /></label>
         <div className="agenda-form-actions"><button type="button" onClick={()=>setModal(null)}>Cancelar</button>
           <button className="agenda-primary" disabled={busy}>{busy?'Salvando...':'Salvar e gerar convite'}</button></div>
@@ -304,8 +308,8 @@ export default function Agendamentos({navigate=()=>{}}) {
       <form className="agenda-form" onSubmit={saveEdit}>
         <div className="agenda-cols">
           <label>Data da visita *
-            <input required type="date" min={localDateISO()} value={editing.data_visita}
-              onChange={e=>setEditing(v=>({...v,data_visita:e.target.value}))}/>
+            <DateInput ariaLabel="Data da visita" value={editing.data_visita} minDate={localDateISO()}
+              onChange={date=>setEditing(v=>({...v,data_visita:date}))}/>
           </label>
           <label>Nº de pessoas *
             <input required type="number" min="1" max="100" value={editing.quantidade_pessoas}
@@ -371,24 +375,29 @@ export default function Agendamentos({navigate=()=>{}}) {
         </div>
         {found.situacao!=='AGENDADO'?<p className="agenda-warning">Esse agendamento já foi utilizado ou cancelado.</p>:<>
           <p className="agenda-hint">O QR registra somente a chegada. O atendimento ficará aguardando até ser iniciado separadamente. Confirme corretor(es) e atendente.</p>
-          <label>Corretor responsável *<select required value={broker} onChange={e=>setBroker(e.target.value)}>
-            <option value="">Selecionar</option>{brokers.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
-          </select></label>
-          <label>Segundo corretor (opcional)<select value={second} onChange={e=>setSecond(e.target.value)}>
-            <option value="">Nenhum</option>{brokers.filter(p=>p.value!==broker).map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
-          </select></label>
-          <label>Quem vai atender? *<select required value={attendant} onChange={e=>setAttendant(e.target.value)}>
-            <option value="">Selecionar atendente</option>{attendants.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
-          </select></label>
+          <div className="agenda-form-intro"><span aria-hidden="true">1</span>
+            <div><strong>Equipe que receberá o visitante</strong>
+              <small>Confirme quem captou, quem atenderá e os participantes.</small></div>
+          </div>
+          <label>Corretor responsável *<SearchSelectInput ariaLabel="Corretor responsável"
+            placeholder="Pesquisar corretor" value={broker} onChange={v=>setBroker(String(v))}
+            options={brokers}/></label>
+          <label>Segundo corretor (opcional)<SearchSelectInput ariaLabel="Segundo corretor"
+            placeholder="Nenhum segundo corretor" value={second} onChange={v=>setSecond(String(v))}
+            options={[{value:'',label:'Nenhum'},...brokers.filter(p=>p.value!==broker)]}/></label>
+          <label>Quem vai atender? *<SearchSelectInput ariaLabel="Atendente responsável"
+            placeholder="Pesquisar atendente" value={attendant} onChange={v=>setAttendant(String(v))}
+            options={attendants}/></label>
           <div className="agenda-linkclient">
             <strong>Vincular cliente já cadastrado (opcional)</strong>
             <p>Se houver cliente com telefone igual, selecione-o antes do check-in para evitar duplicidade.</p>
             <div className="agenda-inline"><input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Telefone ou nome" />
               <button type="button" disabled={busy} onClick={findClients}>Localizar</button></div>
-            <select value={clientId} onChange={e=>setClientId(e.target.value)}>
-              <option value="">Cadastrar ou localizar automaticamente</option>
-              {clients.map(c=><option key={c.id} value={c.id}>{c.nome} · {formatPhone(c.telefone)}</option>)}
-            </select>
+            <SearchSelectInput ariaLabel="Vincular cliente existente" value={clientId}
+              onChange={v=>setClientId(String(v))}
+              options={[{value:'',label:'Cadastrar ou localizar automaticamente'},
+                ...clients.map(c=>({value:String(c.id),label:c.nome+' · '+formatPhone(c.telefone)}))]}
+              placeholder="Buscar ou criar cliente"/>
           </div>
           <div className="agenda-form-actions"><button type="button" onClick={()=>setModal(null)}>Voltar</button>
             <button className="agenda-primary" disabled={busy||!broker||!attendant||second===broker}>
