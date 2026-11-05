@@ -1,6 +1,13 @@
 name: Splash React Native — validação
 
 on:
+  push:
+    branches:
+      - feature/react-native-splash-mobile
+    paths:
+      - "mobile/**"
+      - "backend/app/**"
+      - ".github/workflows/native-mobile-ci.yml"
   pull_request:
     paths:
       - "mobile/**"
@@ -46,6 +53,14 @@ jobs:
       - name: Verificar sintaxe das rotas e da API mobile
         run: |
           php -l backend/app/Config/Routes.php
+          php -l backend/app/Config/AuthGroups.php
+          php -l backend/app/Controllers/Api/FechamentosController.php
+          php -l backend/app/Controllers/Api/GestorVendasController.php
+          php -l backend/app/Controllers/Api/MinhasVendasController.php
+          php -l backend/app/Controllers/Api/MobileNotificacoesController.php
+          php -l backend/app/Controllers/Api/MobileVendasController.php
+          php -l backend/app/Controllers/Api/MobileRateiosController.php
+          php -l backend/app/Controllers/Api/MobileDashboardController.php
           php -l backend/app/Controllers/Api/MobileController.php
           php -l backend/app/Controllers/Api/MobileVisitasController.php
           php -l backend/app/Controllers/Api/MobileClientesController.php
