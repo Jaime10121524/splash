@@ -43,18 +43,20 @@ export default function FinanceiroMobile(){
   const [loading,setLoading]=useState(true);
   const [refreshing,setRefreshing]=useState(false);
   const [error,setError]=useState('');
-  const inFlight=useRef(false);
+  const requestNumber=useRef(0);
   const load=useCallback(async()=>{
-    if(!token||inFlight.current)return;
-    inFlight.current=true;
+    if(!token)return;
+    const current=++requestNumber.current;
     try{
       const query=new URLSearchParams({inicio:period.start,fim:period.end});
       const result=await apiRequest<FinanceData>('mobile/financeiro?'+query.toString(),{token});
-      setData(result);setError('');
+      if(requestNumber.current===current){setData(result);setError('');}
     }catch(e){
-      setError(e instanceof Error?e.message:'Não foi possível consultar o financeiro.');
+      if(requestNumber.current===current){
+        setError(e instanceof Error?e.message:'Não foi possível consultar o financeiro.');
+      }
     }finally{
-      inFlight.current=false;setLoading(false);setRefreshing(false);
+      if(requestNumber.current===current){setLoading(false);setRefreshing(false);}
     }
   },[period.start,period.end,token]);
   useFocusEffect(useCallback(()=>{
