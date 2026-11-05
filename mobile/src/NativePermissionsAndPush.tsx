@@ -73,8 +73,10 @@ export default function NativePermissionsAndPush(){
   const [,requestCameraPermission,getCameraPermission]=useCameraPermissions();
   const permissionJob=useRef<Promise<void>|null>(null);
   const lastToken=useRef('');
+  const activeUserId=useRef('');
   const lastRegisterAt=useRef(0);
   const pushBusy=useRef(false);
+  const tokenLookupBusy=useRef(false);
   useEffect(()=>{
     // Uma unica solicitação, mesmo se o hook da câmera trocar callbacks
     // ou o React remontar efeitos em desenvolvimento.
@@ -89,6 +91,13 @@ export default function NativePermissionsAndPush(){
   useEffect(()=>{
     if(!ready||!user||!token||!asked||Platform.OS!=='android')return;
     let mounted=true;
+    // Ao trocar de usuário, registrar imediatamente para evitar pushes na
+    // conta anterior (sem herdar o cooldown da sessão encerrada).
+    if(activeUserId.current!==String(user.id)){
+      activeUserId.current=String(user.id);
+      lastToken.current='';
+      lastRegisterAt.current=0;
+    }
     // Cada telefone sincroniza com a API apenas ao entrar na conta, quando
     // seu token muda ou apos 15 minutos no primeiro plano. Falhas aguardam
     // pelo menos 2 minutos. Sem chamadas concorrentes.
@@ -110,9 +119,12 @@ export default function NativePermissionsAndPush(){
       }finally{pushBusy.current=false;}
     };
     const register=async()=>{
-      if(pushBusy.current)return;
-      const value=await getNativePushToken();
-      if(mounted&&value)await registerValue(value);
+      if(pushBusy.current||tokenLookupBusy.current)return;
+      tokenLookupBusy.current=true;
+      try{
+        const value=await getNativePushToken();
+        if(mounted&&value)await registerValue(value);
+      }finally{tokenLookupBusy.current=false;}
     };
     void register();
     const foreground=AppState.addEventListener('change',state=>{
