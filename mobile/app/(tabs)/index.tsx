@@ -248,9 +248,9 @@ function HomeOperacional(){
            <MiniKpi title="Vendas fechadas" value={String(data.visitas.venda)}
              description="Resultados nas visitas" icon="🤝" tint="#8972FF"
              onPress={()=>go('/(tabs)/atendimentos')}/>
-           <MiniKpi title="Títulos cadastrados" value={String(data.vendas.total)}
+           {user?.role!=='operador'&&<MiniKpi title="Títulos cadastrados" value={String(data.vendas.total)}
              description="Vendas lançadas" icon="🏆" tint="#E7A348"
-             onPress={()=>go('/vendas')}/>
+             onPress={()=>go('/vendas')}/>}
            <MiniKpi title="Conversão" value={conversion.toFixed(1).replace('.',',')+'%'}
              description={count+' atendimentos concluídos'} icon="📈" tint="#45BE92"
              onPress={()=>go('/(tabs)/atendimentos')}/>
@@ -260,7 +260,7 @@ function HomeOperacional(){
              <Text style={s.revenueValue}>{money(data.vendas.valor)}</Text></View>
            <Text style={s.revenueIcon}>💎</Text>
          </View>}
-         <View style={s.chartCard}>
+         {user?.role!=='operador'&&<View style={s.chartCard}>
            <View style={s.sectionRow}><View><Text style={s.chartTitle}>Evolução de vendas</Text>
              <Text style={s.chartSubtitle}>Títulos cadastrados por dia{days===30?' (grupos de 3 dias)':''}</Text></View>
              <Text style={s.chartTotal}>{data.vendas.total}</Text></View>
@@ -276,7 +276,7 @@ function HomeOperacional(){
              </View>)}
            </View>
            {!data.vendas.total&&<Text style={s.zeroNote}>Nenhum título cadastrado neste período.</Text>}
-         </View>
+         </View>}
          <View style={s.chartCard}>
            <View style={s.sectionRow}><Text style={s.chartTitle}>Andamento das visitas</Text>
              <Pressable onPress={()=>go('/(tabs)/atendimentos')}><Text style={s.seeAll}>Ver tudo</Text></Pressable></View>
