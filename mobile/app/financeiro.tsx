@@ -94,6 +94,19 @@ export default function FinanceiroMobile(){
           <Text style={s.periodEdit}>Alterar</Text>
         </Pressable>
       </View>
+      <Text style={s.section}>Lançamentos financeiros</Text>
+      <View style={s.quickActions}>
+        <Pressable style={s.quickAction} onPress={()=>router.push('/gastos')} accessibilityRole="button">
+          <View style={s.quickIcon}><Text style={s.quickEmoji}>🧾</Text></View>
+          <Text style={s.quickTitle}>Gastos</Text>
+          <Text style={s.quickDescription}>Registrar despesas e consultar valores</Text>
+        </Pressable>
+        <Pressable style={s.quickAction} onPress={()=>router.push('/emprestimos')} accessibilityRole="button">
+          <View style={s.quickIcon}><Text style={s.quickEmoji}>💸</Text></View>
+          <Text style={s.quickTitle}>Empréstimos</Text>
+          <Text style={s.quickDescription}>Registrar e acompanhar saldos</Text>
+        </Pressable>
+      </View>
       {!!error&&<View style={s.errorCard}>
         <Text style={s.errorText}>{error}</Text>
         <Pressable onPress={()=>{void load();}}><Text style={s.retry}>Tentar novamente</Text></Pressable>
@@ -211,6 +224,14 @@ const styles=StyleSheet.create({
   emptyText:{fontSize:12,color:colors.muted},
   warning:{backgroundColor:'#FFF0E9',padding:14,borderRadius:12},
   warningText:{color:colors.danger,fontSize:12},
+  quickActions:{flexDirection:'row',gap:10},
+  quickAction:{flex:1,borderRadius:16,padding:15,backgroundColor:'#FFFFFF',
+    borderWidth:1,borderColor:colors.line,gap:8},
+  quickIcon:{height:36,width:36,borderRadius:12,alignItems:'center',
+    justifyContent:'center',backgroundColor:colors.pale},
+  quickEmoji:{fontSize:20},
+  quickTitle:{fontSize:15,fontWeight:'900',color:colors.ink},
+  quickDescription:{fontSize:11,color:colors.muted,lineHeight:17},
   note:{color:colors.muted,fontSize:11,lineHeight:18},
   detailContainer:{paddingTop:12,borderTopWidth:1,borderTopColor:colors.line,gap:12},
   detailHeader:{fontSize:13,fontWeight:'900',color:colors.brandDark},
