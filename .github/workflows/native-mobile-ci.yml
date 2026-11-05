@@ -6,6 +6,7 @@ on:
       - feature/react-native-splash-mobile
     paths:
       - "mobile/**"
+      - "frontend/**"
       - "backend/app/**"
       - ".github/workflows/native-mobile-ci.yml"
   pull_request:
@@ -25,6 +26,19 @@ on:
   workflow_dispatch:
 
 jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependencias React
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - name: Verificar compilacao Web
+        run: npm run build
+        working-directory: frontend
   typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -60,6 +74,7 @@ jobs:
           php -l backend/app/Controllers/Api/MinhasVendasController.php
           php -l backend/app/Controllers/Api/MobileNotificacoesController.php
           php -l backend/app/Controllers/Api/MobileVendasController.php
+          php -l backend/app/Controllers/Api/MidiasSplashController.php
           php -l backend/app/Controllers/Api/MobileRateiosController.php
           php -l backend/app/Controllers/Api/MobileDashboardController.php
           php -l backend/app/Controllers/Api/MobileController.php
