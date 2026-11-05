@@ -141,6 +141,9 @@ ou índice em produção às cegas.
 - Este extrato é somente leitura: não lança, paga ou estorna.
 - O resumo limita-se a até **500 vendas** do intervalo; ao atingir o limite
   o app avisa para reduzir o período.
+- Na tela Financeiro, tocar em uma pessoa expande até **30 participações**
+  detalhadas por título (direito, recebido, pendente). Para obter outras,
+  filtre datas mais específicas.
 
 ## Firebase, serviços e agendamento de avisos
 
