@@ -108,3 +108,20 @@
 :root[data-theme="dark"] .agenda-form textarea{color-scheme:dark}
 :root[data-theme="dark"] .agenda-status.compareceu{background:#173d31;color:#91e8bc}
 :root[data-theme="dark"] .agenda-status.cancelado{background:#4c2a35;color:#ffc4cf}
+
+/* Formulário de agendamento com divisão clara de etapas. */
+.agenda-form-intro{display:flex;align-items:center;gap:12px;padding:12px 13px;
+  background:var(--surface-alt);border:1px solid var(--border);border-radius:14px}
+.agenda-form-intro>span{width:32px;height:32px;border-radius:11px;
+  display:grid;place-items:center;flex-shrink:0;background:var(--brand-light);
+  color:var(--brand);font-weight:900}
+.agenda-form-intro>div{display:grid;gap:3px}
+.agenda-form-intro strong{color:var(--text);font-size:12px}
+.agenda-form-intro small{color:var(--muted-dark);font-size:11px;line-height:1.5}
+.agenda-reader-preview{position:relative;border-radius:14px;overflow:hidden;background:#141629;
+  width:100%;min-height:180px;display:flex;align-items:center;justify-content:center}
+.agenda-reader-placeholder{display:grid;place-items:center;gap:10px;text-align:center;
+  color:#e2dfff;padding:22px}
+.agenda-reader-placeholder span{font-size:64px;color:#a99bff}
+.agenda-reader-placeholder small{font-size:11px;color:#d4d2e9;line-height:1.6}
+.agenda-reader-preview .agenda-reader-video{border:0;border-radius:0;max-height:310px}
