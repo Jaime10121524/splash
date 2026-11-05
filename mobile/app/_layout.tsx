@@ -4,6 +4,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {SymbolView} from 'expo-symbols';
 import {AuthProvider, useAuth} from '../src/AuthContext';
 import {ThemeProvider, useTheme} from '../src/ThemeContext';
+import NativePermissionsAndPush from '../src/NativePermissionsAndPush';
 
 const items=[
   {key:'inicio',label:'Início',href:'/(tabs)',ios:'house',android:'home'},
@@ -53,6 +54,7 @@ function PersistentMenu(){
 function AppNavigation(){
   const {resolved,palette}=useTheme();
   return <>
+    <NativePermissionsAndPush/>
     <StatusBar barStyle={resolved==='dark'?'light-content':'dark-content'}/>
     <View style={{flex:1,backgroundColor:palette.background}}>
       <Stack screenOptions={{headerShown:false,contentStyle:{backgroundColor:palette.background},
