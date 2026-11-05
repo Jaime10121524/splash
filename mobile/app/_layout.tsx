@@ -21,6 +21,9 @@ function PersistentMenu(){
   const pathname=usePathname();
   const router=useRouter();
   if(!ready||!user||pathname==='/login')return null;
+  const visibleItems=user.role==='vendedor'
+    ? items.filter(item=>item.key==='inicio'||item.key==='mais')
+    : items;
   const active=pathname.startsWith('/agendamentos')?'agenda':
     pathname.startsWith('/escanear')?'escanear':
     pathname.startsWith('/atendimentos')||pathname.startsWith('/atendimento/')?'atendimentos':
@@ -29,7 +32,7 @@ function PersistentMenu(){
       pathname.startsWith('/notificacoes')?'mais':'inicio';
   return <View style={[styles.bar,{height:67+bottom,paddingBottom:bottom+5,
     backgroundColor:palette.surface,borderTopColor:palette.line}]}>
-    {items.map(item=>{
+    {visibleItems.map(item=>{
       const selected=active===item.key;
       const tint=selected?palette.brandDark:palette.muted;
       const scan=item.key==='escanear';
