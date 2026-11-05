@@ -175,6 +175,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   async function uploadSalePhoto(event){
     const photo=event.target.files?.[0]
     if(!photo||!detail?.operacao?.id)return
+    if(detail.fechamento){
+      setFormError('Foto bloqueada: esta venda pertence ao fechamento nº '+detail.fechamento.id+'.')
+      event.target.value='';return
+    }
     setFormError('');setNotice('')
     if(!['image/jpeg','image/png','image/webp'].includes(photo.type)||photo.size>5*1024*1024){
       setFormError('Use uma foto JPG, PNG ou WebP de até 5 MB.')
@@ -558,9 +562,11 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           <div className="vd-sale-photo-content">
             <strong>Foto da venda</strong>
             <p>Registre o momento da conquista. A imagem fica protegida no servidor, fora do banco de dados.</p>
-            <button type="button" className="vd-outline" onClick={()=>salePhotoRef.current?.click()}
-              disabled={salePhotoBusy}>{salePhotoBusy?'Enviando...':'Adicionar / trocar foto'}</button>
-            <small>JPG, PNG ou WebP, até 5 MB.</small>
+            {detail.fechamento
+              ?<small>Foto protegida pelo fechamento nº {detail.fechamento.id}. Apenas consulta.</small>
+              :<><button type="button" className="vd-outline" onClick={()=>salePhotoRef.current?.click()}
+                disabled={salePhotoBusy}>{salePhotoBusy?'Enviando...':'Adicionar / trocar foto'}</button>
+                <small>JPG, PNG ou WebP, até 5 MB.</small></>}
             <input ref={salePhotoRef} type="file" accept="image/jpeg,image/png,image/webp"
               onChange={uploadSalePhoto} style={{display:'none'}} aria-label="Selecionar foto da venda"/>
           </div>
