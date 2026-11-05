@@ -80,9 +80,9 @@
 .agenda-actions button,.agenda-form-actions button,.agenda-inline button{color:var(--brand)}
 .agenda-actions button.accent,.agenda-form-actions .agenda-primary{color:#fff;background:var(--brand);border-color:var(--brand)}
 .agenda-status{background:var(--brand-light);color:var(--brand)}
-.agenda-warning{color:#e27b8b}
-.agenda-feedback.error{background:#432531;color:#ffd6dd}
-.agenda-feedback.success{background:#173d31;color:#bbffdb}
+:root[data-theme="dark"] .agenda-warning{color:#e27b8b}
+:root[data-theme="dark"] .agenda-feedback.error{background:#432531;color:#ffd6dd}
+:root[data-theme="dark"] .agenda-feedback.success{background:#173d31;color:#bbffdb}
 .agenda-heading small{color:var(--brand)}
 
 /* Leitor de QR da versão web: câmera opcional e fallback por leitor/colagem. */
