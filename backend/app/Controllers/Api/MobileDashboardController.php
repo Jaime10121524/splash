@@ -36,6 +36,15 @@ final class MobileDashboardController extends BaseController
                     ->setJSON(['message'=>'Conta sem corretor ativo vinculado.']);
             $scope=(int)$person['id'];
         }
+        // Gerente acompanha vendas sob sua gestão, não o faturamento dos demais.
+        $managerScope=null;
+        if($user->inGroup('gerente')&&!$user->inGroup('admin')){
+            $person=$db->table('pessoas')->select('id')
+                ->where('user_id',(int)$user->id)->where('ativo',1)->get()->getRowArray();
+            if(!$person)return $this->response->setStatusCode(403)
+                ->setJSON(['message'=>'Gestor sem pessoa ativa vinculada.']);
+            $managerScope=(int)$person['id'];
+        }
         $start=date('Y-m-d',strtotime('-'.($days-1).' days'));
         $end=date('Y-m-d');
         $visitQuery=static function () use ($db,$scope,$user,$start,$end){
@@ -67,7 +76,7 @@ final class MobileDashboardController extends BaseController
             ->join('pessoas cp','cp.id=v.corretor_pessoa_id','left')
             ->orderBy('v.chegada_em','DESC')->limit(4)->get()->getResultArray();
 
-        $salesQuery=static function()use($db,$scope,$user,$start,$end){
+        $salesQuery=static function()use($db,$scope,$managerScope,$user,$start,$end){
             $q=$db->table('venda_operacoes o')
                 ->join('visitas v','v.id=o.visita_id','left')
                 ->where('o.situacao','VENDA')
@@ -78,6 +87,12 @@ final class MobileDashboardController extends BaseController
                 ->orWhere('o.segundo_corretor_pessoa_id',$scope)
                 ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd()
                 ->where('o.visita_id IS NOT NULL',null,false);
+            if($managerScope!==null)$q->groupStart()
+                ->where('o.gerente_pessoa_id',$managerScope)
+                ->orWhere('o.criado_por_usuario_id',(int)$user->id)->groupEnd();
+            // Operador acompanha visitas, mas não consulta indicadores de vendas.
+            if($user->inGroup('operador')&&!$user->inGroup('admin','gerente','corretor'))
+                $q->where('o.id',0);
             return $q;
         };
         $salesStats=$salesQuery()->select('COUNT(*) AS total, COALESCE(SUM(o.valor_cobrado),0) AS valor',false)
