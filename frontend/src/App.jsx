@@ -208,7 +208,17 @@ function Login({ onLogin, error, busy, offline, onRetry, onForgot }) {
   </div>
 }
 
-function Sidebar({ user, current, navigate, open, close, logout }) {
+function ProfileAvatar({user,revision=0}){
+  const [failed,setFailed]=useState(false)
+  useEffect(()=>{setFailed(false)},[revision,user?.id])
+  return <span className="avatar-photo-frame">
+    {!failed&&<img src={apiUrl('/api/conta/foto')+'?rev='+revision}
+      alt="" onError={()=>setFailed(true)}/>}
+    {failed&&initials(user.username)}
+  </span>
+}
+
+function Sidebar({ user, current, navigate, open, close, logout, avatarRevision }) {
   const permitted = nav.filter(item => item.roles.includes(user.role))
   const sections = [...new Set(permitted.map(item => item.section))]
   return <>
@@ -224,7 +234,11 @@ function Sidebar({ user, current, navigate, open, close, logout }) {
         </div>)}
       </div>
       <div className="sidebar-bottom">
-        <div className="account-mini"><span className="avatar">{initials(user.username)}</span><div><strong>{user.username}</strong><small>{roleLabel(user.role)}</small></div></div>
+        <button type="button" className="account-mini account-profile-link"
+          onClick={()=>{navigate('meu-perfil');close()}} title="Abrir meu perfil">
+          <ProfileAvatar user={user} revision={avatarRevision}/>
+          <span className="account-profile-text"><strong>{user.username}</strong><small>{roleLabel(user.role)}</small></span>
+        </button>
         <button className="logout-link" onClick={logout}><Icon name="logout" size={18}/> Sair da conta</button>
       </div>
     </aside>
@@ -424,6 +438,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
   const [unreadCount,setUnreadCount]=useState(0)
+  const [avatarRevision,setAvatarRevision]=useState(0)
   const seenNotificationId=useRef(null)
   const [forgotOpen,setForgotOpen]=useState(false)
   const [theme, setTheme] = useState(() => {
@@ -442,6 +457,11 @@ function App() {
     }
   }
   useEffect(() => { refresh() }, [])
+  useEffect(()=>{
+    const update=()=>setAvatarRevision(n=>n+1)
+    window.addEventListener('splash:avatar-updated',update)
+    return()=>window.removeEventListener('splash:avatar-updated',update)
+  },[])
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     document.title = 'SPLASH · Gestão de títulos'
@@ -531,7 +551,7 @@ function App() {
   const active=allowed.some(x=>x.id===current)?current:'dashboard'
   const mobileNav=['dashboard','atendimentos','vendas','financeiro','relatorios'].map(id=>allowed.find(x=>x.id===id)).filter(Boolean).slice(0,5)
   return <div className="app-shell">
-    <Sidebar user={user} current={active} navigate={go} open={menuOpen} close={()=>setMenuOpen(false)} logout={logout}/>
+    <Sidebar user={user} current={active} navigate={go} open={menuOpen} close={()=>setMenuOpen(false)} logout={logout} avatarRevision={avatarRevision}/>
     <div className="workspace">
       <header className="topbar">
         <div className="top-left"><button className="icon-btn hamburger" onClick={()=>setMenuOpen(true)} aria-label="Abrir menu"><Icon name="menu"/></button><div className="top-breadcrumb"><span>SPLASH</span><Icon name="chevron" size={14}/><strong>{active==='dashboard'?'Visão geral':nav.find(x=>x.id===active)?.label}</strong></div></div>
@@ -539,7 +559,10 @@ function App() {
           <span className="connection-indicator"><span/> Conectado</span>
           <button className="icon-btn" title="Alternar tema" aria-label="Alternar tema" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}><Icon name={theme==='light'?'moon':'sun'} size={20}/></button>
           <div className="notification-wrap"><button className="icon-btn" title="Notificações" aria-label={unreadCount?'Notificações, '+unreadCount+' não lidas':'Notificações'} aria-expanded={noticesOpen} onClick={()=>setNoticesOpen(s=>!s)}><Icon name="bell" size={20}/>{unreadCount>0&&<span className="notification-count">{unreadCount>99?'99+':unreadCount}</span>}</button>{noticesOpen&&<div className="notification-pop"><NotificacoesSplash navigate={go} onUnreadChange={setUnreadCount}/></div>}</div>
-          <button type="button" className="top-avatar" title="Abrir meu perfil" aria-label="Meu perfil" onClick={()=>go('meu-perfil')}>{initials(user.username)}</button>
+          <button type="button" className="top-avatar" title="Abrir meu perfil" aria-label="Meu perfil"
+            onClick={()=>go('meu-perfil')}>
+            <ProfileAvatar user={user} revision={avatarRevision}/>
+          </button>
         </div>
       </header>
       <main className="main-content">
