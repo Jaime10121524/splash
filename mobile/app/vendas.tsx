@@ -1,4 +1,5 @@
 import {useThemedStyles,useTheme} from '../src/ThemeContext';
+import MinhasVendasMobile from '../src/components/MinhasVendasMobile';
 import {useCallback,useState} from 'react';
 import ChoiceSheet, {type Choice} from '../src/components/ChoiceSheet';
 import DateRangeCalendar from '../src/components/DateRangeCalendar';
@@ -19,6 +20,10 @@ const dateISO=(input:string):string|null=>{const m=input.match(/^(\d{2})\/(\d{2}
 const dateBR=(d:Date)=>[String(d.getDate()).padStart(2,'0'),String(d.getMonth()+1).padStart(2,'0'),String(d.getFullYear())].join('/');
 const money=(v:string)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
 export default function Vendas(){
+  const {user}=useAuth();
+  return user?.role==='vendedor'?<MinhasVendasMobile/>:<VendasOperacionais/>;
+}
+function VendasOperacionais(){
   const router=useRouter();
   const s=useThemedStyles(lightStyles);
   const {palette}=useTheme();
