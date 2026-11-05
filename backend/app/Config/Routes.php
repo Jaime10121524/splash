@@ -29,6 +29,17 @@ $routes->group('api', static function ($routes): void {
             $routes->post('logout', 'Api\MobileController::logout');
             $routes->get('dashboard', 'Api\MobileDashboardController::index');
             $routes->get('financeiro', 'Api\FechamentosController::mobileContas');
+            // Mesmo financeiro pessoal do sistema web; token Shield mobile,
+            // consulta por propria pessoa ou equipe somente para admin.
+            $routes->get('financeiro/pessoal', 'Api\\FinanceiroPessoalController::index');
+            $routes->get('financeiro/pessoas', 'Api\\FinanceiroPessoalController::mobilePessoas');
+            $routes->post('financeiro/categorias', 'Api\\FinanceiroPessoalController::cadastrarCategoria');
+            $routes->post('financeiro/gastos', 'Api\\FinanceiroPessoalController::cadastrarDespesa');
+            $routes->post('financeiro/gastos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarDespesa/$1');
+            $routes->post('financeiro/gastos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarDespesa/$1');
+            $routes->post('financeiro/emprestimos', 'Api\\FinanceiroPessoalController::cadastrarEmprestimo');
+            $routes->post('financeiro/emprestimos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarEmprestimo/$1');
+            $routes->post('financeiro/emprestimos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarEmprestimo/$1');
             $routes->get('atendimentos', 'Api\MobileController::atendimentos');
             // Agendamentos e QR: acesso exclusivo com token Shield mobile.
             $routes->get('agendamentos', 'Api\AgendamentosController::index');
