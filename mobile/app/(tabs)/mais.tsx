@@ -10,6 +10,7 @@ import {SymbolView} from 'expo-symbols';
 import {apiRequest} from '../../src/api';
 import {useAuth} from '../../src/AuthContext';
 import {colors} from '../../src/theme';
+import {isExpoGo} from '../../src/runtime';
 
 type Entry={title:string;subtitle:string;ios:string;android:string;route:string;count?:number};
 function MenuLink({entry}:{entry:Entry}){
@@ -40,6 +41,10 @@ export default function Mais(){
   },[token,reloadPhoto]));
   async function testPush(){
     if(!token||testingPush)return;
+    if(isExpoGo){
+      setPushMessage('O Expo Go permite testar as telas, mas nao recebe push remoto do Firebase. Para testar notificacoes reais, use o APK Splash Next.');
+      return;
+    }
     setPushMessage('');setTestingPush(true);
     try{
       const permission=await Notifications.getPermissionsAsync();
