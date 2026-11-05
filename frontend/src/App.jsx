@@ -107,7 +107,7 @@ const descriptions = {
 
 function Brand({ small = false }) {
   return <div className={'brand ' + (small ? 'brand-small' : '')}>
-    <span className="brand-emblem"><span /><span /><span /></span>
+    <span className="brand-emblem"><img src="/mascote-splash.png" alt="" width="42" height="42"/></span>
     <span className="brand-name">splash<span className="brand-stop">.</span></span>
   </div>
 }
