@@ -55,7 +55,100 @@ function QuickAction({label,description,ios,android,onPress}:{
     <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} size={17} tintColor={palette.muted}/>
   </Pressable>;
 }
+type OwnSummary={
+  vendas:{id:number;titulo:string;data_venda:string;
+    comissao:{direito:string|null;pendente:string|null;recebido:string|null}}[];
+  resumo_pagina:{a_receber:string;liquidado:string;a_apurar:number};
+  tem_mais:boolean;
+};
+function VendedorHome(){
+  const router=useRouter();
+  const {user,token}=useAuth();
+  const {palette}=useTheme();
+  const styles=useThemedStyles(lightStyles);
+  const [days,setDays]=useState<Range>(7);
+  const [own,setOwn]=useState<OwnSummary|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  const load=useCallback(async()=>{
+    if(!token)return;
+    setLoading(true);
+    try{
+      const toIso=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),
+        String(d.getDate()).padStart(2,'0')].join('-');
+      const end=new Date(),start=new Date(end);
+      start.setDate(end.getDate()-days+1);
+      const query=new URLSearchParams({pagina:'1',inicio:toIso(start),fim:toIso(end)});
+      const data=await apiRequest<OwnSummary>('mobile/minhas-vendas?'+query.toString(),{token});
+      setOwn(data);setError('');
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível consultar suas comissões.');}
+    finally{setLoading(false);}
+  },[token,days]);
+  useFocusEffect(useCallback(()=>{void load();},[load]));
+  const firstName=user?.username?.split(/[.\s_-]/)[0]||'você';
+  return <SafeAreaView style={styles.root} edges={['top']}>
+    <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <View><Text style={styles.eyebrow}>SPLASH NEXT · SEU PAINEL</Text>
+          <Text style={styles.greeting}>Olá, {firstName}! 👋</Text>
+          <Text style={styles.date}>Seus direitos financeiros</Text></View>
+        <Pressable style={styles.bell} onPress={()=>router.push('/notificacoes')}
+          accessibilityLabel="Notificações"><Text style={styles.bellGlyph}>🔔</Text></Pressable>
+      </View>
+      <LinearGradient colors={['#5845B9','#282456']} style={styles.hero}>
+        <Text style={styles.heroKicker}>MINHAS COMISSÕES</Text>
+        <Text style={styles.heroTitle}>Seus resultados,{String.fromCharCode(10)}com privacidade.</Text>
+        <Text style={styles.heroDescription}>Somente suas comissões e pagamentos. Nenhum dado financeiro de terceiros.</Text>
+        <View style={styles.periodTabs}>{([1,7,30] as Range[]).map(n=>
+          <Pressable key={n} style={[styles.periodTab,days===n&&styles.periodSelected]}
+            onPress={()=>setDays(n)}>
+            <Text style={[styles.periodText,days===n&&styles.periodSelectedText]}>
+              {n===1?'Hoje':n===7?'7 dias':'30 dias'}</Text>
+          </Pressable>)}</View>
+      </LinearGradient>
+      {loading?<ActivityIndicator size="large" color={palette.brand} style={{marginTop:25}}/>:
+        error?<View style={styles.message}><Text style={styles.messageText}>{error}</Text>
+          <Pressable style={styles.retry} onPress={()=>{void load();}}>
+            <Text style={styles.retryText}>Tentar novamente</Text></Pressable></View>:
+        own&&<>
+          <Text style={styles.sectionTitle}>Comissões do período</Text>
+          <View style={styles.kpiGrid}>
+            <MiniKpi title="A receber" value={money(own.resumo_pagina.a_receber)}
+              description="Participações desta página" icon="💰" tint="#8972FF"
+              onPress={()=>router.push('/vendas')}/>
+            <MiniKpi title="Liquidado" value={money(own.resumo_pagina.liquidado)}
+              description="Pagamentos e abatimentos" icon="✅" tint="#45BE92"
+              onPress={()=>router.push('/vendas')}/>
+          </View>
+          <Text style={styles.zeroNote}>Resumo das primeiras 25 participações do período. Consulte a lista completa para navegar entre páginas.</Text>
+          <View style={styles.chartCard}>
+            <View style={styles.sectionRow}><Text style={styles.chartTitle}>Minhas participações recentes</Text>
+              <Pressable onPress={()=>router.push('/vendas')}>
+                <Text style={styles.seeAll}>Ver todas</Text></Pressable></View>
+            {own.vendas.length?own.vendas.slice(0,5).map(item=><View key={item.id} style={styles.legend}>
+              <View style={{flex:1,gap:3}}>
+                <Text style={styles.chartTitle}>{item.titulo}</Text>
+                <Text style={styles.chartSubtitle}>{item.data_venda}</Text>
+              </View>
+              <Text style={styles.chartTitle}>{item.comissao.direito===null?'A apurar':money(item.comissao.direito)}</Text>
+            </View>):<Text style={styles.zeroNote}>Nenhuma comissão neste período.</Text>}
+          </View>
+          <View style={styles.quickCard}>
+            <QuickAction label="Minhas vendas e comissões" description="Consultar recebidos e pendentes"
+              ios="bag.fill" android="shopping_bag" onPress={()=>router.push('/vendas')}/>
+            <QuickAction label="Notificações" description="Avisos da sua conta"
+              ios="bell.badge" android="notifications" onPress={()=>router.push('/notificacoes')}/>
+          </View>
+        </>}
+    </ScrollView>
+  </SafeAreaView>;
+}
+
 export default function HomeScreen(){
+  const {user}=useAuth();
+  return user?.role==='vendedor'?<VendedorHome/>:<HomeOperacional/>;
+}
+function HomeOperacional(){
   const router=useRouter();const s=useThemedStyles(lightStyles);
   const {palette,isDark}=useTheme();const {user,token}=useAuth();
   const [days,setDays]=useState<Range>(7);
