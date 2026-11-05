@@ -417,11 +417,28 @@ class FechamentosController extends CommercialBaseController
                 $isOwn=$ownId!==null&&$id===$ownId;
                 if($isOwn){$ownOpen+=$open;$ownReceived+=$received;}
                 if($admin&&!$isOwn){$teamPayable+=$open;$teamPaid+=$paid;}
+                // Detalhes limitados, sem dados de associado nem informações
+                // financeiras de outra pessoa para o usuário não-admin.
+                $detail=[];
+                foreach(array_slice($account['itens'],0,30) as $line){
+                    $detail[]=[
+                        'operacao_id'=>(int)$line['operacao_id'],
+                        'titulo'=>$line['titulo'],
+                        'data_venda'=>$line['data_venda'],
+                        'descricao'=>$line['descricao'],
+                        'total'=>$line['total'],
+                        'recebidas'=>$line['recebido'],
+                        'abatidas'=>$line['abatido'],
+                        'a_receber'=>$line['pendente'],
+                    ];
+                }
                 $items[]=[
                     'pessoa_id'=>$id,'nome'=>$account['nome'],
                     'total'=>$x['total'],'a_receber'=>$x['pendente'],
                     'recebidas'=>$x['recebido'],'abatidas'=>$x['abatido'],
                     'liquidadas'=>$x['pago'],'participacoes'=>count($account['itens']),
+                    'detalhes'=>$detail,
+                    'detalhes_limitados'=>count($account['itens'])>30,
                 ];
             }
             return $this->response->setJSON([
