@@ -353,3 +353,10 @@ a { text-decoration: none; }
 .account-profile-text strong{font-size:13px;max-width:152px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .account-profile-text small{color:var(--muted);font-size:11px}
 .account-profile-link>.avatar-photo-frame{width:39px;height:39px;border-radius:13px;flex-shrink:0}
+
+/* Mascote oficial do clube: visível no menu, carregamento e autenticação. */
+.brand-emblem,.auth-story .brand-emblem{width:42px;height:42px;flex-shrink:0;
+  background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible}
+.brand-emblem img{display:block;width:100%;height:100%;object-fit:contain}
+.brand-emblem span,.brand-emblem span:nth-child(2),.brand-emblem span:nth-child(3){display:none}
+@media(max-width:600px){.brand-emblem,.auth-story .brand-emblem{width:39px;height:39px}}
