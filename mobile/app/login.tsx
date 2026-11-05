@@ -3,6 +3,7 @@ import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -32,17 +33,9 @@ const subdued = '#79829A';
 type ErrorKind = 'credentials' | 'connection' | 'server';
 
 function Mark({ size = 39 }: { size?: number }) {
-  const styles=useThemedStyles(lightStyles);
-  return (
-    <View style={[styles.mark, { width: size, height: size, borderRadius: Math.round(size * 0.32) }]}>
-      <View style={styles.markLines}>
-        <View style={[styles.markLine, { height: size * 0.30 }]} />
-        <View style={[styles.markLine, { height: size * 0.43 }]} />
-        <View style={[styles.markLine, { height: size * 0.25 }]} />
-      </View>
-      <View style={styles.markDot} />
-    </View>
-  );
+  return <Image source={require('../assets/icon.png')}
+    style={{width:size,height:size}} resizeMode="contain"
+    accessibilityLabel="Mascote do clube Splash"/>;
 }
 
 function InputSymbol({ kind, color }: { kind: 'user' | 'lock'; color: string }) {
