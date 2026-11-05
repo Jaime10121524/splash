@@ -2,7 +2,8 @@ import {useProtectedPhoto} from '../../src/useProtectedPhoto';
 import ThemeSettings from '../../src/components/ThemeSettings';
 import {useThemedStyles} from '../../src/ThemeContext';
 import {useCallback,useState} from 'react';
-import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
+import {ActivityIndicator,Image,Linking,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
+import * as Notifications from 'expo-notifications';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter,useFocusEffect} from 'expo-router';
 import {SymbolView} from 'expo-symbols';
@@ -27,6 +28,7 @@ export default function Mais(){
   const s=useThemedStyles(lightStyles);
   const {user,token,logout}=useAuth();
   const [unread,setUnread]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [testingPush,setTestingPush]=useState(false),[pushMessage,setPushMessage]=useState('');
   const {uri:photoUri,reload:reloadPhoto}=useProtectedPhoto('mobile/me/foto',token);
   useFocusEffect(useCallback(()=>{
     if(!token)return;
@@ -36,6 +38,22 @@ export default function Mais(){
       .then(d=>{if(active)setUnread(d.nao_lidas||0);}).catch(()=>{});
     return ()=>{active=false;};
   },[token,reloadPhoto]));
+  async function testPush(){
+    if(!token||testingPush)return;
+    setPushMessage('');setTestingPush(true);
+    try{
+      const permission=await Notifications.getPermissionsAsync();
+      if(!permission.granted){
+        setPushMessage('Notificações desativadas. Habilite nas configurações do Android.');
+        return;
+      }
+      const r=await apiRequest<{message:string}>('mobile/notificacoes/testar',
+        {token,method:'POST',body:{}});
+      setPushMessage(r.message||'Teste enviado ao Firebase.');
+    }catch(e){
+      setPushMessage(e instanceof Error?e.message:'Não foi possível testar o push.');
+    }finally{setTestingPush(false);}
+  }
   async function signOut(){
     if(busy)return;
     setBusy(true);setError('');
@@ -63,6 +81,21 @@ export default function Mais(){
       </View>
       <View style={s.links}>{items.map(i=><MenuLink key={i.title} entry={i}/>)}</View>
       <ThemeSettings/>
+      <View style={s.pushCard}>
+        <Text style={s.pushTitle}>Notificações do Android</Text>
+        <Text style={s.pushDescription}>
+          Receba alertas mesmo com o aplicativo fechado. Para verificar, envie um aviso de teste.
+        </Text>
+        <Pressable disabled={testingPush} style={s.pushTest} onPress={()=>{void testPush();}}
+          accessibilityRole="button">
+          {testingPush?<ActivityIndicator color="#FFFFFF"/>:
+            <Text style={s.pushTestText}>Enviar notificação de teste</Text>}
+        </Pressable>
+        <Pressable onPress={()=>{void Linking.openSettings();}} accessibilityRole="button">
+          <Text style={s.pushSettings}>Abrir permissões do aplicativo</Text>
+        </Pressable>
+        {!!pushMessage&&<Text style={s.pushFeedback}>{pushMessage}</Text>}
+      </View>
       {!!error&&<Text style={s.error}>{error}</Text>}
       <Pressable disabled={busy} style={s.logout} onPress={()=>{void signOut();}}>
         {busy?<ActivityIndicator color={colors.danger}/>:
@@ -94,4 +127,12 @@ const lightStyles = StyleSheet.create({
     borderRadius:15,minHeight:54,justifyContent:'center',flexDirection:'row',alignItems:'center',gap:10},
   logoutText:{color:colors.danger,fontWeight:'900'},
   error:{color:colors.danger,fontSize:12},
+  pushCard:{marginTop:7,backgroundColor:'#FFFFFF',borderRadius:19,padding:17,gap:11},
+  pushTitle:{fontSize:15,fontWeight:'900',color:colors.ink},
+  pushDescription:{fontSize:12,lineHeight:19,color:colors.muted},
+  pushTest:{padding:13,minHeight:45,alignItems:'center',justifyContent:'center',
+    borderRadius:12,backgroundColor:colors.brand},
+  pushTestText:{color:'#FFFFFF',fontWeight:'900',fontSize:13},
+  pushSettings:{color:colors.brandDark,fontWeight:'800',fontSize:12,textAlign:'center'},
+  pushFeedback:{color:colors.ink,fontSize:12,lineHeight:19},
 });
