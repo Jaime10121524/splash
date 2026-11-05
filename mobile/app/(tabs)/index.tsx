@@ -296,8 +296,8 @@ function HomeOperacional(){
              onPress={()=>go('/atendimento/novo')}/>
            <QuickAction label="Agendamentos" description="Consultar visitas marcadas" ios="calendar" android="event"
              onPress={()=>go('/(tabs)/agendamentos')}/>
-           <QuickAction label="Vendas" description="Títulos, filtros e recebimentos" ios="bag.fill" android="shopping_bag"
-             onPress={()=>go('/vendas')}/>
+           {user?.role!=='operador'&&<QuickAction label="Vendas" description="Títulos, filtros e recebimentos" ios="bag.fill" android="shopping_bag"
+             onPress={()=>go('/vendas')}/>}
            <QuickAction label="Clientes" description="Carteira e contatos" ios="person.2.fill" android="contacts"
              onPress={()=>go('/clientes')}/>
          </View>
