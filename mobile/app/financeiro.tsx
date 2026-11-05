@@ -157,7 +157,7 @@ export default function FinanceiroMobile(){
               Exibindo até 30 participações. Escolha um período menor para consultar as restantes.
             </Text>}
           </View>}
-        </View>)}:<View style={s.empty}><Text style={s.emptyTitle}>Sem comissões no período</Text>
+        </View>):<View style={s.empty}><Text style={s.emptyTitle}>Sem comissões no período</Text>
           <Text style={s.emptyText}>Não existem direitos apurados nas vendas selecionadas.</Text></View>}
         {data.possivel_truncamento&&<View style={s.warning}>
           <Text style={s.warningText}>Há muitas vendas no período. Reduza o intervalo para consultar todos os resultados.</Text>
