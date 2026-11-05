@@ -21,6 +21,42 @@ Porém, a branch inteira acrescenta três migrations novas desde `main`,
 listadas abaixo. Precisam estar instaladas antes de publicar todos os
 endpoints e telas da branch.
 
+## Gastos e empréstimos pelo aplicativo
+
+A versão mobile **0.2.3** adiciona atalhos em `Mais > Financeiro` para
+`Gastos` e `Empréstimos` com cadastro e histórico. Usa as tabelas já existentes
+`financeiro_categorias_despesa`, `financeiro_despesas`,
+`financeiro_emprestimos` e `financeiro_emprestimo_abates`.
+**Não exige nova migration**, desde que a migration original
+`2026-10-10-000013_FinanceiroPessoal.php` já esteja aplicada.
+
+O controlador `backend/app/Controllers/Api/FinanceiroPessoalController.php`
+e as rotas `backend/app/Config/Routes.php` **precisam ser atualizados no
+servidor** junto com o aplicativo. Após deploy, reinicie/limpe caches PHP se
+necessário. Rotas de consulta e registro com `tokens:mobile`:
+
+- `GET /api/mobile/financeiro/pessoal` (gastos por intervalo, empréstimos e categorias);
+- `GET /api/mobile/financeiro/pessoas` (admin somente);
+- `POST /api/mobile/financeiro/categorias`;
+- `POST /api/mobile/financeiro/gastos`;
+- `POST /api/mobile/financeiro/emprestimos`.
+
+Outras rotas de edição e cancelamento também estão protegidas; a interface
+mobile inicial oferece cadastro e consulta, mantendo correções administrativas
+detalhadas no sistema web.
+
+- Admin: cria gastos e empréstimos para si e outras pessoas; vê todas as contas;
+- Corretor com `expenses.own`: cria apenas despesas próprias, lê empréstimos próprios;
+- Gerente/vendedor: consulta exclusivamente a própria conta, sem poder criar
+  empréstimos ou despesas;
+- Operador/restrito: sem consulta financeira;
+- Despesas não abatem comissões automaticamente. Empréstimos só sofrem
+  abatimento real quando registrado no fechamento existente.
+
+**Adiantamento de comissão sem saldo apurado não foi implementado aqui.**
+Esse recurso exige controle próprio para não confundir empréstimo, gasto e
+comissão paga; não usar qualquer um dos dois novos cadastros como substituto.
+
 ## O que vai à HostGator
 
 Use o empacotador já existente para evitar esquecer arquivos do backend:
@@ -71,6 +107,7 @@ Controllers/Api/BonificacoesController.php
 Controllers/Api/CatalogosController.php
 Controllers/Api/ClientesController.php
 Controllers/Api/FechamentosController.php
+Controllers/Api/FinanceiroPessoalController.php
 Controllers/Api/GestorVendasController.php
 Controllers/Api/MidiasSplashController.php
 Controllers/Api/MinhasVendasController.php
