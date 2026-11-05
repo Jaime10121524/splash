@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { ApiError, apiRequest, MobileUser } from './api';
+import {unregisterAndroidPush} from './NativePermissionsAndPush';
 
 const KEY = 'splash.mobile.auth.token';
 type LoginResponse = { token: string; user: MobileUser };
@@ -56,7 +57,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    if (token) await apiRequest('mobile/logout', { method: 'POST', token });
+    if (token) {
+      // Evita notificações privadas chegarem após sair da conta.
+      await unregisterAndroidPush(token).catch(() => {});
+      await apiRequest('mobile/logout', { method: 'POST', token });
+    }
     await SecureStore.deleteItemAsync(KEY);
     setUser(null); setToken(null);
   }, [token]);
