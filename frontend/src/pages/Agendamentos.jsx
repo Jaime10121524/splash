@@ -272,11 +272,21 @@ export default function Agendamentos({navigate=()=>{}}) {
     {modal?.type==='new'&&<SurfaceModal title="Novo agendamento" subtitle="O convite com QR Code será gerado ao salvar."
       busy={busy} onClose={()=>setModal(null)}>
       <form className="agenda-form" onSubmit={create}>
+        <div className="agenda-form-intro">
+          <span aria-hidden="true">1</span>
+          <div><strong>Dados da visita</strong>
+            <small>Preencha quem virá ao parque e o dia do agendamento.</small></div>
+        </div>
         <label>Nome completo *<input required maxLength={160} value={form.nome_completo} onChange={e=>set('nome_completo',e.target.value)} /></label>
         <label>WhatsApp / telefone com DDD *<input required inputMode="tel" value={formatPhone(form.telefone)} onChange={e=>set('telefone',cleanPhone(e.target.value))} /></label>
         <div className="agenda-cols">
           <label>Data da visita *<input required type="date" min={localDateISO()} value={form.data_visita} onChange={e=>set('data_visita',e.target.value)} /></label>
           <label>Nº de pessoas *<input required type="number" min="1" max="100" value={form.quantidade_pessoas} onChange={e=>set('quantidade_pessoas',e.target.value)} /></label>
+        </div>
+        <div className="agenda-form-intro">
+          <span aria-hidden="true">2</span>
+          <div><strong>Responsável e convite</strong>
+            <small>O voucher com QR Code será gerado após salvar.</small></div>
         </div>
         <label>Corretor que captou *<select required value={form.captador_pessoa_id} onChange={e=>set('captador_pessoa_id',e.target.value)}>
           <option value="">Selecionar corretor</option>
@@ -322,8 +332,14 @@ export default function Agendamentos({navigate=()=>{}}) {
             <div><strong>Leitor de QR Code</strong>
               <small>Aponte a câmera para o QR Code do convite.</small></div>
           </div>
-          <video ref={videoRef} className="agenda-reader-video" autoPlay muted playsInline
-            aria-label="Câmera para leitura do QR Code"/>
+          <div className="agenda-reader-preview">
+            {!cameraActive&&<div className="agenda-reader-placeholder" aria-hidden="true">
+              <span>▣</span><small>Posicione o QR Code dentro da câmera</small>
+            </div>}
+            <video ref={videoRef} className="agenda-reader-video" autoPlay muted playsInline
+              style={{display:cameraActive?'block':'none'}}
+              aria-label="Câmera para leitura do QR Code"/>
+          </div>
           <div className="agenda-reader-actions">
             {cameraActive?<button type="button" onClick={stopCamera}>Parar câmera</button>:
               <button type="button" onClick={()=>{void startCamera()}}>Ativar câmera</button>}
