@@ -30,7 +30,7 @@ function PersistentMenu(){
     pathname.startsWith('/atendimentos')||pathname.startsWith('/atendimento/')?'atendimentos':
     pathname.startsWith('/mais')||pathname.startsWith('/venda')||
       pathname.startsWith('/cliente')||pathname.startsWith('/perfil')||
-      pathname.startsWith('/notificacoes')?'mais':'inicio';
+      pathname.startsWith('/notificacoes')||pathname.startsWith('/financeiro')?'mais':'inicio';
   return <View style={[styles.bar,{height:67+bottom,paddingBottom:bottom+5,
     backgroundColor:palette.surface,borderTopColor:palette.line}]}>
     {visibleItems.map(item=>{
@@ -67,6 +67,7 @@ function AppNavigation(){
         <Stack.Screen name="cliente/[id]"/>
         <Stack.Screen name="venda/[id]"/>
         <Stack.Screen name="vendas"/>
+        <Stack.Screen name="financeiro"/>
         <Stack.Screen name="clientes"/>
         <Stack.Screen name="notificacoes"/>
         <Stack.Screen name="perfil"/>
