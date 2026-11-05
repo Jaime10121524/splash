@@ -345,9 +345,28 @@ class FechamentosController extends CommercialBaseController
 
     public function contas(): ResponseInterface
     {
-        $user=auth('session')->user();
+        return $this->contasCore(false);
+    }
+
+    /**
+     * Extrato financeiro do aplicativo, derivado da MESMA apuracao web.
+     * Admin consulta o conjunto da equipe; demais perfis somente a pessoa
+     * associada ao token Shield. Esta rota nao permite mutacoes nem recebe
+     * pessoa_id de usuarios nao administradores.
+     */
+    public function mobileContas(): ResponseInterface
+    {
+        return $this->contasCore(true);
+    }
+
+    private function contasCore(bool $mobile): ResponseInterface
+    {
+        $user=auth($mobile?'tokens':'session')->user();
         if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
-        $admin=$user->inGroup('admin')&&$user->can('visits.manage');
+        $admin=$user->inGroup('admin')&&($mobile||$user->can('visits.manage'));
+        if($mobile&&!$user->inGroup('admin','gerente','corretor','vendedor')){
+            return $this->errorResponse(403,'Seu perfil nao possui acesso ao financeiro.');
+        }
         $period=$this->period();
         if($period instanceof ResponseInterface)return $period;
         [$start,$end]=$period;
@@ -368,16 +387,56 @@ class FechamentosController extends CommercialBaseController
         }
         $canSeeOutgoing=$admin;
         if(!$admin){
-            if(!$user->can('finance.own') || (! $user->inGroup('corretor') && ! $user->inGroup('vendedor') && ! $user->inGroup('gerente'))){
+            if((!$mobile&&!$user->can('finance.own')) || (! $user->inGroup('corretor') && ! $user->inGroup('vendedor') && ! $user->inGroup('gerente'))){
                 return $this->errorResponse(403,'Acesso ao financeiro não autorizado.');
             }
             // Delegados consultam apenas a conta pessoal: jamais recebem o extrato dos terceiros.
             $delegado=$db->table('fechamento_responsabilidades')
                 ->where('corretor_pessoa_id',$personId)->countAllResults()>0;
-            $canSeeOutgoing=ExtratoPermissoes::repasses(false,$user->inGroup('corretor'),$delegado);
+            $canSeeOutgoing=$mobile ? false : ExtratoPermissoes::repasses(false,$user->inGroup('corretor'),$delegado);
         }
         $operations=$this->rows($db,$start,$end);
         $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId,$canSeeOutgoing);
+        if($mobile){
+            // O servidor retorna SOMENTE valores e identificadores autorizados:
+            // nao enviar linhas SQL, dados do cliente nem rateios de terceiros.
+            $ownId=$personId;
+            if($admin){
+                $ownRecord=$db->table('pessoas')->select('id')
+                    ->where('user_id',(int)$user->id)->where('ativo',1)
+                    ->get()->getRowArray();
+                $ownId=$ownRecord?(int)$ownRecord['id']:null;
+            }
+            $items=[];$ownOpen=0;$ownReceived=0;$teamPayable=0;$teamPaid=0;
+            foreach($accounts as $account){
+                $id=(int)$account['pessoa_id'];
+                $x=$account['resumo'];
+                $open=VendaMoney::cents((string)$x['pendente'],true);
+                $received=VendaMoney::cents((string)$x['recebido'],true);
+                $paid=VendaMoney::cents((string)$x['pago'],true);
+                $isOwn=$ownId!==null&&$id===$ownId;
+                if($isOwn){$ownOpen+=$open;$ownReceived+=$received;}
+                if($admin&&!$isOwn){$teamPayable+=$open;$teamPaid+=$paid;}
+                $items[]=[
+                    'pessoa_id'=>$id,'nome'=>$account['nome'],
+                    'total'=>$x['total'],'a_receber'=>$x['pendente'],
+                    'recebidas'=>$x['recebido'],'abatidas'=>$x['abatido'],
+                    'liquidadas'=>$x['pago'],'participacoes'=>count($account['itens']),
+                ];
+            }
+            return $this->response->setJSON([
+                'inicio'=>$start,'fim'=>$end,'admin'=>$admin,
+                'resumo'=>[
+                    'a_pagar'=>$admin?VendaMoney::decimal($teamPayable):null,
+                    'a_receber'=>VendaMoney::decimal($ownOpen),
+                    'recebidas'=>VendaMoney::decimal($ownReceived),
+                    'pagas'=>$admin?VendaMoney::decimal($teamPaid):null,
+                ],
+                'contas'=>$items,
+                'possivel_truncamento'=>count($operations)===500,
+                'aviso'=>'Período pela data da venda. Os valores liquidados incluem os pagamentos confirmados dessas vendas, mesmo realizados em outra data. Abatimentos são discriminados separadamente. A pagar exclui a própria conta do administrador.',
+            ])->setHeader('Cache-Control','private, no-store');
+        }
         $lots=[];
         if($admin){
             $query=$db->table('comissao_lotes_pagamento l')
