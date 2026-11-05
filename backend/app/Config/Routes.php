@@ -23,6 +23,7 @@ $routes->group('api', static function ($routes): void {
             $routes->get('notificacoes', 'Api\MobileNotificacoesController::index');
             $routes->post('notificacoes/dispositivo', 'Api\MobileNotificacoesController::registerDevice');
             $routes->post('notificacoes/dispositivo/remover', 'Api\MobileNotificacoesController::removeDevice');
+            $routes->post('notificacoes/testar', 'Api\MobileNotificacoesController::testDevice');
             $routes->post('notificacoes/ler-todas', 'Api\MobileNotificacoesController::readAll');
             $routes->post('notificacoes/(:num)/ler', 'Api\MobileNotificacoesController::read/$1');
             $routes->post('logout', 'Api\MobileController::logout');
