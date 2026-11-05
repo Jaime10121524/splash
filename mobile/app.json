@@ -15,7 +15,11 @@
       "package": "com.ahritech.splashnext",
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
-      "allowBackup": false
+      "allowBackup": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -41,6 +45,13 @@
         {
           "photosPermission": "Permitir que o Splash escolha fotos para o perfil e o registro de vendas.",
           "cameraPermission": "Permitir que o Splash tire fotos do perfil e das vendas."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7861F9",
+          "defaultChannel": "splash_avisos"
         }
       ]
     ],
