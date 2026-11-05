@@ -8,3 +8,4 @@ android/
 ios/
 *.keystore
 *.jks
+google-services.json
