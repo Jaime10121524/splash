@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { ApiError, apiRequest, MobileUser } from './api';
-import {unregisterAndroidPush} from './NativePermissionsAndPush';
+import {unregisterAndroidPush} from './pushDevice';
 
 const KEY = 'splash.mobile.auth.token';
 type LoginResponse = { token: string; user: MobileUser };
