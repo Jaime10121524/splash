@@ -9,12 +9,18 @@
       "environment": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SPLASH_ALLOW_LAN_HTTP": "true"
       }
     },
     "production": {
       "environment": "production",
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SPLASH_ALLOW_LAN_HTTP": "false"
       }
     }
   }
