@@ -105,7 +105,7 @@ export default function NativePermissionsAndPush(){
       if(!mounted||!fcm||pushBusy.current)return;
       const id=String(user.id)+':'+fcm;
       const elapsed=Date.now()-lastRegisterAt.current;
-      if(!changed && lastToken.current===id && elapsed<15*60*1000)return;
+      if(lastToken.current===id && elapsed<15*60*1000)return;
       if(!changed && elapsed<2*60*1000)return;
       pushBusy.current=true;
       lastRegisterAt.current=Date.now();
