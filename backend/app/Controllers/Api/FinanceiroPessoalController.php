@@ -93,7 +93,9 @@ class FinanceiroPessoalController extends CommercialBaseController
         }
         $db=db_connect();
         $categories=$db->table('financeiro_categorias_despesa')->where('ativo',1);
-        if($id){
+        // No mobile do administrador, a lista de pessoas pode ser filtrada
+        // sem ocultar categorias de outra conta que ele escolha ao cadastrar.
+        if($id && (!$actor['admin'] || !$this->mobile())){
             $categories->groupStart()->where('pessoa_id',null)
                 ->orWhere('pessoa_id',$id)->groupEnd();
         }
