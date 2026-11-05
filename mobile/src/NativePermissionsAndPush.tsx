@@ -7,6 +7,7 @@ import {router} from 'expo-router';
 import {useAuth} from './AuthContext';
 import {apiRequest} from './api';
 import {getNativePushToken} from './pushDevice';
+import {isExpoGo} from './runtime';
 
 /**
  * As notificações precisam aparecer mesmo com o aplicativo aberto.
@@ -89,7 +90,8 @@ export default function NativePermissionsAndPush(){
   },[getCameraPermission,requestCameraPermission]);
 
   useEffect(()=>{
-    if(!ready||!user||!token||!asked||Platform.OS!=='android')return;
+    // Expo Go (Android) nao oferece push remoto; as telas e a API continuam funcionais.
+    if(!ready||!user||!token||!asked||Platform.OS!=='android'||isExpoGo)return;
     let mounted=true;
     // Ao trocar de usuário, registrar imediatamente para evitar pushes na
     // conta anterior (sem herdar o cooldown da sessão encerrada).
@@ -147,7 +149,8 @@ export default function NativePermissionsAndPush(){
   // Tocar no push abre a central interna correspondente à conta logada.
   // As telas individuais continuam autorizadas pelo backend.
   useEffect(()=>{
-    if(!ready||!user)return;
+    // O listener de resposta remota tambem nao deve ser registrado no Expo Go.
+    if(!ready||!user||isExpoGo)return;
     let active=true;
     const open=()=>{
       if(!active)return;
