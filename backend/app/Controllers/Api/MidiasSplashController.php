@@ -34,20 +34,28 @@ final class MidiasSplashController extends BaseController
         $saleId=filter_var($id,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
         if($saleId===false)return $this->fail(404,'Venda não encontrada.');
         $db=db_connect();
-        $op=$db->table('venda_operacoes')->select('id,visita_id,corretor_pessoa_id,segundo_corretor_pessoa_id')
+        $op=$db->table('venda_operacoes')->select('id,visita_id,corretor_pessoa_id,segundo_corretor_pessoa_id,gerente_pessoa_id,criado_por_usuario_id')
             ->where('id',(int)$saleId)->get()->getRowArray();
         if(!$op)return $this->fail(404,'Venda não encontrada.');
         if(!$mobile && !$a['admin'])return $this->fail(403,'Somente o administrador consulta esta venda no site.');
-        if($mobile && !$a['admin'] && !$a['user']->inGroup('gerente','operador')){
+        if($mobile && !$a['admin']){
+            if(!$a['user']->inGroup('corretor','gerente'))
+                return $this->fail(403,'Seu perfil não pode acessar fotos de vendas.');
             $person=$db->table('pessoas')->select('id')->where('user_id',(int)$a['user']->id)
                 ->where('ativo',1)->get()->getRowArray();
-            if(!$person)return $this->fail(403,'Usuário sem corretor vinculado.');
-            $pid=(int)$person['id'];$allowed=in_array($pid,[(int)$op['corretor_pessoa_id'],
-                (int)($op['segundo_corretor_pessoa_id']??0)],true);
-            if(!$allowed && $op['visita_id']){
-                $visit=$db->table('visitas')->select('criado_por_usuario_id')
-                    ->where('id',(int)$op['visita_id'])->get()->getRowArray();
-                $allowed=(int)($visit['criado_por_usuario_id']??0)===(int)$a['user']->id;
+            if(!$person)return $this->fail(403,'Conta sem pessoa ativa vinculada.');
+            $pid=(int)$person['id'];
+            if($a['user']->inGroup('gerente')){
+                $allowed=(int)($op['gerente_pessoa_id']??0)===$pid
+                    ||(int)($op['criado_por_usuario_id']??0)===(int)$a['user']->id;
+            }else{
+                $allowed=in_array($pid,[(int)$op['corretor_pessoa_id'],
+                    (int)($op['segundo_corretor_pessoa_id']??0)],true);
+                if(!$allowed && $op['visita_id']){
+                    $visit=$db->table('visitas')->select('criado_por_usuario_id')
+                        ->where('id',(int)$op['visita_id'])->get()->getRowArray();
+                    $allowed=(int)($visit['criado_por_usuario_id']??0)===(int)$a['user']->id;
+                }
             }
             if(!$allowed)return $this->fail(404,'Venda não encontrada.');
         }
