@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
+use App\Libraries\ProtecaoVendaFechada;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -79,36 +80,62 @@ final class MidiasSplashController extends BaseController
     private function upload(string $kind,int $id):ResponseInterface
     {
         $file=$this->request->getFile('foto');
-        if(!$file||!$file->isValid()||$file->hasMoved())
-            return $this->fail(422,'Selecione uma foto válida. Verifique o limite do PHP para uploads.');
+        if(!$file||!$file->isValid()||$file->hasMoved()){
+            // Limites upload_max_filesize/post_max_size e erros de arquivo chegam aqui.
+            log_message('warning','SPLASH foto recusada antes de validar: {erro}',[
+                'erro'=>$file?$file->getErrorString():'Arquivo nao recebido no campo foto',
+            ]);
+            return $this->fail(422,'Não foi possível receber a foto. Confira o tamanho e os limites de upload do servidor.');
+        }
         $limit=$kind==='perfis'?2097152:5242880;
         if($file->getSize()<1||$file->getSize()>$limit)
             return $this->fail(422,'Foto muito grande. Limite: '.($limit/1048576).' MB.');
+
         $temp=$file->getTempName();
         $info=@getimagesize($temp);
         if(!$info||($info[0]??0)<40||($info[1]??0)<40
             ||($info[0]??0)>8000||($info[1]??0)>8000)
             return $this->fail(422,'A foto deve ser uma imagem válida (40 a 8000 pixels por dimensão).');
-        $type=(new \finfo(FILEINFO_MIME_TYPE))->file($temp);
-        $ext=match($type){'image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp',default=>null};
-        if(!$ext||($info['mime']??'')!==$type)
-            return $this->fail(422,'Envie uma imagem JPG, PNG ou WebP.');
-        $dir=$this->dir($kind);
-        if(!is_dir($dir)&&!mkdir($dir,0750,true)&&!is_dir($dir))
-            return $this->fail(500,'A pasta de fotos não está disponível.');
+        if(!class_exists(\finfo::class)){
+            log_message('error','SPLASH foto: extensao PHP fileinfo indisponivel.');
+            return $this->fail(503,'O servidor precisa habilitar a extensão PHP fileinfo para receber imagens.');
+        }
         try{
-            // A extensão vem do conteúdo verificado; jamais de um caminho enviado pelo usuário.
-            $new=$dir.$id.'.'.$ext;
-            if(!$file->move($dir,$id.'.'.$ext,true))
-                return $this->fail(500,'Não foi possível salvar a imagem.');
+            $type=(new \finfo(FILEINFO_MIME_TYPE))->file($temp);
+            $ext=match($type){'image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp',default=>null};
+            if(!$ext||($info['mime']??'')!==$type)
+                return $this->fail(422,'Envie uma imagem JPG, PNG ou WebP.');
+
+            // O writable permanece privado. Em hospedagem compartilhada,
+            // as pastas precisam pertencer ao mesmo usuario do PHP.
+            $dir=$this->dir($kind);
+            if(!is_dir($dir)&&!@mkdir($dir,0750,true)&&!is_dir($dir)){
+                log_message('error','SPLASH foto: nao foi possivel criar diretorio de uploads ({kind}).',[
+                    'kind'=>$kind,
+                ]);
+                return $this->fail(500,'A pasta de fotos não pôde ser criada. Verifique writable/uploads no servidor.');
+            }
+            if(!is_writable($dir)){
+                log_message('error','SPLASH foto: diretorio de uploads sem escrita ({kind}).',[
+                    'kind'=>$kind,
+                ]);
+                return $this->fail(500,'A pasta de fotos não permite escrita. Verifique as permissões do servidor.');
+            }
+            $name=$id.'.'.$ext;
+            if(!$file->move($dir,$name,true)){
+                log_message('error','SPLASH foto: move falhou ({kind}).',['kind'=>$kind]);
+                return $this->fail(500,'Falha ao gravar a foto no servidor. Confira as permissões da pasta.');
+            }
             foreach(['jpg','png','webp'] as $oldExt){
-                if($oldExt!==$ext && is_file($dir.$id.'.'.$oldExt))@unlink($dir.$id.'.'.$oldExt);
+                if($oldExt!==$ext&&is_file($dir.$id.'.'.$oldExt))@unlink($dir.$id.'.'.$oldExt);
             }
             return $this->response->setJSON(['message'=>'Foto enviada com sucesso.','foto_disponivel'=>true])
                 ->setHeader('Cache-Control','no-store');
         }catch(Throwable $e){
-            log_message('error','SPLASH upload foto: {error}',['error'=>$e->getMessage()]);
-            return $this->fail(500,'Falha ao salvar foto. Confira as permissões de writable/uploads.');
+            log_message('error','SPLASH upload foto ({kind}): {error}',[
+                'kind'=>$kind,'error'=>$e->getMessage(),
+            ]);
+            return $this->fail(500,'Falha ao salvar foto. Confira writable/uploads e o log PHP.');
         }
     }
 
@@ -144,16 +171,26 @@ final class MidiasSplashController extends BaseController
         $sale=$this->operation($id,true,$a);if($sale instanceof ResponseInterface)return $sale;
         return $this->show('vendas',(int)$sale['id']);
     }
+    private function protegerFotoVenda(int $saleId):?ResponseInterface
+    {
+        if(ProtecaoVendaFechada::bloqueada(db_connect(),$saleId)){
+            return $this->fail(409,'Venda vinculada a fechamento: não é permitido alterar a foto.');
+        }
+        return null;
+    }
+
     public function uploadVendaWeb(int|string $id):ResponseInterface
     {
         $a=$this->actor(false);if($a instanceof ResponseInterface)return $a;
         $sale=$this->operation($id,false,$a);if($sale instanceof ResponseInterface)return $sale;
+        if($blocked=$this->protegerFotoVenda((int)$sale['id']))return $blocked;
         return $this->upload('vendas',(int)$sale['id']);
     }
     public function uploadVendaMobile(int|string $id):ResponseInterface
     {
         $a=$this->actor(true);if($a instanceof ResponseInterface)return $a;
         $sale=$this->operation($id,true,$a);if($sale instanceof ResponseInterface)return $sale;
+        if($blocked=$this->protegerFotoVenda((int)$sale['id']))return $blocked;
         return $this->upload('vendas',(int)$sale['id']);
     }
 }
