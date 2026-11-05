@@ -91,12 +91,17 @@ export async function apiRequest<T>(path: string, options: {
   method?: 'GET' | 'POST'; token?: string | null; body?: unknown; timeoutMs?: number;
 } = {}): Promise<T> {
   const origin = process.env.EXPO_PUBLIC_SPLASH_API_URL?.replace(/\/+$/, '');
-  // HTTP só para testes de desenvolvimento em localhost ou na LAN privada.
-  // Builds de distribuição exigem HTTPS para proteger login e tokens.
+  // HTTPS obrigatório na distribuição. Exceção explícita APENAS para
+  // APK de homologação Expo "preview" em Wi-Fi privado; não usar dados reais.
   const localDevUrl = /^http:\/\/(?:localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d{1,5})?$/i;
+  const privateLanUrl = /^http:\/\/(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d{1,5})?$/i;
+  const allowPreviewLan = process.env.EXPO_PUBLIC_SPLASH_ALLOW_LAN_HTTP === 'true';
   const httpsUrl = /^https:\/\/[^/\s]+$/i;
-  if (!origin || (!httpsUrl.test(origin) && !(__DEV__ && localDevUrl.test(origin)))) {
-    throw new ApiError('Configure a URL HTTPS da API ou, apenas em desenvolvimento, o IP local do computador.', 0);
+  if (!origin || (!httpsUrl.test(origin) && !(
+    (__DEV__ && localDevUrl.test(origin)) ||
+    (allowPreviewLan && privateLanUrl.test(origin))
+  ))) {
+    throw new ApiError('API inválida: use HTTPS ou IP privado HTTP autorizado no APK de testes.', 0);
   }
   if (!/^mobile\/[a-z0-9/?=&%._-]+$/i.test(path)) {
     throw new ApiError('Rota nativa inválida.', 0);
