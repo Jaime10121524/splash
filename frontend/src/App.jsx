@@ -13,6 +13,7 @@ import RegrasComissoes from './pages/RegrasComissoes.jsx'
 import Relatorios from './pages/Relatorios.jsx'
 import Titulos from './pages/Titulos.jsx'
 import MinhasVendas from './pages/MinhasVendas.jsx'
+import VendasGestor from './pages/VendasGestor.jsx'
 import MeuPerfil from './pages/MeuPerfil.jsx'
 import AlertasComerciais from './pages/AlertasComerciais.jsx'
 import NotificacoesSplash, {stopCurrentPush} from './components/NotificacoesSplash.jsx'
@@ -254,10 +255,11 @@ function Dashboard({ user, navigate }) {
     const query='?'+new URLSearchParams({inicio:start,fim:end})
     setPeriod(new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(now))
     setLoading(true);setError('')
-    const requests=operator?[]:[
-      ['contas',getJSON('/api/fechamentos/contas'+query)],
-      ['pessoal',getJSON('/api/financeiro/pessoal'+query)],
-    ]
+    const requests=operator?[]:[['contas',getJSON('/api/fechamentos/contas'+query)]]
+    // Despesas e empréstimos pessoais são específicos do corretor e do admin.
+    // Gerente e vendedor não devem consultar esse endpoint (403).
+    if(admin||user.role==='corretor')
+      requests.push(['pessoal',getJSON('/api/financeiro/pessoal'+query)])
     if(admin){
       requests.push(['vendas',getJSON('/api/vendas/resumo')])
       requests.push(['visitas',getJSON('/api/atendimentos'+query)])
@@ -534,7 +536,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='agendamentos'?<Agendamentos navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='alertas'?<AlertasComerciais/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='agendamentos'?<Agendamentos navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'} gestor={user.role==='gerente'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='alertas'?<AlertasComerciais/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&user.role==='gerente'?<VendasGestor initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)}/>:active==='vendas'&&['corretor','vendedor'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>
