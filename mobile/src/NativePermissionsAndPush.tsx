@@ -71,11 +71,8 @@ export default function NativePermissionsAndPush(){
   const {user,token,ready}=useAuth();
   const [asked,setAsked]=useState(false);
   const [,requestCameraPermission,getCameraPermission]=useCameraPermissions();
-  const permissionFlowStarted=useRef(false);
   const lastToken=useRef('');
   useEffect(()=>{
-    if(permissionFlowStarted.current)return;
-    permissionFlowStarted.current=true;
     let mounted=true;
     void startupPermissions(getCameraPermission,requestCameraPermission)
       .finally(()=>{if(mounted)setAsked(true);});
