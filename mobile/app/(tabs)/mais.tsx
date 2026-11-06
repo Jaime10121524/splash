@@ -11,6 +11,7 @@ import {apiRequest} from '../../src/api';
 import {useAuth} from '../../src/AuthContext';
 import {colors} from '../../src/theme';
 import {isExpoGo} from '../../src/runtime';
+import {getNativePushToken} from '../../src/pushDevice';
 
 type Entry={title:string;subtitle:string;ios:string;android:string;route:string;count?:number};
 function MenuLink({entry}:{entry:Entry}){
@@ -52,6 +53,15 @@ export default function Mais(){
         setPushMessage('Notificações desativadas. Habilite nas configurações do Android.');
         return;
       }
+      // Antes de testar, garantir que ESTE APK esteja associado ao usuário
+      // atual. Na primeira execução o efeito de login pode ainda estar registrando.
+      const fcm=await getNativePushToken();
+      if(!fcm){
+        setPushMessage('Não foi possível obter o token do Firebase neste APK. Confira as permissões do Android, Play Services e a configuração google-services.json usada no build.');
+        return;
+      }
+      await apiRequest('mobile/notificacoes/dispositivo',
+        {token,method:'POST',body:{plataforma:'android',token:fcm}});
       const r=await apiRequest<{message:string}>('mobile/notificacoes/testar',
         {token,method:'POST',body:{}});
       setPushMessage(r.message||'Teste enviado ao Firebase.');
