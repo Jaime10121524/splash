@@ -1,8 +1,10 @@
-import Constants from 'expo-constants';
+import Constants, {ExecutionEnvironment} from 'expo-constants';
 
 /**
- * Expo Go nao possui modulo Android FCM de notificacoes remotas.
- * expoGoConfig e preenchido somente no cliente Expo Go, nao no APK
- * proprio nem em development builds com o expo-dev-client.
+ * Somente o cliente Expo Go, que nao possui FCM remoto no Android.
+ * expoGoConfig isoladamente nao discrimina o APK standalone com seguranca.
+ * Apps standalone/production SEMPRE habilitam a tentativa de registrar FCM.
  */
-export const isExpoGo = Constants.expoGoConfig != null || Constants.appOwnership === 'expo';
+export const isExpoGo =
+  Constants.executionEnvironment !== ExecutionEnvironment.Standalone &&
+  Constants.appOwnership === 'expo';
