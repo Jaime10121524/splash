@@ -1,7 +1,7 @@
-import {useThemedStyles} from '../ThemeContext';
+import {useTheme,useThemedStyles} from '../ThemeContext';
 import { type ComponentRef, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Dimensions, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
@@ -9,6 +9,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
+import {Asset,requestPermissionsAsync} from 'expo-media-library';
 import { colors } from '../theme';
 
 export type Booking = {
@@ -69,6 +70,7 @@ export default function BookingInvite({ booking, onClose }: {
   onClose: () => void;
 }) {
   const styles=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const card = useRef<ComponentRef<typeof View>>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState('');
@@ -77,118 +79,56 @@ export default function BookingInvite({ booking, onClose }: {
   const prettyDate = date.length === 3 ? date[2] + '/' + date[1] + '/' + date[0] : booking?.data_visita;
   const code = booking?.qr_token ? 'SPLASH:AG:1:' + booking.qr_token : '';
 
-  async function openWhatsApp() {
-    if (!booking) return;
-    setError('');
-    const digits = booking.telefone.replace(/\D/g, '');
-    if (![10, 11, 12, 13].includes(digits.length)) {
-      setError('Telefone do agendamento inválido para abrir o WhatsApp.');
-      return;
-    }
-    const phone = digits.startsWith('55') && digits.length >= 12 ? digits : '55' + digits;
-    const url = 'https://wa.me/' + phone + '?text=' +
-      encodeURIComponent(whatsAppMessage(booking, prettyDate || booking.data_visita));
-    try {
-      await Linking.openURL(url);
-    } catch {
-      setError('Não foi possível abrir o WhatsApp. Confira se ele está disponível.');
-    }
-  }
-
-  async function sendWithWhatsApp() {
+  async function shareVoucher() {
     if (!card.current || !booking || sharing || !code) return;
-    setError(''); setHint('');
-    const digits = booking.telefone.replace(/\D/g, '');
-    if (![10, 11, 12, 13].includes(digits.length)) {
-      setError('Confira o telefone com DDD cadastrado no agendamento.');
-      return;
-    }
-    const phone = digits.startsWith('55') && digits.length >= 12 ? digits : '55' + digits;
-    setSharing(true);
-    try {
-      // ShareSingle necessita de código Android nativo no APK: não roda no Expo Go.
-      // A biblioteca recebe foto + texto e tenta abrir o WhatsApp do número informado.
-      let NativeShare: (typeof import('react-native-share'))['default'];
-      try {
-        NativeShare = (await import('react-native-share')).default;
-        if (!NativeShare?.shareSingle) throw new Error('Módulo nativo indisponível.');
-      } catch {
-        setError('Para compartilhar foto e mensagem juntas, instale o APK atualizado do Splash. O Expo Go não suporta essa integração.');
-        return;
-      }
-      const [regular, business] = await Promise.all([
-        NativeShare.isPackageInstalled('com.whatsapp'),
-        NativeShare.isPackageInstalled('com.whatsapp.w4b'),
-      ]);
-      if (!regular.isInstalled && !business.isInstalled) {
-        setError('Instale o WhatsApp ou WhatsApp Business para compartilhar o voucher.');
-        return;
-      }
-      const uri = await captureRef(card.current, {
-        format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1920,
-      });
-      const social = (regular.isInstalled ? NativeShare.Social.WHATSAPP
-        : NativeShare.Social.WHATSAPPBUSINESS) as Parameters<typeof NativeShare.shareSingle>[0]['social'];
-      const options = {
-        social,
-        whatsAppNumber: phone,
-        url: uri,
-        type: 'image/png',
-        message: whatsAppMessage(booking, prettyDate || booking.data_visita),
-        filename: 'voucher-splash-' + booking.id,
-        forceDialog: false,
-      };
-      await NativeShare.shareSingle(options as Parameters<typeof NativeShare.shareSingle>[0]);
-      // Abertura do WhatsApp não prova entrega: envio depende da confirmação do usuário.
-      setHint('Voucher aberto no WhatsApp. Confira o número, a imagem e a legenda antes de tocar em Enviar. Em algumas versões o WhatsApp ainda pede escolher o contato.');
-    } catch (e) {
-      setError('O WhatsApp não conseguiu preparar foto e texto juntos neste aparelho. ' +
-        (e instanceof Error ? e.message : 'Tente a opção de compartilhar PNG.'));
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  async function share(withCaption: boolean) {
-    if (!card.current || !booking || sharing || !code) return;
-    setSharing(true);
-    setError('');
-    setHint('');
+    setSharing(true);setError('');setHint('');
     try {
       if (!(await Sharing.isAvailableAsync())) {
-        setError('Compartilhamento de imagens indisponível neste dispositivo.');
+        setError('Este dispositivo não oferece compartilhamento de arquivos.');
         return;
       }
-      // A imagem contém o QR opaco, sem telefone ou outros dados embutidos no código.
+      // Texto fica na área de transferência ANTES do diálogo de compartilhar.
+      // O usuário seleciona o contato/app e cola a mensagem na legenda.
+      await Clipboard.setStringAsync(
+        whatsAppMessage(booking, prettyDate || booking.data_visita),
+      );
       const uri = await captureRef(card.current, {
-        format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1920,
+        format:'png',quality:1,result:'tmpfile',width:1080,height:1920,
       });
-      if (withCaption) {
-        // O Expo Go só compartilha o arquivo, não suporta incluir EXTRA_TEXT
-        // no mesmo envio Android. Copiamos a legenda para colar no WhatsApp.
-        await Clipboard.setStringAsync(whatsAppMessage(booking, prettyDate || booking.data_visita), {
-          android: { isSensitive: true },
-        });
-        setHint('Mensagem copiada! Escolha WhatsApp, selecione a conversa do cliente (' +
-          booking.telefone + ') e COLE o texto na legenda da foto antes de enviar.');
-      }
+      setHint('Texto copiado! Escolha o aplicativo e cole a mensagem na legenda do voucher.');
       await Sharing.shareAsync(uri, {
-        mimeType: 'image/png',
-        dialogTitle: withCaption ? 'Escolha WhatsApp e cole a legenda copiada' : 'Compartilhar voucher PNG',
-        UTI: 'public.png',
+        mimeType:'image/png',dialogTitle:'Compartilhar voucher Splash',UTI:'public.png',
       });
-    } catch {
-      setError('Não foi possível compartilhar a foto. Tente novamente.');
-    } finally {
-      setSharing(false);
-    }
+    } catch (e) {
+      setError(e instanceof Error?e.message:'Não foi possível compartilhar o voucher.');
+    } finally { setSharing(false); }
+  }
+
+  async function saveVoucher() {
+    if (!card.current || !booking || sharing || !code) return;
+    setSharing(true);setError('');setHint('');
+    try {
+      // A permissão é SOMENTE de salvar imagens; não é necessário ler fotos.
+      const permission=await requestPermissionsAsync(true,['photo']);
+      if (!permission.granted) {
+        setError('Permita que o Splash salve imagens para baixar o voucher na galeria.');
+        return;
+      }
+      const uri=await captureRef(card.current,{
+        format:'png',quality:1,result:'tmpfile',width:1080,height:1920,
+      });
+      await Asset.create(uri);
+      setHint('Voucher salvo na galeria de fotos do celular.');
+    } catch (e) {
+      setError(e instanceof Error?e.message:'Não foi possível salvar o voucher na galeria.');
+    } finally { setSharing(false); }
   }
 
   return <Modal visible={booking !== null} animationType="slide" onRequestClose={onClose}>
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
         <Pressable style={styles.close} onPress={onClose} accessibilityLabel="Fechar voucher">
-          <SymbolView name={{ ios: 'xmark', android: 'close' }} size={21} tintColor={colors.ink} />
+          <SymbolView name={{ ios: 'xmark', android: 'close' }} size={21} tintColor={palette.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Voucher de visita</Text>
         <View style={styles.close} />
@@ -260,25 +200,21 @@ export default function BookingInvite({ booking, onClose }: {
       </ScrollView>
       {error !== '' && <Text style={styles.error}>{error}</Text>}
       {hint !== '' && <Text style={styles.hint} accessibilityRole="text">{hint}</Text>}
-      <Pressable onPress={() => { void sendWithWhatsApp(); }} disabled={!booking || sharing}
-        style={[styles.whatsapp, sharing && styles.disabled]} accessibilityRole="button">
-        {sharing ? <ActivityIndicator color="#FFFFFF" /> : <>
-          <SymbolView name={{ios:'message.fill',android:'chat'}} size={20} tintColor="#FFFFFF"/>
-          <Text style={styles.shareText}>WhatsApp: foto + mensagem</Text>
+      <Pressable onPress={() => { void shareVoucher(); }} disabled={!booking || sharing}
+        style={[styles.share, sharing && styles.disabled]} accessibilityRole="button">
+        {sharing?<ActivityIndicator color="#FFFFFF"/>:<>
+          <SymbolView name={{ios:'square.and.arrow.up',android:'share'}} size={19} tintColor="#FFFFFF"/>
+          <Text style={styles.shareText}>Compartilhar voucher</Text>
         </>}
       </Pressable>
-      <Pressable onPress={() => { void share(false); }} disabled={!booking || sharing}
-        style={[styles.share, sharing && styles.disabled]} accessibilityRole="button">
-        <SymbolView name={{ios:'square.and.arrow.up',android:'share'}} size={19} tintColor="#FFFFFF"/>
-        <Text style={styles.shareText}>Compartilhar apenas o PNG</Text>
-      </Pressable>
-      <Pressable onPress={() => { void openWhatsApp(); }} disabled={!booking || sharing}
-        style={styles.textOnly} accessibilityRole="button">
-        <Text style={styles.textOnlyLabel}>Abrir conversa do cliente (somente texto)</Text>
+      <Pressable onPress={() => { void saveVoucher(); }} disabled={!booking || sharing}
+        style={[styles.download, sharing && styles.disabled]} accessibilityRole="button">
+        <SymbolView name={{ios:'arrow.down.to.line',android:'download'}} size={20} tintColor={palette.brandDark}/>
+        <Text style={[styles.downloadText,{color:palette.brandDark}]}>Baixar imagem</Text>
       </Pressable>
       <Text style={styles.footer}>
-        No APK, o Splash prepara a imagem e a legenda para o WhatsApp do número cadastrado.
-        O envio ainda precisa ser confirmado no WhatsApp; não é automático.
+        Ao compartilhar, o texto é copiado primeiro. Escolha a conversa e cole na legenda da imagem.
+        Ou baixe o PNG diretamente na galeria.
       </Text>
     </SafeAreaView>
   </Modal>;
@@ -326,6 +262,10 @@ const lightStyles = StyleSheet.create({
     lineHeight: 16, marginHorizontal: 5, marginBottom: 10, borderRadius: 12, padding: 10 },
   textOnly: { minHeight: 36, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   textOnlyLabel: { color: colors.brandDark, fontSize: 11, fontWeight: '800' },
+  download: { backgroundColor: colors.pale, minHeight: 51, borderRadius: 15,
+    marginHorizontal:5, marginTop:8, alignItems:'center',justifyContent:'center',
+    flexDirection:'row',gap:10 },
+  downloadText:{fontSize:13,fontWeight:'900'},
   share: { backgroundColor: colors.brand, minHeight: 55, borderRadius: 17, marginHorizontal: 5,
     flexDirection: 'row', gap: 11, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
