@@ -1,0 +1,90 @@
+{
+  "expo": {
+    "name": "Splash Next",
+    "slug": "splash-mobile",
+    "scheme": "splashmobile",
+    "version": "0.2.5",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.ahritech.splashnext",
+      "supportsTablet": false,
+      "icon": "./assets/icon.png"
+    },
+    "android": {
+      "package": "com.ahritech.splashnext",
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize",
+      "allowBackup": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "versionCode": 7,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F7F4FF"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir que o Splash Next utilize a câmera para ler os QR Codes de agendamentos.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "react-native-share",
+        {
+          "android": [
+            "com.whatsapp",
+            "com.whatsapp.w4b"
+          ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que o Splash escolha fotos para o perfil e o registro de vendas.",
+          "cameraPermission": "Permitir que o Splash tire fotos do perfil e das vendas."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7861F9",
+          "defaultChannel": "splash_avisos"
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "O Splash só acessa fotos mediante sua autorização.",
+          "savePhotosPermission": "Permitir que o Splash salve o voucher na galeria do celular.",
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F4FF"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c7523883-a2e0-4f93-8861-b7497833c433"
+      }
+    }
+  }
+}

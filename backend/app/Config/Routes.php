@@ -8,6 +8,75 @@ $routes->get('/', 'Home::index');
 // Sessões e autenticação da SPA (mesma origem em produção; proxy /api no Vite local).
 $routes->group('api', static function ($routes): void {
     $routes->get('session', 'Api\\SessionController::show');
+
+    // React Native: autenticação stateless com token Shield; não altera a sessão SPA.
+    // Escopo "mobile" é obrigatório em cada endpoint protegido.
+    $routes->group('mobile', static function ($routes): void {
+        $routes->get('ping', 'Api\MobileController::ping');
+        $routes->post('login', 'Api\MobileController::login');
+        $routes->group('', ['filter' => 'tokens:mobile'], static function ($routes): void {
+            $routes->get('me', 'Api\MobileController::me');
+            $routes->get('me/perfil', 'Api\MobileContaController::show');
+            $routes->post('me/perfil', 'Api\MobileContaController::update');
+            $routes->get('me/foto', 'Api\MidiasSplashController::avatarMobile');
+            $routes->post('me/foto', 'Api\MidiasSplashController::uploadAvatarMobile');
+            $routes->get('notificacoes', 'Api\MobileNotificacoesController::index');
+            $routes->post('notificacoes/dispositivo', 'Api\MobileNotificacoesController::registerDevice');
+            $routes->post('notificacoes/dispositivo/remover', 'Api\MobileNotificacoesController::removeDevice');
+            $routes->post('notificacoes/testar', 'Api\MobileNotificacoesController::testDevice');
+            $routes->post('notificacoes/ler-todas', 'Api\MobileNotificacoesController::readAll');
+            $routes->post('notificacoes/(:num)/ler', 'Api\MobileNotificacoesController::read/$1');
+            $routes->post('logout', 'Api\MobileController::logout');
+            $routes->get('dashboard', 'Api\MobileDashboardController::index');
+            $routes->get('financeiro', 'Api\FechamentosController::mobileContas');
+            // Mesmo financeiro pessoal do sistema web; token Shield mobile,
+            // consulta por propria pessoa ou equipe somente para admin.
+            $routes->get('financeiro/pessoal', 'Api\\FinanceiroPessoalController::index');
+            $routes->get('financeiro/pessoas', 'Api\\FinanceiroPessoalController::mobilePessoas');
+            $routes->post('financeiro/categorias', 'Api\\FinanceiroPessoalController::cadastrarCategoria');
+            $routes->post('financeiro/gastos', 'Api\\FinanceiroPessoalController::cadastrarDespesa');
+            $routes->post('financeiro/gastos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarDespesa/$1');
+            $routes->post('financeiro/gastos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarDespesa/$1');
+            $routes->post('financeiro/emprestimos', 'Api\\FinanceiroPessoalController::cadastrarEmprestimo');
+            $routes->post('financeiro/emprestimos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarEmprestimo/$1');
+            $routes->post('financeiro/emprestimos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarEmprestimo/$1');
+            $routes->get('atendimentos', 'Api\MobileController::atendimentos');
+            // Agendamentos e QR: acesso exclusivo com token Shield mobile.
+            $routes->get('agendamentos', 'Api\AgendamentosController::index');
+            $routes->get('bonificacoes', 'Api\BonificacoesController::index');
+            $routes->post('bonificacoes/(:num)/pagar', 'Api\BonificacoesController::pagar/$1');
+            $routes->post('agendamentos', 'Api\AgendamentosController::create');
+            $routes->post('agendamentos/(:num)/editar', 'Api\AgendamentosController::update/$1');
+            $routes->post('agendamentos/validar-qr', 'Api\AgendamentosController::validateQr');
+            $routes->post('agendamentos/(:num)/checkin', 'Api\AgendamentosController::checkin/$1');
+            $routes->post('agendamentos/(:num)/cancelar', 'Api\AgendamentosController::cancel/$1');
+            // Operações nativas mantêm o filtro Shield tokens:mobile.
+            $routes->get('atendimento-opcoes', 'Api\MobileVisitasController::options');
+            $routes->get('clientes', 'Api\MobileClientesController::index');
+            $routes->post('clientes', 'Api\MobileClientesController::create');
+            $routes->get('clientes/(:num)', 'Api\MobileClientesController::show/$1');
+            $routes->post('clientes/(:num)/editar', 'Api\MobileClientesController::update/$1');
+            $routes->get('cliente-visita-retomavel', 'Api\MobileVisitasController::resumableClientVisit');
+            $routes->post('atendimentos/chegada', 'Api\MobileVisitasController::arrival');
+            $routes->get('atendimentos/(:num)', 'Api\MobileVisitasController::show/$1');
+            $routes->post('atendimentos/(:num)/iniciar', 'Api\MobileVisitasController::start/$1');
+            $routes->post('atendimentos/(:num)/finalizar', 'Api\MobileVisitasController::finish/$1');
+            $routes->post('atendimentos/(:num)/retomar', 'Api\MobileVisitasController::resume/$1');
+            // Vendas do aplicativo: regras financeiras compartilhadas com o web, acesso por token.
+            // Extrato estritamente pessoal (corretor, vendedor e gerente).
+            $routes->get('minhas-vendas', 'Api\MinhasVendasController::index');
+            $routes->get('vendas/opcoes', 'Api\MobileVendasController::opcoes');
+            $routes->get('vendas', 'Api\MobileVendasController::index');
+            $routes->post('vendas', 'Api\MobileVendasController::create');
+            $routes->get('vendas/(:num)', 'Api\MobileVendasController::detalhe/$1');
+            $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaMobile/$1');
+            $routes->post('vendas/(:num)/foto', 'Api\MidiasSplashController::uploadVendaMobile/$1');
+            $routes->post('vendas/(:num)/receber', 'Api\MobileVendasController::receber/$1');
+            $routes->post('vendas/(:num)/ajustar-comissao', 'Api\MobileVendasController::ajustarComissao/$1');
+            $routes->get('vendas/(:num)/rateios', 'Api\MobileRateiosController::rateiosVenda/$1');
+            $routes->post('vendas/(:num)/rateios', 'Api\MobileRateiosController::ratear/$1');
+        });
+    });
     $routes->post('session/login', 'Api\\SessionController::login', ['filter' => 'csrf']);
     $routes->post('session/logout', 'Api\\SessionController::logout', ['filter' => 'csrf']);
     $routes->get('alertas-comerciais/config', 'Api\\AlertasComerciaisController::consultar');
@@ -21,6 +90,8 @@ $routes->group('api', static function ($routes): void {
     $routes->post('notificacoes/nativo/remover', 'Api\\NotificacoesController::removerNativo', ['filter'=>'csrf']);
     $routes->post('notificacoes/dispositivos/remover', 'Api\\NotificacoesController::removerDispositivo', ['filter'=>'csrf']);
     $routes->get('conta/perfil', 'Api\\ContaController::perfil');
+    $routes->get('conta/foto', 'Api\MidiasSplashController::avatarWeb');
+    $routes->post('conta/foto', 'Api\MidiasSplashController::uploadAvatarWeb', ['filter'=>'csrf']);
     $routes->post('conta/perfil', 'Api\\ContaController::atualizar', ['filter'=>'csrf']);
     $routes->post('conta/recuperar', 'Api\\ContaController::solicitarRecuperacao', ['filter'=>'csrf']);
     $routes->post('conta/redefinir', 'Api\\ContaController::redefinirSenha', ['filter'=>'csrf']);
@@ -46,6 +117,14 @@ $routes->group('api', static function ($routes): void {
     $routes->post('comercial/origens/(:num)/editar', 'Api\CatalogosController::editarOrigem/$1', ['filter'=>'csrf']);
     $routes->post('comercial/motivos', 'Api\CatalogosController::criarMotivo', ['filter'=>'csrf']);
     $routes->post('comercial/motivos/(:num)/editar', 'Api\CatalogosController::editarMotivo/$1', ['filter'=>'csrf']);
+    $routes->get('agendamentos', 'Api\AgendamentosController::index');
+    $routes->get('bonificacoes', 'Api\BonificacoesController::index');
+    $routes->post('bonificacoes/(:num)/pagar', 'Api\BonificacoesController::pagar/$1', ['filter'=>'csrf']);
+    $routes->post('agendamentos', 'Api\AgendamentosController::create', ['filter'=>'csrf']);
+    $routes->post('agendamentos/(:num)/editar', 'Api\AgendamentosController::update/$1', ['filter'=>'csrf']);
+    $routes->post('agendamentos/validar-qr', 'Api\AgendamentosController::validateQr', ['filter'=>'csrf']);
+    $routes->post('agendamentos/(:num)/checkin', 'Api\AgendamentosController::checkin/$1', ['filter'=>'csrf']);
+    $routes->post('agendamentos/(:num)/cancelar', 'Api\AgendamentosController::cancel/$1', ['filter'=>'csrf']);
     $routes->get('clientes', 'Api\ClientesController::index');
     $routes->post('clientes', 'Api\ClientesController::create', ['filter'=>'csrf']);
     $routes->post('clientes/(:num)/editar', 'Api\ClientesController::update/$1', ['filter'=>'csrf']);
@@ -64,6 +143,12 @@ $routes->group('api', static function ($routes): void {
     $routes->get('titulos/(:num)/historico', 'Api\\TitulosController::historico/$1');
     $routes->post('titulos/(:num)/movimentar', 'Api\\TitulosController::movimentar/$1', ['filter'=>'csrf']);
 
+    // Gestor/gerente: vendas gerenciadas e cadastro operacional, sem abrir rotas
+    // administrativas de recebimento, estorno ou rateio.
+    $routes->get('gestor/vendas', 'Api\\GestorVendasController::index');
+    $routes->get('gestor/vendas/opcoes', 'Api\\GestorVendasController::opcoes');
+    $routes->post('gestor/vendas', 'Api\\GestorVendasController::create', ['filter'=>'csrf']);
+
     // Consulta individual exclusivamente pela pessoa vinculada ao login Shield.
     // Nunca aceita pessoa_id do navegador nem expõe dados de associados.
     $routes->get('minhas-vendas', 'Api\\MinhasVendasController::index');
@@ -74,6 +159,8 @@ $routes->group('api', static function ($routes): void {
     $routes->get('vendas/resumo', 'Api\VendasController::resumo');
     $routes->get('vendas', 'Api\VendasController::index');
     $routes->get('vendas/(:num)', 'Api\VendasController::detalhe/$1');
+    $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaWeb/$1');
+    $routes->post('vendas/(:num)/foto', 'Api\MidiasSplashController::uploadVendaWeb/$1', ['filter'=>'csrf']);
     $routes->post('vendas', 'Api\VendasController::create', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/converter', 'Api\VendasController::converter/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/editar', 'Api\VendasController::editar/$1', ['filter'=>'csrf']);

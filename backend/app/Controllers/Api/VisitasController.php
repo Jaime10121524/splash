@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api;
 
 use App\Libraries\ClienteRules;
+use App\Libraries\BonificacaoIndicacao;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
 
@@ -142,6 +143,11 @@ class VisitasController extends CommercialBaseController
                     'usuario_id'=>(int)auth('session')->user()->id,
                     'criado_em'=>$now,
                 ]);
+                $bonificacao=BonificacaoIndicacao::registrar($db,$clientId,$clean,$fresh,auth('session')->user());
+                if(isset($bonificacao['error'])){
+                    $db->transRollback();
+                    return $this->errorResponse(422,$bonificacao['error']);
+                }
             }else{
                 $client=$db->query('SELECT id,ativo FROM clientes WHERE id=? FOR UPDATE',[$clientId])->getRowArray();
                 if(!$client || !(bool)$client['ativo']){

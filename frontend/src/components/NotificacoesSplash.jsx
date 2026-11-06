@@ -207,11 +207,21 @@ export default function NotificacoesSplash({navigate,onUnreadChange=()=>{}}){
   {notice&&<p role="status" className="sn-note">{notice}</p>}
   {error&&<p role="alert" className="sn-error">{error}</p>}
   {!data.avisos.length?<p className="sn-empty">Ainda não existem avisos na sua conta.</p>:
-  <div className="sn-list">{data.avisos.map(a=><button key={a.id} className={'sn-item'+(!a.lido_em?' unread':'')}
-    type="button" onClick={()=>open(a)}>
-      <strong>{a.titulo}</strong><span>{a.mensagem}</span>
-      <small>{dateBR(a.criado_em,true)}{a.lido_em?' · Lida':' · Nova'}</small>
-    </button>)}</div>}
+  <div className="sn-list">{data.avisos.map(a=>{
+    const venda=a.categoria==='VENDA_REGISTRADA'||a.categoria==='VENDA_PAGA'||a.categoria==='COMISSAO_APURADA'
+    const paga=a.categoria==='VENDA_PAGA'
+    return <button key={a.id} className={'sn-item'+(!a.lido_em?' unread':'')+(venda?' sale':'')+(paga?' paid':'')}
+      type="button" onClick={()=>open(a)}>
+      <span className="sn-item-icon" aria-hidden="true">{paga?'💰':venda?'🎉':'🔔'}</span>
+      <span className="sn-item-body">
+        <small className="sn-tag">{paga?'VENDA QUITADA':venda?'CONQUISTA COMERCIAL':'ATUALIZAÇÃO SPLASH'}</small>
+        <strong>{a.titulo}</strong><span>{a.mensagem}</span>
+        {a.valor_proprio!=null&&<b className="sn-value">Seu valor: {Number(a.valor_proprio).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</b>}
+        <small>{dateBR(a.criado_em,true)}{a.lido_em?' · Lida':' · Nova'}</small>
+      </span>
+      {!a.lido_em&&<span className="sn-new-dot" aria-label="Não lida"/>}
+    </button>
+  })}</div>}
   <p className="sn-footnote">As comissões mostradas são somente as suas. Valores em apuração não representam pagamentos confirmados.</p>
  </div>
 }

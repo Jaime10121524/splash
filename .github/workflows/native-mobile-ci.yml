@@ -1,0 +1,88 @@
+name: Splash React Native — validação
+
+on:
+  push:
+    branches:
+      - feature/react-native-splash-mobile
+    paths:
+      - "mobile/**"
+      - "frontend/**"
+      - "backend/app/**"
+      - ".github/workflows/native-mobile-ci.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - "backend/app/Controllers/Api/MobileController.php"
+      - "backend/app/Controllers/Api/MobileVisitasController.php"
+      - "backend/app/Controllers/Api/MobileClientesController.php"
+      - "backend/app/Controllers/Api/AgendamentosController.php"
+      - "backend/app/Controllers/Api/BonificacoesController.php"
+      - "backend/app/Libraries/BonificacaoIndicacao.php"
+      - "backend/app/Database/Migrations/2026-11-03-000002_CreateAgendamentosSplash.php"
+      - "backend/app/Database/Migrations/2026-11-03-000003_BonificacoesIndicacao.php"
+      - "backend/app/Database/Migrations/2026-11-03-000001_AuditarTrocaAtendenteRetomadaMobile.php"
+      - "backend/app/Config/Routes.php"
+      - ".github/workflows/native-mobile-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependencias React
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - name: Verificar compilacao Web
+        run: npm run build
+        working-directory: frontend
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependências mobile
+        run: npm install --no-audit --no-fund
+        working-directory: mobile
+      - name: Verificar TypeScript
+        run: npm run typecheck
+        working-directory: mobile
+      - name: Testar máscara telefônica brasileira
+        run: npm run test:phone
+        working-directory: mobile
+      - name: Verificar empacotamento JavaScript Android
+        run: npx expo export --platform android --output-dir .expo-export
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_SPLASH_API_URL: https://exemplo.invalid
+  lint-php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar sintaxe das rotas e da API mobile
+        run: |
+          php -l backend/app/Config/Routes.php
+          php -l backend/app/Config/AuthGroups.php
+          php -l backend/app/Controllers/Api/FechamentosController.php
+          php -l backend/app/Controllers/Api/FinanceiroPessoalController.php
+          php -l backend/app/Controllers/Api/GestorVendasController.php
+          php -l backend/app/Controllers/Api/MinhasVendasController.php
+          php -l backend/app/Controllers/Api/MobileNotificacoesController.php
+          php -l backend/app/Controllers/Api/MobileVendasController.php
+          php -l backend/app/Controllers/Api/MidiasSplashController.php
+          php -l backend/app/Controllers/Api/MobileRateiosController.php
+          php -l backend/app/Controllers/Api/MobileDashboardController.php
+          php -l backend/app/Controllers/Api/MobileController.php
+          php -l backend/app/Controllers/Api/MobileVisitasController.php
+          php -l backend/app/Controllers/Api/MobileClientesController.php
+          php -l backend/app/Controllers/Api/AgendamentosController.php
+          php -l backend/app/Controllers/Api/BonificacoesController.php
+          php -l backend/app/Libraries/BonificacaoIndicacao.php
+          php -l backend/app/Database/Migrations/2026-11-03-000002_CreateAgendamentosSplash.php
+          php -l backend/app/Database/Migrations/2026-11-03-000003_BonificacoesIndicacao.php
+          php -l backend/app/Database/Migrations/2026-11-03-000001_AuditarTrocaAtendenteRetomadaMobile.php

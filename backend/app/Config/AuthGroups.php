@@ -46,6 +46,7 @@ class AuthGroups extends ShieldAuthGroups
         'clients.manage' => 'Gerenciar cadastro de clientes',
         'sales.all' => 'Consultar todas as vendas',
         'sales.own' => 'Consultar vendas próprias autorizadas',
+        'sales.manage' => 'Cadastrar e consultar vendas sob a gestão do gerente',
         'finance.all' => 'Consultar todas as contas financeiras',
         'finance.own' => 'Consultar somente contas financeiras próprias',
         'expenses.own' => 'Gerenciar despesas pessoais',
@@ -65,7 +66,7 @@ class AuthGroups extends ShieldAuthGroups
             'sales.own', 'finance.own', 'reports.own',
         ],
         'gerente' => [
-            'visits.manage', 'clients.manage', 'sales.own', 'finance.own', 'reports.own',
+            'visits.manage', 'clients.manage', 'sales.own', 'sales.manage', 'finance.own', 'reports.own',
         ],
         'operador' => ['visits.manage', 'clients.manage'],
         'restrito' => [],
