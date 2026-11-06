@@ -1,7 +1,7 @@
 import {useProtectedPhoto} from '../src/useProtectedPhoto';
 import FeedbackPopup from '../src/components/FeedbackPopup';
 import ThemeSettings from '../src/components/ThemeSettings';
-import {useThemedStyles} from '../src/ThemeContext';
+import {useTheme,useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Image,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {useRouter,useFocusEffect} from 'expo-router';
@@ -16,6 +16,7 @@ type Profile={perfil:{username:string;email:string;foto_disponivel:boolean}};
 export default function ProfileScreen(){
   const router=useRouter();
   const s=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const {user,token,logout}=useAuth();
   const [email,setEmail]=useState(''),[username,setUsername]=useState('');
   const [current,setCurrent]=useState(''),[next,setNext]=useState(''),[confirm,setConfirm]=useState('');
@@ -74,7 +75,7 @@ export default function ProfileScreen(){
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.heading}>
         <Pressable onPress={()=>router.back()} style={s.back} accessibilityLabel="Voltar">
-          <SymbolView name={{ios:'arrow.left',android:'arrow_back'}} size={21} tintColor={colors.ink}/>
+          <SymbolView name={{ios:'arrow.left',android:'arrow_back'}} size={21} tintColor={palette.ink}/>
         </Pressable><View><Text style={s.kicker}>SUA CONTA</Text><Text style={s.title}>Meu perfil</Text></View>
       </View>
       {loading?<ActivityIndicator color={colors.brand} style={{marginVertical:45}}/>:null}
