@@ -1,5 +1,5 @@
 import FeedbackPopup from '../../src/components/FeedbackPopup';
-import {useThemedStyles} from '../../src/ThemeContext';
+import {useTheme,useThemedStyles} from '../../src/ThemeContext';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView,
@@ -39,6 +39,7 @@ const money=(value:string)=>{
 
 export default function ClientEditor() {
   const styles=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const {id:rawId,vendaVisita:rawVisit}=useLocalSearchParams<{id:string;vendaVisita?:string}>();
   const saleVisitId=Number(Array.isArray(rawVisit)?rawVisit[0]:rawVisit);
   const continueToSale=Number.isSafeInteger(saleVisitId)&&saleVisitId>0;
@@ -158,7 +159,7 @@ export default function ClientEditor() {
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Pressable style={styles.back} accessibilityLabel="Voltar" onPress={()=>router.back()}>
-            <SymbolView name={{ios:'arrow.left',android:'arrow_back'}} size={20} tintColor={colors.ink}/>
+            <SymbolView name={{ios:'arrow.left',android:'arrow_back'}} size={20} tintColor={palette.ink}/>
           </Pressable>
           <Text style={styles.headerTitle}>{isNew?'Novo cliente':'Editar cliente'}</Text>
         </View>
