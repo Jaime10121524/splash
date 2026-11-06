@@ -1,5 +1,5 @@
 import FeedbackPopup from '../../src/components/FeedbackPopup';
-import {useThemedStyles} from '../../src/ThemeContext';
+import {useTheme,useThemedStyles} from '../../src/ThemeContext';
 import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
@@ -43,6 +43,7 @@ function dateISO(value: string): string | null {
 
 export default function AgendamentosScreen({ initialMode = 'list' }: { initialMode?: 'list' | 'scan' }) {
   const styles=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const { token } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const lockedScan = useRef(false);
@@ -322,7 +323,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
         setError('');
       }}
         style={styles.back} accessibilityLabel="Voltar">
-        <SymbolView name={{ios:'xmark',android:'close'}} tintColor={colors.ink} size={21}/>
+        <SymbolView name={{ios:'xmark',android:'close'}} tintColor={palette.ink} size={21}/>
       </Pressable>}</View>
     <KeyboardAvoidingView style={styles.scrollArea}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
