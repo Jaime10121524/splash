@@ -3,7 +3,7 @@
     "name": "Splash Next",
     "slug": "splash-mobile",
     "scheme": "splashmobile",
-    "version": "0.2.4",
+    "version": "0.2.5",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -21,7 +21,7 @@
         "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F7F4FF"
@@ -70,6 +70,11 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#F7F4FF"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c7523883-a2e0-4f93-8861-b7497833c433"
+      }
     }
   }
 }
