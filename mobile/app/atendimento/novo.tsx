@@ -1,5 +1,5 @@
 import FeedbackPopup from '../../src/components/FeedbackPopup';
-import {useThemedStyles} from '../../src/ThemeContext';
+import {useTheme,useThemedStyles} from '../../src/ThemeContext';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable,
@@ -22,6 +22,7 @@ type BrokerField = 'main' | 'second' | 'origin' | 'owner' | null;
 
 export default function NewVisitScreen() {
   const styles=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const { token, user } = useAuth();
   const admin = !!user?.groups?.includes('admin');
   const [options, setOptions] = useState<MobileVisitOptions | null>(null);
@@ -217,7 +218,7 @@ export default function NewVisitScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Pressable style={styles.back} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Voltar">
-            <SymbolView name={{ ios: 'arrow.left', android: 'arrow_back' }} size={20} tintColor={colors.ink} />
+            <SymbolView name={{ ios: 'arrow.left', android: 'arrow_back' }} size={20} tintColor={palette.ink} />
           </Pressable>
           <View>
             <Text style={styles.eyebrow}>OPERAÇÃO / VISITAS</Text>
