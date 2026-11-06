@@ -1,5 +1,5 @@
 import FeedbackPopup from '../../src/components/FeedbackPopup';
-import {useThemedStyles} from '../../src/ThemeContext';
+import {useTheme,useThemedStyles} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable,
@@ -73,6 +73,7 @@ function PickerField({ label, value, hint, onPress }: {
 }
 
 export default function AtendimentoDetailScreen() {
+  const {palette}=useTheme();
   const styles=useThemedStyles(lightStyles);
   const params = useLocalSearchParams<{ id: string }>();
   const id = Number(Array.isArray(params.id) ? params.id[0] : params.id);
@@ -253,7 +254,7 @@ export default function AtendimentoDetailScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} tintColor={colors.brand} />}>
           <View style={styles.header}>
             <Pressable accessibilityLabel="Voltar" accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-              <SymbolView name={{ ios: 'arrow.left', android: 'arrow_back' }} size={20} tintColor={colors.ink} />
+              <SymbolView name={{ ios: 'arrow.left', android: 'arrow_back' }} size={20} tintColor={palette.ink} />
             </Pressable>
             <View style={styles.headerText}>
               <Text style={styles.eyebrow}>OPERAÇÃO / VISITAS</Text>
