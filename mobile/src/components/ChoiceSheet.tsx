@@ -1,4 +1,4 @@
-import {useThemedStyles} from '../ThemeContext';
+import {useTheme,useThemedStyles} from '../ThemeContext';
 import {
   Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
@@ -19,6 +19,7 @@ export default function ChoiceSheet({
   allowEmpty?: boolean;
 }) {
   const styles=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const all = allowEmpty ? [{ id: 0, label: 'Nenhum' }, ...choices] : choices;
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
@@ -29,7 +30,7 @@ export default function ChoiceSheet({
           <View style={styles.head}>
             <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Fechar" style={styles.close}>
-              <SymbolView name={{ ios: 'xmark', android: 'close' }} size={18} tintColor={colors.muted} />
+              <SymbolView name={{ ios: 'xmark', android: 'close' }} size={18} tintColor={palette.ink} />
             </Pressable>
           </View>
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
