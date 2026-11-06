@@ -60,7 +60,17 @@
           "defaultChannel": "splash_avisos"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "O Splash só acessa fotos mediante sua autorização.",
+          "savePhotosPermission": "Permitir que o Splash salve o voucher na galeria do celular.",
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
