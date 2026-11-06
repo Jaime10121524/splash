@@ -1,4 +1,4 @@
-import {useThemedStyles} from '../src/ThemeContext';
+import {useTheme,useThemedStyles} from '../src/ThemeContext';
 import {useCallback,useState} from 'react';
 import {ActivityIndicator,Pressable,RefreshControl,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ function formatMoney(v:string){return new Intl.NumberFormat('pt-BR',{style:'curr
 export default function Notifications(){
   const router=useRouter();
   const s=useThemedStyles(lightStyles);
+  const {palette}=useTheme();
   const {token}=useAuth();
   const [data,setData]=useState<Data>({avisos:[],nao_lidas:0});
   const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false);
@@ -67,7 +68,7 @@ export default function Notifications(){
         tintColor={colors.brand}/>}>
       <View style={s.heading}>
         <Pressable style={s.back} onPress={()=>router.back()} accessibilityLabel="Voltar">
-          <SymbolView name={{ios:'arrow.left',android:'arrow_back'}} size={21} tintColor={colors.ink}/>
+          <SymbolView name={{ios:'arrow.left',android:'arrow_back'}} size={21} tintColor={palette.ink}/>
         </Pressable>
         <View style={{flex:1}}><Text style={s.kicker}>CENTRAL SPLASH</Text><Text style={s.title}>Notificações</Text></View>
       </View>
