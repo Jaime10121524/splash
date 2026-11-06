@@ -134,66 +134,66 @@ export default function BookingInvite({ booking, onClose }: {
         <View style={styles.close} />
       </View>
       <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewContent}>
-        {booking && <View ref={card} collapsable={false} style={[styles.card, { width: cardWidth }]}>
-          <View style={styles.top}>
-            <Text style={styles.brand}>SPLASH PARK <Text style={styles.fazendinha}>FAZENDINHA</Text></Text>
-            <Text style={styles.tagline}>VOUCHER DE VISITA AGENDADA</Text>
+        {booking && <View ref={card} collapsable={false} style={[lightStyles.card, { width: cardWidth }]}>
+          <View style={lightStyles.top}>
+            <Text style={lightStyles.brand}>SPLASH PARK <Text style={lightStyles.fazendinha}>FAZENDINHA</Text></Text>
+            <Text style={lightStyles.tagline}>VOUCHER DE VISITA AGENDADA</Text>
           </View>
-          <View style={styles.body}>
-            <View style={styles.brokerBox}>
-              <Text style={styles.brokerCaption}>VOCÊ SERÁ ATENDIDO PELO CORRETOR:</Text>
-              <Text style={styles.brokerName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.75}>
+          <View style={lightStyles.body}>
+            <View style={lightStyles.brokerBox}>
+              <Text style={lightStyles.brokerCaption}>VOCÊ SERÁ ATENDIDO PELO CORRETOR:</Text>
+              <Text style={lightStyles.brokerName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.75}>
                 {booking.captador_nome || 'Corretor responsável'}
               </Text>
             </View>
-            <View style={styles.visitBox}>
-              <View style={styles.visitDate}>
-                <Text style={styles.fieldLabel}>DATA DA VISITA</Text>
-                <Text style={styles.dateValue}>{prettyDate}</Text>
+            <View style={lightStyles.visitBox}>
+              <View style={lightStyles.visitDate}>
+                <Text style={lightStyles.fieldLabel}>DATA DA VISITA</Text>
+                <Text style={lightStyles.dateValue}>{prettyDate}</Text>
               </View>
-              <View style={styles.visitCount}>
-                <Text style={styles.fieldLabel}>PESSOAS</Text>
-                <Text style={styles.dateValue}>{booking.quantidade_pessoas}</Text>
+              <View style={lightStyles.visitCount}>
+                <Text style={lightStyles.fieldLabel}>PESSOAS</Text>
+                <Text style={lightStyles.dateValue}>{booking.quantidade_pessoas}</Text>
               </View>
             </View>
             <View>
-              <Text style={styles.fieldLabel}>NOME DO CLIENTE</Text>
-              <Text style={styles.clientName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.8}>
+              <Text style={lightStyles.fieldLabel}>NOME DO CLIENTE</Text>
+              <Text style={lightStyles.clientName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.8}>
                 {booking.nome_completo}
               </Text>
             </View>
-            <View style={styles.qrRow}>
-              <View style={styles.qrBackground}>
+            <View style={lightStyles.qrRow}>
+              <View style={lightStyles.qrBackground}>
                 <QRCode size={117} value={code || 'SPLASH:SEM-CODIGO'}
                   backgroundColor="#FFFFFF" color="#24184E" ecl="M" quietZone={4} />
               </View>
-              <View style={styles.qrDetails}>
-                <Text style={styles.qrInstruction}>APRESENTE O QR CODE NA RECEPÇÃO</Text>
-                <Text style={styles.number}>AGENDAMENTO Nº {booking.id}</Text>
-                <Text style={styles.qrNote}>A leitura confirma apenas a chegada.</Text>
+              <View style={lightStyles.qrDetails}>
+                <Text style={lightStyles.qrInstruction}>APRESENTE O QR CODE NA RECEPÇÃO</Text>
+                <Text style={lightStyles.number}>AGENDAMENTO Nº {booking.id}</Text>
+                <Text style={lightStyles.qrNote}>A leitura confirma apenas a chegada.</Text>
               </View>
             </View>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>O que você vai ter nessa visita</Text>
+            <View style={lightStyles.section}>
+              <Text style={lightStyles.sectionTitle}>O que você vai ter nessa visita</Text>
               {benefits.map((item, index) =>
-                <View style={styles.item} key={item}>
-                  <Text style={styles.itemMarker}>{index + 1}.</Text>
-                  <Text style={styles.itemText}>{item}</Text>
+                <View style={lightStyles.item} key={item}>
+                  <Text style={lightStyles.itemMarker}>{index + 1}.</Text>
+                  <Text style={lightStyles.itemText}>{item}</Text>
                 </View>,
               )}
             </View>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Regras do voucher</Text>
+            <View style={lightStyles.section}>
+              <Text style={lightStyles.sectionTitle}>Regras do voucher</Text>
               {rules.map((item, index) =>
-                <View style={styles.item} key={item}>
-                  <Text style={styles.itemMarker}>{index + 1}.</Text>
-                  <Text style={styles.itemText}>{item}</Text>
+                <View style={lightStyles.item} key={item}>
+                  <Text style={lightStyles.itemMarker}>{index + 1}.</Text>
+                  <Text style={lightStyles.itemText}>{item}</Text>
                 </View>,
               )}
             </View>
-            <View style={styles.address}>
-              <Text style={styles.addressHeading}>ENDEREÇO</Text>
-              <Text style={styles.addressText}>Estrada do Frutuoso, 315, Santa Cruz, Rio de Janeiro - RJ</Text>
+            <View style={lightStyles.address}>
+              <Text style={lightStyles.addressHeading}>ENDEREÇO</Text>
+              <Text style={lightStyles.addressText}>Estrada do Frutuoso, 315, Santa Cruz, Rio de Janeiro - RJ</Text>
             </View>
           </View>
         </View>}
@@ -256,12 +256,8 @@ const lightStyles = StyleSheet.create({
   address: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, borderTopWidth: 1, borderTopColor: '#E5DFFF', paddingTop: 5 },
   addressHeading: { fontSize: 8, fontWeight: '900', color: colors.brandDark, marginTop: 1 },
   addressText: { fontSize: 8.8, fontWeight: '800', lineHeight: 11, color: colors.navy, flex: 1 },
-  whatsapp: { backgroundColor: '#177E53', minHeight: 50, borderRadius: 15, marginHorizontal: 5,
-    flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
   hint: { backgroundColor: '#EAF5EE', color: '#155C3D', fontSize: 11, fontWeight: '700',
     lineHeight: 16, marginHorizontal: 5, marginBottom: 10, borderRadius: 12, padding: 10 },
-  textOnly: { minHeight: 36, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  textOnlyLabel: { color: colors.brandDark, fontSize: 11, fontWeight: '800' },
   download: { backgroundColor: colors.pale, minHeight: 51, borderRadius: 15,
     marginHorizontal:5, marginTop:8, alignItems:'center',justifyContent:'center',
     flexDirection:'row',gap:10 },
