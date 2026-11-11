@@ -341,12 +341,12 @@ export default function VendaMobile(){
         <View style={s.header}><Pressable style={s.back} onPress={()=>router.back()} accessibilityRole="button" accessibilityLabel="Voltar">
           <SymbolView name={{ios:'chevron.left',android:'chevron_left'}} size={24} tintColor={palette.ink}/></Pressable>
           <View style={{flex:1}}><Text style={s.kicker}>SPLASH / COMERCIAL</Text>
-            <Text style={s.title}>Venda e comissionamento</Text></View></View>
+            <Text style={s.title}>{isPendingNew?'Nova pendência':isPendingOperation?'Recebimentos da pendência':'Venda e comissionamento'}</Text></View></View>
         <View style={s.steps}>{(['titulo','pagamento','comissao'] as const).map((v,i)=>
-          <Pressable key={v} disabled={!opId} onPress={()=>setStep(v)}
+          <Pressable key={v} disabled={!opId||(v==='comissao'&&isPendingOperation)} onPress={()=>setStep(v)}
             style={[s.step,step===v&&s.stepActive]}>
             <Text style={[s.stepText,step===v&&s.stepTextActive]}>
-              {i+1}. {['Título','Pagamento','Comissões'][i]}
+              {i+1}. {[(isPendingNew||isPendingOperation)?'Negociação':'Título','Recebimentos','Comissões'][i]}
             </Text></Pressable>)}</View>
         {loading?<ActivityIndicator color={colors.brand} size="large" style={{marginTop:45}}/>:null}
 
@@ -356,24 +356,34 @@ export default function VendaMobile(){
             <Text style={s.client}>{visit.cliente_nome}</Text>
             <Text style={s.helper}>Corretor: {visit.corretor_nome||'Vinculado ao atendimento'}</Text>
             <Text style={s.helper}>Atendente: {visit.atendente_nome||'Não informado'}</Text></View>
-          <View style={s.card}><Text style={s.section}>Dados da venda</Text>
+          <View style={s.card}><Text style={s.section}>{isPendingNew?'Dados da negociação':'Dados da venda'}</Text>
+            {isPendingNew&&<Text style={s.helper}>Registre as condições combinadas. O título será informado quando a pendência virar venda.</Text>}
             <Select label="Plano vendido *" value={plan?plan.nome+' · '+money(plan.valor):'Selecionar plano'}
               onPress={()=>setChoice({field:'plan'})}/>
-            <Input label="Número do título (4 dígitos) *" value={titleNumber} numeric placeholder="Ex.: 1567"
-              onChange={v=>setTitleNumber(v.replace(/\D/g,'').slice(0,4))}/>
-            {plan?<Text style={s.helper}>Título: {titleNumber||'____'} {plan.codigo}</Text>:null}
+            {!isPendingNew&&<>
+              <Input label="Número do título (4 dígitos) *" value={titleNumber} numeric placeholder="Ex.: 1567"
+                onChange={v=>setTitleNumber(v.replace(/\D/g,'').slice(0,4))}/>
+              {plan?<Text style={s.helper}>Título: {titleNumber||'____'} {plan.codigo}</Text>:null}
+            </>}
             <Input label="Desconto concedido ao cliente (R$)" value={discount} numeric placeholder="0,00"
               onChange={v=>{setDiscount(v);}}/>
             <View style={s.total}><Text style={s.label}>Valor cobrado do cliente</Text>
               <Text style={s.totalValue}>{total===null||total<=0?'Inválido':money(decimal(total))}</Text></View>
-            <Input label="Data da venda * (DD/MM/AAAA)" value={date} onChange={setDate} numeric placeholder="DD/MM/AAAA"/>
-            <Input label="Início da vigência * (DD/MM/AAAA)" value={startDate} onChange={setStartDate} numeric placeholder="DD/MM/AAAA"/>
+            <Input label={isPendingNew?'Data da negociação * (DD/MM/AAAA)':'Data da venda * (DD/MM/AAAA)'}
+              value={date} onChange={setDate} numeric placeholder="DD/MM/AAAA"/>
+            {isPendingNew?<>
+              <Input label="Retorno previsto (opcional, DD/MM/AAAA)" value={pendingReturn}
+                onChange={setPendingReturn} numeric placeholder="DD/MM/AAAA"/>
+              <Input label="Observações da negociação" value={pendingNotes}
+                onChange={setPendingNotes} placeholder="O que falta para fechar?"/>
+            </>:<Input label="Início da vigência * (DD/MM/AAAA)" value={startDate}
+              onChange={setStartDate} numeric placeholder="DD/MM/AAAA"/>}
             <Select label="Gerente (opcional)" value={opts?.gerentes.find(p=>p.id===managerId)?.nome||'Sem gerente'}
               onPress={()=>setChoice({field:'manager'})}/>
             <Text style={s.helper}>Corretor e atendentes são herdados do atendimento. O desconto respeita as regras de comissão do sistema web.</Text>
           </View>
           <View style={s.card}>
-            <Text style={s.section}>📸 Foto da venda</Text>
+            <Text style={s.section}>{isPendingNew?'📸 Foto da negociação (opcional)':'📸 Foto da venda'}</Text>
             <Text style={s.helper}>{opId
               ?'Adicione ou troque a foto do título já cadastrado.'
               :'Selecione agora. A imagem será enviada automaticamente depois de salvar o título.'}</Text>
@@ -408,7 +418,7 @@ export default function VendaMobile(){
             <Text style={s.helper}>JPG, PNG ou WebP · até 5 MB · armazenamento privado</Text>
             {!!photoError&&<Text style={s.photoError}>{photoError}</Text>}
           </View>
-          <Btn text={busy?'Salvando...':'Cadastrar título e continuar'} disabled={busy} onPress={()=>setConfirm(true)}/>
+          <Btn text={busy?'Salvando...':isPendingNew?'Cadastrar pendência':'Cadastrar título e continuar'} disabled={busy} onPress={()=>setConfirm(true)}/>
         </>}
 
         {!loading&&opId&&detail&&<>
@@ -420,7 +430,7 @@ export default function VendaMobile(){
             </Text>
           </View>}
           {step==='titulo'&&<View style={s.card}>
-            <Text style={s.section}>📸 Foto da venda</Text>
+            <Text style={s.section}>{isPendingNew?'📸 Foto da negociação (opcional)':'📸 Foto da venda'}</Text>
             <Text style={s.helper}>{opId
               ?'Adicione ou troque a foto do título já cadastrado.'
               :'Selecione agora. A imagem será enviada automaticamente depois de salvar o título.'}</Text>
@@ -471,15 +481,18 @@ export default function VendaMobile(){
                 </Pressable>
               </View>
             </View>}
-            <Text style={s.kicker}>TÍTULO {detail.operacao.numero_titulo} {detail.operacao.sigla_plano}</Text>
+            <Text style={s.kicker}>{isPendingOperation?'PENDÊNCIA · NEGOCIAÇÃO Nº '+opId:
+              'TÍTULO '+(detail.operacao.numero_titulo||'')+' '+detail.operacao.sigla_plano}</Text>
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
-            <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda}</Text>
+            <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda||detail.operacao.data_negociacao}</Text>
             <View style={s.two}><View><Text style={s.label}>Recebido do cliente</Text>
               <Text style={s.lineTitle}>{money(detail.recebido)}</Text></View>
               <View><Text style={s.label}>Saldo do cliente</Text>
                 <Text style={s.lineTitle}>{money(detail.saldo)}</Text></View></View></View>
-          {step==='pagamento'&&<View style={s.card}><Text style={s.section}>{saleLocked?'Recebimentos registrados':'Registrar recebimento'}</Text>
-            <Text style={s.helper}>Registre cada forma separadamente. O sistema só apura a comissão automática após a quitação total.</Text>
+          {step==='pagamento'&&<View style={s.card}><Text style={s.section}>{saleLocked?'Recebimentos registrados':isPendingOperation?'Recebimentos da negociação':'Registrar recebimento'}</Text>
+            <Text style={s.helper}>{isPendingOperation
+              ?'Valores recebidos agora permanecerão nesta negociação quando ela virar venda.'
+              :'Registre cada forma separadamente. O sistema só apura a comissão automática após a quitação total.'}</Text>
             {!saleLocked&&Number(detail.saldo)>0?<>
               <Select label="Forma de pagamento *" value={method?.nome||'Selecionar'} onPress={()=>setChoice({field:'method'})}/>
               <Input label="Valor recebido (R$) *" value={amount} onChange={setAmount} numeric placeholder={money(detail.saldo)}/>
@@ -494,7 +507,9 @@ export default function VendaMobile(){
             {(detail.movimentos||[]).map(r=><View key={r.id} style={s.row}>
               <Text style={s.helper}>{r.forma_nome} · {r.data_movimento}</Text>
               <Text style={s.lineTitle}>{r.tipo==='ENTRADA'?'+':'−'} {money(r.valor)}</Text></View>)}
-            <Btn text="Conferir comissões" muted onPress={()=>setStep('comissao')}/>
+            {isPendingOperation?<Btn text="Fechar pendência em venda" muted
+              onPress={()=>router.push({pathname:'/pendencia/[id]',params:{id:String(opId)}})}/>:
+              <Btn text="Conferir comissões" muted onPress={()=>setStep('comissao')}/>}
           </View>}
 
           {step==='comissao'&&<View style={s.card}><Text style={s.section}>Comissionamento da venda</Text>
