@@ -77,7 +77,7 @@ export default function AtendimentoDetailScreen() {
   const styles=useThemedStyles(lightStyles);
   const params = useLocalSearchParams<{ id: string }>();
   const id = Number(Array.isArray(params.id) ? params.id[0] : params.id);
-  const { token } = useAuth();
+  const { token,user } = useAuth();
   const [data, setData] = useState<VisitDetailsResponse | null>(null);
   const [options, setOptions] = useState<MobileVisitOptions | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,7 +86,7 @@ export default function AtendimentoDetailScreen() {
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
-  const [success, setSuccess] = useState<{ title: string; description: string; completeClientId?: number; saleVisitId?: number } | null>(null);
+  const [success, setSuccess] = useState<{ title: string; description: string; completeClientId?: number; saleVisitId?: number; pendingVisitId?:number } | null>(null);
   const [mode, setMode] = useState<FormMode>(null);
   const [sheet, setSheet] = useState<SheetField>(null);
   const [mainAttendant, setMainAttendant] = useState<number | null>(null);
@@ -127,6 +127,7 @@ export default function AtendimentoDetailScreen() {
   }, [data, mode]);
 
   const visit = data?.visita;
+  const canManageSales=['admin','gerente','corretor'].includes(user?.role||'');
   const isToday = visit?.chegada_em?.slice(0, 10) === (() => {
     const d = new Date();
     const pad = (v: number) => String(v).padStart(2, '0');
@@ -180,7 +181,8 @@ export default function AtendimentoDetailScreen() {
           ? result.message + ' Quer aproveitar e completar o cadastro do cliente?'
           : result.message,
         completeClientId: incomplete ? visit?.cliente_id : undefined,
-        saleVisitId: action === 'finish' && outcome === 'VENDA' ? id : undefined,
+        saleVisitId: action === 'finish' && outcome === 'VENDA' && canManageSales ? id : undefined,
+        pendingVisitId: action === 'finish' && outcome === 'PENDENCIA' && canManageSales ? id : undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
@@ -324,11 +326,20 @@ export default function AtendimentoDetailScreen() {
                 <Text style={styles.primaryText}>{visit.operacao_id?'Ver venda e comissões':'Cadastrar venda e pagamentos'}</Text>
                 <SymbolView name={{ios:'arrow.right',android:'arrow_forward'}} size={19} tintColor="#FFFFFF" />
               </Pressable>}
+              {visit.status==='PENDENCIA'&&canManageSales&&<Pressable style={styles.primaryAction}
+                onPress={()=>router.push(visit.operacao_id
+                  ?{pathname:'/pendencia/[id]',params:{id:String(visit.operacao_id)}}
+                  :{pathname:'/venda/[id]',params:{id:'novo',visita:String(visit.id)}})}>
+                <Text style={styles.primaryText}>{visit.operacao_id
+                  ?'Abrir negociação e fechar venda':'Cadastrar negociação pendente'}</Text>
+                <SymbolView name={{ios:'arrow.right',android:'arrow_forward'}} size={19} tintColor="#FFFFFF"/>
+              </Pressable>}
               {canResume && <Pressable style={styles.primaryAction} disabled={saving} onPress={confirmResume}>
                 <Text style={styles.primaryText}>{saving ? 'Retomando...' : 'Retomar visita de hoje'}</Text>
                 <SymbolView name={{ ios: 'arrow.counterclockwise', android: 'restart_alt' }} size={19} tintColor="#FFFFFF" />
               </Pressable>}
               {!['AGUARDANDO', 'ATENDENDO'].includes(visit.status) && !canResume
+                && !(visit.status==='PENDENCIA'&&canManageSales)
                 ? <Text style={styles.readOnly}>Este atendimento está encerrado. Seu histórico permanece disponível para consulta.</Text>
                 : null}
             </View>}
@@ -439,22 +450,24 @@ export default function AtendimentoDetailScreen() {
         secondaryLabel="Voltar" onPrimary={submitConfirmed}
         onSecondary={() => setConfirming(false)} busy={saving} />
 
-      <Modal visible={!!success?.saleVisitId} transparent animationType="fade"
+      <Modal visible={!!success?.saleVisitId||!!success?.pendingVisitId} transparent animationType="fade"
         onRequestClose={() => setSuccess(null)}>
         <View style={styles.saleOverlay}>
           <View style={styles.saleModal}>
             <Text style={styles.saleModalTag}>ATENDIMENTO CONCLUÍDO</Text>
-            <Text style={styles.saleModalTitle}>Venda fechada!</Text>
+            <Text style={styles.saleModalTitle}>{success?.pendingVisitId?'Negociação pendente!':'Venda fechada!'}</Text>
             <Text style={styles.saleModalDescription}>
-              O atendimento foi encerrado. Como deseja continuar?
+              {success?.pendingVisitId
+                ?'O atendimento foi registrado como pendência. Cadastre as condições da negociação agora ou depois.'
+                :'O atendimento foi encerrado. Como deseja continuar?'}
             </Text>
             <Pressable style={styles.salePrimary} onPress={() => {
-              const saleVisitId = success?.saleVisitId;
+              const nextVisitId = success?.saleVisitId||success?.pendingVisitId;
               setSuccess(null);
-              if (saleVisitId) router.push({pathname:'/venda/[id]',
-                params:{id:'novo',visita:String(saleVisitId)}});
+              if (nextVisitId) router.push({pathname:'/venda/[id]',
+                params:{id:'novo',visita:String(nextVisitId)}});
             }}>
-              <Text style={styles.salePrimaryText}>Cadastrar a venda agora</Text>
+              <Text style={styles.salePrimaryText}>{success?.pendingVisitId?'Cadastrar negociação agora':'Cadastrar a venda agora'}</Text>
             </Pressable>
             {!!success?.completeClientId && <Pressable style={styles.saleSecondary} onPress={() => {
               const clientId=success?.completeClientId;
