@@ -129,7 +129,7 @@ export default function VendaMobile(){
         setVisit(v.visita);
         if(!['VENDA','PENDENCIA'].includes(v.visita.status))throw Error('Encerre o atendimento como Venda ou Pendência antes de continuar.');
         if(v.visita.operacao_id){
-          router.replace({pathname:v.visita.status==='PENDENCIA'?'/pendencia/[id]':'/venda/[id]',params:{id:String(v.visita.operacao_id)}});return;
+          router.replace({pathname:v.visita.status==='PENDENCIA'?'/pendencia/[id]':'/venda/[id]',params:{id:String(v.visita.operacao_id)}} as never);return;
         }
       }else{
         if(!Number.isSafeInteger(Number(rawId))||Number(rawId)<1)throw Error('Venda inválida.');
@@ -198,7 +198,7 @@ export default function VendaMobile(){
       }
       setStep('pagamento');
       if(kind==='PENDENCIA'){
-        router.replace({pathname:'/pendencia/[id]',params:{id:String(res.operacao_id)}});
+        router.replace({pathname:'/pendencia/[id]',params:{id:String(res.operacao_id)}} as never);
       }else{
         setNotice('Venda cadastrada. Agora registre os pagamentos.');
       }
@@ -510,7 +510,7 @@ export default function VendaMobile(){
               <Text style={s.helper}>{r.forma_nome} · {r.data_movimento}</Text>
               <Text style={s.lineTitle}>{r.tipo==='ENTRADA'?'+':'−'} {money(r.valor)}</Text></View>)}
             {isPendingOperation?<Btn text="Fechar pendência em venda" muted
-              onPress={()=>router.push({pathname:'/pendencia/[id]',params:{id:String(opId)}})}/>:
+              onPress={()=>router.push({pathname:'/pendencia/[id]',params:{id:String(opId)}} as never)}/>:
               <Btn text="Conferir comissões" muted onPress={()=>setStep('comissao')}/>}
           </View>}
 
