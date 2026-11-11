@@ -214,10 +214,12 @@ export default function VendaMobile(){
       await apiRequest('mobile/vendas/'+opId+'/receber',{method:'POST',token,body:makePayment(paid)});
       await refresh(opId,!!opts?.pode_corrigir_comissao);
       setAmount('');
-      setStep(balance-paid===0?'comissao':'pagamento');
-      setNotice(balance-paid===0
-        ?'Título quitado! Comissão e participações apuradas pelo servidor.'
-        :'Pagamento registrado. Lance a próxima forma para concluir a quitação.');
+      setStep(isPendingOperation?'pagamento':balance-paid===0?'comissao':'pagamento');
+      setNotice(isPendingOperation
+        ?'Recebimento registrado na pendência. O valor será preservado ao converter em venda.'
+        :balance-paid===0
+          ?'Título quitado! Comissão e participações apuradas pelo servidor.'
+          :'Pagamento registrado. Lance a próxima forma para concluir a quitação.');
     });
   }
 
@@ -503,7 +505,7 @@ export default function VendaMobile(){
                 </Pressable>)}</View>:
                 <Text style={s.helper}>{method?.credito?'Cartão: valor com a empresa.':method?.codigo==='PIX'?'PIX: valor com o corretor.':''}</Text>}
               <Btn text={busy?'Registrando...':'Registrar pagamento'} disabled={busy} onPress={()=>{void savePayment();}}/>
-            </>:<Text style={s.done}>{saleLocked?'Venda protegida pelo fechamento. Não é possível registrar novos recebimentos.':'Título quitado. Comissão calculada pelo servidor.'}</Text>}
+            </>:<Text style={s.done}>{saleLocked?'Venda protegida pelo fechamento. Não é possível registrar novos recebimentos.':isPendingOperation?'Valor da negociação recebido. Agora converta a pendência em venda.':'Título quitado. Comissão calculada pelo servidor.'}</Text>}
             {(detail.movimentos||[]).map(r=><View key={r.id} style={s.row}>
               <Text style={s.helper}>{r.forma_nome} · {r.data_movimento}</Text>
               <Text style={s.lineTitle}>{r.tipo==='ENTRADA'?'+':'−'} {money(r.valor)}</Text></View>)}
