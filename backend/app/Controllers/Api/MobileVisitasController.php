@@ -326,8 +326,8 @@ final class MobileVisitasController extends BaseController
             $operation=(int)($r['operacao_id']??0);
             $canManage=!$operator && ($admin || $manager && (
                 ($personId>0 && (int)($r['operacao_gerente_id']??0)===$personId) ||
-                (int)($r['operacao_criado_por']??0)===(int)$user->id ||
-                $operation===0
+                ($personId>0 && (int)($r['operacao_criado_por']??0)===(int)$user->id) ||
+                ($personId>0 && $operation===0)
             ) || (!$manager && $scope!==0));
             $items[]=[
                 'id'=>(int)$r['id'],'cliente_nome'=>$r['cliente_nome'],
@@ -341,6 +341,34 @@ final class MobileVisitasController extends BaseController
                 'pode_gerenciar'=>(bool)$canManage,
             ];
         }
+        // O web tambem permite pendencias sem vinculo com uma visita.
+        // Apenas admin e gerente responsavel acessam essas operacoes.
+        if($admin || ($manager&&$personId>0)){
+            $standalone=$db->table('venda_operacoes o')
+                ->select('o.id,o.data_negociacao,o.retorno_previsto,o.observacoes,
+                    c.nome AS cliente_nome,c.telefone AS cliente_telefone,cp.nome AS corretor_nome')
+                ->join('clientes c','c.id=o.cliente_id')
+                ->join('pessoas cp','cp.id=o.corretor_pessoa_id','left')
+                ->where('o.situacao','PENDENCIA')->where('o.visita_id',null);
+            if(!$admin){
+                $standalone->groupStart()->where('o.gerente_pessoa_id',$personId)
+                    ->orWhere('o.criado_por_usuario_id',(int)$user->id)->groupEnd();
+            }
+            $otherRows=$standalone->orderBy('o.id','DESC')->limit(151)->get()->getResultArray();
+            if(count($otherRows)>150)$limited=true;
+            foreach($otherRows as $r){
+                $items[]=[
+                    'id'=>-(int)$r['id'],'cliente_nome'=>$r['cliente_nome'],
+                    'cliente_telefone'=>$r['cliente_telefone'],'corretor_nome'=>$r['corretor_nome'],
+                    'chegada_em'=>$r['data_negociacao'].' 00:00:00','fim_em'=>null,
+                    'retorno_previsto'=>$r['retorno_previsto'],'observacoes'=>$r['observacoes'],
+                    'possui_negociacao'=>true,'operacao_id'=>(int)$r['id'],
+                    'pode_gerenciar'=>true,'sem_atendimento'=>true,
+                ];
+            }
+        }
+        usort($items,static fn($a,$b)=>strcmp((string)$b['chegada_em'],(string)$a['chegada_em']));
+        if(count($items)>150){$limited=true;$items=array_slice($items,0,150);}
         return $this->response->setJSON(['pendencias'=>$items,'limitado'=>$limited])
             ->setHeader('Cache-Control','private, no-store');
     }
