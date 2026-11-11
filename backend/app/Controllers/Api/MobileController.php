@@ -33,10 +33,10 @@ final class MobileController extends BaseController
             'id' => (int) $user->id,
             'username' => (string) $user->username,
             'role' => $user->inGroup('admin') ? 'admin'
-                : ($user->inGroup('corretor') ? 'corretor'
-                : ($user->inGroup('vendedor') ? 'vendedor'
                 : ($user->inGroup('gerente') ? 'gerente'
-                : ($user->inGroup('operador') ? 'operador' : 'restrito')))),
+                : ($user->inGroup('operador') ? 'operador'
+                : ($user->inGroup('corretor') ? 'corretor'
+                : ($user->inGroup('vendedor') ? 'vendedor' : 'restrito')))),
             'groups' => $user->getGroups(),
         ];
     }
