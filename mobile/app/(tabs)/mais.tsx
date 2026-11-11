@@ -81,6 +81,9 @@ export default function Mais(){
       subtitle:user?.role==='vendedor'?'Minhas comissões':'Títulos, pagamentos e comissões',
       ios:'bag.fill',android:'shopping_bag',route:'/vendas'}]),
     ...(user?.role==='vendedor'?[]:[{title:'Clientes',subtitle:'Carteira, contatos e cadastros',ios:'person.2.fill',android:'contacts',route:'/clientes'}]),
+    ...(user?.role==='vendedor'||user?.role==='restrito'?[]:
+      [{title:'Pendências',subtitle:'Negociações em aberto, recebimentos e conversão em venda',
+        ios:'clock.arrow.circlepath',android:'pending_actions',route:'/pendencias'}]),
     ...(user?.role==='operador'||user?.role==='restrito'?[]:
       [{title:'Financeiro',subtitle:user?.role==='admin'
         ?'Comissões a pagar, a receber e já pagas':'Minhas comissões e recebimentos por período',
