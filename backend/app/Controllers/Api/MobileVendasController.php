@@ -215,7 +215,10 @@ final class MobileVendasController extends VendasController
                 'situacao'=>$op['situacao'],'numero_titulo'=>$op['numero_titulo'],
                 'sigla_plano'=>$op['sigla_plano'],'valor_cobrado'=>$op['valor_cobrado'],
                 'data_negociacao'=>$op['data_negociacao'],
-                'data_venda'=>$op['data_venda'],'observacao_comissao'=>$op['observacao_comissao'],
+                'data_venda'=>$op['data_venda'],
+                'retorno_previsto'=>$op['retorno_previsto'],
+                'observacoes'=>$op['observacoes'],
+                'observacao_comissao'=>$op['observacao_comissao'],
             ],
             'movimentos'=>array_map(static function(array $r):array{return [
                 'id'=>(int)$r['id'],'tipo'=>$r['tipo'],'valor'=>$r['valor'],
