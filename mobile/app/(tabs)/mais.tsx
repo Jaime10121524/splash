@@ -77,6 +77,8 @@ export default function Mais(){
     finally{setBusy(false);}
   }
   const items:Entry[]=[
+    ...(user?.role==='gerente'?[{title:'Atendimentos',subtitle:'Visitas da equipe, chegada e negociações',
+      ios:'person.2.fill',android:'groups',route:'/(tabs)/atendimentos'}]:[]),
     ...(user?.role==='operador'?[]:[{title:'Vendas',
       subtitle:user?.role==='vendedor'?'Minhas comissões':'Títulos, pagamentos e comissões',
       ios:'bag.fill',android:'shopping_bag',route:'/vendas'}]),
