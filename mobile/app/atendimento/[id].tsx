@@ -127,7 +127,7 @@ export default function AtendimentoDetailScreen() {
   }, [data, mode]);
 
   const visit = data?.visita;
-  const canManageSales=['admin','gerente','corretor'].includes(user?.role||'');
+  const canManageSales=!!visit?.pode_gerenciar_negociacao;
   const isToday = visit?.chegada_em?.slice(0, 10) === (() => {
     const d = new Date();
     const pad = (v: number) => String(v).padStart(2, '0');
