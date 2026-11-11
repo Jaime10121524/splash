@@ -41,6 +41,7 @@ $routes->group('api', static function ($routes): void {
             $routes->post('financeiro/emprestimos/(:num)/editar', 'Api\\FinanceiroPessoalController::editarEmprestimo/$1');
             $routes->post('financeiro/emprestimos/(:num)/cancelar', 'Api\\FinanceiroPessoalController::cancelarEmprestimo/$1');
             $routes->get('atendimentos', 'Api\MobileController::atendimentos');
+            $routes->get('pendencias', 'Api\MobileVisitasController::pendencias');
             // Agendamentos e QR: acesso exclusivo com token Shield mobile.
             $routes->get('agendamentos', 'Api\AgendamentosController::index');
             $routes->get('bonificacoes', 'Api\BonificacoesController::index');
@@ -68,6 +69,7 @@ $routes->group('api', static function ($routes): void {
             $routes->get('vendas/opcoes', 'Api\MobileVendasController::opcoes');
             $routes->get('vendas', 'Api\MobileVendasController::index');
             $routes->post('vendas', 'Api\MobileVendasController::create');
+            $routes->post('vendas/(:num)/converter', 'Api\MobileVendasController::converter/$1');
             $routes->get('vendas/(:num)', 'Api\MobileVendasController::detalhe/$1');
             $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaMobile/$1');
             $routes->post('vendas/(:num)/foto', 'Api\MidiasSplashController::uploadVendaMobile/$1');
