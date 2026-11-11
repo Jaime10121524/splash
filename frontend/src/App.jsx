@@ -4,6 +4,7 @@ import Planos from './pages/Planos.jsx'
 import PessoasUsuarios from './pages/PessoasUsuarios.jsx'
 import Clientes from './pages/Clientes.jsx'
 import Atendimentos from './pages/Atendimentos.jsx'
+import Agendamentos from './pages/Agendamentos.jsx'
 import OrigensMotivos from './pages/OrigensMotivos.jsx'
 import Vendas from './pages/Vendas.jsx'
 import FechamentosPeriodos from './pages/FechamentosPeriodos.jsx'
@@ -12,6 +13,7 @@ import RegrasComissoes from './pages/RegrasComissoes.jsx'
 import Relatorios from './pages/Relatorios.jsx'
 import Titulos from './pages/Titulos.jsx'
 import MinhasVendas from './pages/MinhasVendas.jsx'
+import VendasGestor from './pages/VendasGestor.jsx'
 import MeuPerfil from './pages/MeuPerfil.jsx'
 import AlertasComerciais from './pages/AlertasComerciais.jsx'
 import NotificacoesSplash, {stopCurrentPush} from './components/NotificacoesSplash.jsx'
@@ -66,6 +68,7 @@ function Icon({ name, size = 20, stroke = 1.8, ...props }) {
 const nav = [
   { id: 'dashboard', label: 'Visão geral', icon: 'grid', roles: ['admin','corretor','vendedor','gerente','operador'], section: 'Principal' },
   { id: 'atendimentos', label: 'Atendimentos', icon: 'clipboard', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
+  { id: 'agendamentos', label: 'Agendamentos', icon: 'calendar', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
   { id: 'planos', label: 'Planos', icon: 'tag', roles: ['admin'], section: 'Operação' },
   { id: 'pessoas', label: 'Pessoas', icon: 'users', roles: ['admin'], section: 'Operação' },
   { id: 'clientes', label: 'Clientes', icon: 'users', roles: ['admin','operador','corretor','gerente'], section: 'Operação' },
@@ -85,6 +88,7 @@ const nav = [
 ]
 const descriptions = {
   atendimentos: 'Organize chegadas, atendentes e resultados de cada visita.',
+  agendamentos: 'Cadastre visitas antecipadas, compartilhe QR Codes e acompanhe o funil de leads.',
   planos: 'Gerencie códigos, valores, prazos e versões históricas dos planos.',
   pessoas: 'Cadastre corretores, gerentes e atendentes com múltiplos papéis.',
   usuarios: 'Gerencie login e permissões dos participantes.',
@@ -103,7 +107,7 @@ const descriptions = {
 
 function Brand({ small = false }) {
   return <div className={'brand ' + (small ? 'brand-small' : '')}>
-    <span className="brand-emblem"><span /><span /><span /></span>
+    <span className="brand-emblem"><img src="/mascote-splash.png" alt="" width="42" height="42"/></span>
     <span className="brand-name">splash<span className="brand-stop">.</span></span>
   </div>
 }
@@ -204,7 +208,17 @@ function Login({ onLogin, error, busy, offline, onRetry, onForgot }) {
   </div>
 }
 
-function Sidebar({ user, current, navigate, open, close, logout }) {
+function ProfileAvatar({user,revision=0}){
+  const [failed,setFailed]=useState(false)
+  useEffect(()=>{setFailed(false)},[revision,user?.id])
+  return <span className="avatar-photo-frame">
+    {!failed&&<img src={apiUrl('/api/conta/foto')+'?rev='+revision}
+      alt="" onError={()=>setFailed(true)}/>}
+    {failed&&initials(user.username)}
+  </span>
+}
+
+function Sidebar({ user, current, navigate, open, close, logout, avatarRevision }) {
   const permitted = nav.filter(item => item.roles.includes(user.role))
   const sections = [...new Set(permitted.map(item => item.section))]
   return <>
@@ -220,7 +234,11 @@ function Sidebar({ user, current, navigate, open, close, logout }) {
         </div>)}
       </div>
       <div className="sidebar-bottom">
-        <div className="account-mini"><span className="avatar">{initials(user.username)}</span><div><strong>{user.username}</strong><small>{roleLabel(user.role)}</small></div></div>
+        <button type="button" className="account-mini account-profile-link"
+          onClick={()=>{navigate('meu-perfil');close()}} title="Abrir meu perfil">
+          <ProfileAvatar user={user} revision={avatarRevision}/>
+          <span className="account-profile-text"><strong>{user.username}</strong><small>{roleLabel(user.role)}</small></span>
+        </button>
         <button className="logout-link" onClick={logout}><Icon name="logout" size={18}/> Sair da conta</button>
       </div>
     </aside>
@@ -251,10 +269,11 @@ function Dashboard({ user, navigate }) {
     const query='?'+new URLSearchParams({inicio:start,fim:end})
     setPeriod(new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(now))
     setLoading(true);setError('')
-    const requests=operator?[]:[
-      ['contas',getJSON('/api/fechamentos/contas'+query)],
-      ['pessoal',getJSON('/api/financeiro/pessoal'+query)],
-    ]
+    const requests=operator?[]:[['contas',getJSON('/api/fechamentos/contas'+query)]]
+    // Despesas e empréstimos pessoais são específicos do corretor e do admin.
+    // Gerente e vendedor não devem consultar esse endpoint (403).
+    if(admin||user.role==='corretor')
+      requests.push(['pessoal',getJSON('/api/financeiro/pessoal'+query)])
     if(admin){
       requests.push(['vendas',getJSON('/api/vendas/resumo')])
       requests.push(['visitas',getJSON('/api/atendimentos'+query)])
@@ -363,10 +382,17 @@ function Dashboard({ user, navigate }) {
             {label:'Financeiro',detail:'Despesas e empréstimos',id:'financeiro',icon:'receipt'},
           ]:operator?[
             {label:'Atendimentos',detail:'Acompanhar visitantes',id:'atendimentos',icon:'clipboard'},
+          ]:user.role==='vendedor'?[
+            {label:'Minhas vendas',detail:'Consultar minhas comissões',id:'vendas',icon:'bag'},
+            {label:'Meu financeiro',detail:'Recebidos e a receber',id:'financeiro',icon:'wallet'},
+          ]:user.role==='gerente'?[
+            {label:'Atendimentos',detail:'Acompanhar a operação',id:'atendimentos',icon:'clipboard'},
+            {label:'Gestão de vendas',detail:'Consultar e cadastrar títulos',id:'vendas',icon:'bag'},
+            {label:'Meu financeiro',detail:'Minhas comissões e recebimentos',id:'financeiro',icon:'wallet'},
           ]:[
             {label:'Atendimentos',detail:'Minhas visitas e retornos',id:'atendimentos',icon:'clipboard'},
-             {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
-            ...(user.role==='corretor'?[{label:'Meus fechamentos',detail:'Recebimentos e repasses por período',id:'fechamentos',icon:'arrows'}]:[]),
+            {label:'Meu financeiro',detail:'Comissões e recebimentos',id:'financeiro',icon:'wallet'},
+            {label:'Meus fechamentos',detail:'Recebimentos e repasses por período',id:'fechamentos',icon:'arrows'},
             {label:'Minhas despesas',detail:'Registrar gastos',id:'despesas',icon:'receipt'},
             {label:'Empréstimos',detail:'Consultar saldos',id:'emprestimos',icon:'arrows'},
           ]).map(item=><button key={item.id} type="button" className="quick-link" onClick={()=>navigate(item.id)}>
@@ -412,6 +438,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
   const [unreadCount,setUnreadCount]=useState(0)
+  const [avatarRevision,setAvatarRevision]=useState(0)
   const seenNotificationId=useRef(null)
   const [forgotOpen,setForgotOpen]=useState(false)
   const [theme, setTheme] = useState(() => {
@@ -430,6 +457,11 @@ function App() {
     }
   }
   useEffect(() => { refresh() }, [])
+  useEffect(()=>{
+    const update=()=>setAvatarRevision(n=>n+1)
+    window.addEventListener('splash:avatar-updated',update)
+    return()=>window.removeEventListener('splash:avatar-updated',update)
+  },[])
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     document.title = 'SPLASH · Gestão de títulos'
@@ -519,7 +551,7 @@ function App() {
   const active=allowed.some(x=>x.id===current)?current:'dashboard'
   const mobileNav=['dashboard','atendimentos','vendas','financeiro','relatorios'].map(id=>allowed.find(x=>x.id===id)).filter(Boolean).slice(0,5)
   return <div className="app-shell">
-    <Sidebar user={user} current={active} navigate={go} open={menuOpen} close={()=>setMenuOpen(false)} logout={logout}/>
+    <Sidebar user={user} current={active} navigate={go} open={menuOpen} close={()=>setMenuOpen(false)} logout={logout} avatarRevision={avatarRevision}/>
     <div className="workspace">
       <header className="topbar">
         <div className="top-left"><button className="icon-btn hamburger" onClick={()=>setMenuOpen(true)} aria-label="Abrir menu"><Icon name="menu"/></button><div className="top-breadcrumb"><span>SPLASH</span><Icon name="chevron" size={14}/><strong>{active==='dashboard'?'Visão geral':nav.find(x=>x.id===active)?.label}</strong></div></div>
@@ -527,11 +559,14 @@ function App() {
           <span className="connection-indicator"><span/> Conectado</span>
           <button className="icon-btn" title="Alternar tema" aria-label="Alternar tema" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}><Icon name={theme==='light'?'moon':'sun'} size={20}/></button>
           <div className="notification-wrap"><button className="icon-btn" title="Notificações" aria-label={unreadCount?'Notificações, '+unreadCount+' não lidas':'Notificações'} aria-expanded={noticesOpen} onClick={()=>setNoticesOpen(s=>!s)}><Icon name="bell" size={20}/>{unreadCount>0&&<span className="notification-count">{unreadCount>99?'99+':unreadCount}</span>}</button>{noticesOpen&&<div className="notification-pop"><NotificacoesSplash navigate={go} onUnreadChange={setUnreadCount}/></div>}</div>
-          <button type="button" className="top-avatar" title="Abrir meu perfil" aria-label="Meu perfil" onClick={()=>go('meu-perfil')}>{initials(user.username)}</button>
+          <button type="button" className="top-avatar" title="Abrir meu perfil" aria-label="Meu perfil"
+            onClick={()=>go('meu-perfil')}>
+            <ProfileAvatar user={user} revision={avatarRevision}/>
+          </button>
         </div>
       </header>
       <main className="main-content">
-        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='alertas'?<AlertasComerciais/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&['corretor','vendedor','gerente'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
+        {user.role==='restrito' ? <section className="panel access-warning"><Icon name="shield" size={30}/><h1>Acesso aguardando liberação</h1><p>Sua conta foi criada. Um administrador precisa atribuir um grupo para liberar os módulos do SPLASH.</p></section> : active==='dashboard'?<Dashboard user={user} navigate={go}/>:active==='planos'?<Planos/>:active==='pessoas'||active==='usuarios'?<PessoasUsuarios tab={active}/>:active==='clientes'?<Clientes navigate={go}/>:active==='agendamentos'?<Agendamentos navigate={go}/>:active==='atendimentos'?<Atendimentos initialClient={arrivalClient} onClientAccepted={()=>setArrivalClient(null)} navigate={go} admin={user.role==='admin'} gestor={user.role==='gerente'}/>:active==='origens'?<OrigensMotivos/>:active==='configuracoes'?<RegrasComissoes/>:active==='fechamentos'?<FechamentosPeriodos role={user.role}/>:active==='relatorios'?<Relatorios role={user.role}/>:active==='meu-perfil'?<MeuPerfil/>:active==='alertas'?<AlertasComerciais/>:active==='titulos'?<Titulos role={user.role} navigate={go}/>:(active==='financeiro'||active==='despesas'||active==='emprestimos')?<Financeiro key={active} role={user.role} initialTab={active==='despesas'?'despesas':active==='emprestimos'?'emprestimos':'comissoes'}/>:active==='vendas'&&user.role==='gerente'?<VendasGestor initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)}/>:active==='vendas'&&['corretor','vendedor'].includes(user.role)?<MinhasVendas role={user.role} navigate={go}/>: (active==='vendas'||active==='pendencias')&&user.role==='admin'?<Vendas tab={active} role={user.role} initialVisit={initialSaleVisit} onVisitAccepted={()=>setInitialSaleVisit(null)} initialOperation={initialSaleOperation} onOperationAccepted={()=>setInitialSaleOperation(null)}/>:<ModulePage page={active} user={user}/>}
         <footer className="app-footer"><span>© {new Date().getFullYear()} SPLASH · Ahritech</span><span>Feito para simplificar sua gestão</span></footer>
       </main>
     </div>

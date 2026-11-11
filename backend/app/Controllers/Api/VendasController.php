@@ -17,9 +17,18 @@ use Throwable;
  */
 class VendasController extends CommercialBaseController
 {
-    private function guard(): ?ResponseInterface
+    protected function guard(): ?ResponseInterface
     {
         return $this->authorizeAdmin();
+    }
+
+    /** Usuário autenticado da sessão web ou do token Shield mobile validado pela rota. */
+    protected function saleActorId(): int
+    {
+        $mobile = str_contains((string) $this->request->getUri()->getPath(), '/api/mobile/');
+        $user = auth($mobile ? 'tokens' : 'session')->user();
+        if (!$user || $user->isBanned()) throw new \RuntimeException('Usuário não autenticado.');
+        return (int) $user->id;
     }
 
     private function impedeVendaFechada($db,int $id): ?ResponseInterface
@@ -316,7 +325,7 @@ class VendasController extends CommercialBaseController
                 ...$attendants,
                 'data_negociacao'=>$day,'data_venda'=>$saleDate,'data_inicio'=>$start,
                 'data_vencimento'=>$expiry,'retorno_previsto'=>$kind==='PENDENCIA'?$returnDay:null,
-                'observacoes'=>$notes,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'observacoes'=>$notes,'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$now,
             ]);
             $id=(int)$db->insertID();
@@ -474,7 +483,7 @@ class VendasController extends CommercialBaseController
                 'dados_antes'=>json_encode($before,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'dados_depois'=>json_encode($new,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'justificativa'=>$reason,
-                'usuario_id'=>(int)auth('session')->user()->id,
+                'usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->commitOrFail($db);
@@ -532,12 +541,12 @@ class VendasController extends CommercialBaseController
                         'visita_id'=>(int)$visit['id'],
                         'status_anterior'=>'PENDENCIA',
                         'status_novo'=>'VENDA',
-                        'usuario_id'=>(int)auth('session')->user()->id,
+                        'usuario_id'=>$this->saleActorId(),
                         'criado_em'=>$this->nowLocal(),
                     ]);
                 }
             }
-            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $this->commitOrFail($db);
             \App\Libraries\AvisosSplash::venda((int)$id);
             \App\Libraries\AvisosSplash::venda((int)$id,true);
@@ -601,11 +610,11 @@ class VendasController extends CommercialBaseController
                 'operacao_id'=>(int)$id,'tipo'=>'ENTRADA','referencia_entrada_id'=>null,
                 'forma_id'=>$methodId,'detentor'=>$holder,'valor'=>VendaMoney::decimal($money),
                 'data_movimento'=>$date,'observacoes'=>$note,
-                'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->updateEstimate($db,(int)$id,$op);
-            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $this->commitOrFail($db);
             \App\Libraries\AvisosSplash::venda((int)$id,true);
             \App\Libraries\AvisosSplash::vendaPaga((int)$id);
@@ -661,7 +670,7 @@ class VendasController extends CommercialBaseController
                 'operacao_id'=>(int)$id,'tipo'=>'DEVOLUCAO','referencia_entrada_id'=>$reference,
                 'forma_id'=>$original['forma_id'],'detentor'=>$original['detentor'],
                 'valor'=>VendaMoney::decimal($amount),'data_movimento'=>$date,
-                'observacoes'=>$note,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'observacoes'=>$note,'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->updateEstimate($db,(int)$id,$op);
@@ -721,7 +730,7 @@ class VendasController extends CommercialBaseController
                 'forma_id'=>$original['forma_id'],'detentor'=>$original['detentor'],
                 'valor'=>VendaMoney::decimal($remaining),
                 'data_movimento'=>$date,'observacoes'=>$reason,
-                'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->updateEstimate($db,(int)$id,$op);
@@ -768,10 +777,10 @@ class VendasController extends CommercialBaseController
             ]);
             $db->table('venda_comissao_ajustes')->insert([
                 'operacao_id'=>(int)$id,'valor_anterior'=>$before,'valor_novo'=>$adjusted,
-                'justificativa'=>$reason,'usuario_id'=>(int)auth('session')->user()->id,
+                'justificativa'=>$reason,'usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
-            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $this->commitOrFail($db);
             return $this->responseOK('Comissão ajustada e registrada no histórico. Nenhum repasse foi realizado.');
         }catch(Throwable $e){

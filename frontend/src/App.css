@@ -339,3 +339,24 @@ a { text-decoration: none; }
 
 .notification-wrap .icon-btn{position:relative;overflow:visible}
 .notification-count{position:absolute;right:-5px;top:-6px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#dc3545;color:#fff;font-size:10px;font-weight:800;line-height:1;box-shadow:0 0 0 2px var(--surface);pointer-events:none}
+
+/* Foto privada de perfil: mesma imagem do aplicativo mobile. */
+.avatar-photo-frame{display:grid;place-items:center;width:100%;height:100%;
+  overflow:hidden;border-radius:inherit;background:var(--brand-light);
+  color:var(--brand);font-weight:900;font-size:12px;line-height:1}
+.avatar-photo-frame img{display:block;width:100%;height:100%;object-fit:cover}
+.top-avatar{overflow:hidden;padding:0;border:2px solid var(--border);cursor:pointer}
+.top-avatar:hover,.account-profile-link:hover{border-color:var(--brand)}
+.account-profile-link{width:100%;background:transparent;text-align:left;
+  border:1px solid transparent;padding:5px;border-radius:12px;color:var(--text);cursor:pointer}
+.account-profile-text{display:grid;gap:3px;min-width:0}
+.account-profile-text strong{font-size:13px;max-width:152px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-profile-text small{color:var(--muted);font-size:11px}
+.account-profile-link>.avatar-photo-frame{width:39px;height:39px;border-radius:13px;flex-shrink:0}
+
+/* Mascote oficial do clube: visível no menu, carregamento e autenticação. */
+.brand-emblem,.auth-story .brand-emblem{width:42px;height:42px;flex-shrink:0;
+  background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible}
+.brand-emblem img{display:block;width:100%;height:100%;object-fit:contain}
+.brand-emblem span,.brand-emblem span:nth-child(2),.brand-emblem span:nth-child(3){display:none}
+@media(max-width:600px){.brand-emblem,.auth-story .brand-emblem{width:39px;height:39px}}

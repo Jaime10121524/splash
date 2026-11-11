@@ -70,6 +70,7 @@ export function emptyClient() {
     nome:'',telefone:'',cpf:'',email:'',data_nascimento:'',endereco:'',
     profissao:'',observacoes:'',origem_id:'',indicador_cliente_id:null,
     dono_corrente_pessoa_id:'',ativo:true,motivo_corrente:'',
+    bonificacao_registrar:false,bonificacao_valor:'',bonificacao_paga:false,
   }
 }
 export function normalizeClient(record) {
@@ -142,6 +143,28 @@ export function ClientFields({ fields, onChange, catalogs, compact=false, origin
           dono_corrente_pessoa_id:selected?.dono_corrente_pessoa_id
             ? String(selected.dono_corrente_pessoa_id) : fields.dono_corrente_pessoa_id})
       }}/>} 
+    {canRefer && referrer && !original && <div className="cm-inheritance">
+      <strong>Bonificação pela indicação</strong>
+      <p>Informe se houve bonificação para quem indicou. O valor será registrado na conta financeira responsável pela corrente.</p>
+      <label className="cm-status-switch">
+        <span><strong>Registrar bonificação?</strong><small>Sim / Não</small></span>
+        <input type="checkbox" checked={!!fields.bonificacao_registrar}
+          onChange={e=>onChange({...fields,bonificacao_registrar:e.target.checked,
+            bonificacao_paga:e.target.checked?!!fields.bonificacao_paga:false})}/>
+      </label>
+      {fields.bonificacao_registrar&&<>
+        <label>Valor (R$)
+          <input inputMode="decimal" placeholder="30,00" value={fields.bonificacao_valor||''}
+            onChange={e=>set('bonificacao_valor',e.target.value)} />
+        </label>
+        {catalogs.pode_confirmar_bonificacao&&<label className="cm-status-switch">
+          <span><strong>O pagamento já foi realizado?</strong>
+            <small>Se SIM, lança despesa no financeiro imediatamente.</small></span>
+          <input type="checkbox" checked={!!fields.bonificacao_paga}
+            onChange={e=>set('bonificacao_paga',e.target.checked)}/>
+        </label>}
+      </>}
+    </div>}
     {inherited ? <div className="cm-inheritance">
       <strong>Corrente herdada da indicação</strong>
       <p>O responsável será determinado pelo cadastro do cliente indicador. Isso não transfere a corrente para o atendente.</p>

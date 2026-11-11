@@ -4,6 +4,7 @@ import { FormControl } from '../components/UiFields.jsx'
 import { comercialGet, comercialPost, dateBR, localDateISO, personOptions, timeSpan } from '../lib/comercialApi.js'
 import './ComercialPages.css'
 import { formatPhone } from '../components/PhoneInput.jsx'
+import TransientNotice from '../components/TransientNotice.jsx'
 
 const statusLabels={
   AGUARDANDO:'Aguardando', ATENDENDO:'Em atendimento',
@@ -19,7 +20,7 @@ const stateOptions=[
 ]
 const initialStats={total:0,aguardando:0,atendendo:0,retorno:0,sem_venda:0,pendencia:0,venda:0,canceladas:0,media_segundos:null,mais_rapido_segundos:null,mais_demorado_segundos:null}
 
-export default function Atendimentos({initialClient=null,onClientAccepted=()=>{},navigate=()=>{},admin=false}) {
+export default function Atendimentos({initialClient=null,onClientAccepted=()=>{},navigate=()=>{},admin=false,gestor=false}) {
   const [catalogs,setCatalogs]=useState({origens:[],motivos:[],pessoas:[]})
   const [visits,setVisits]=useState([])
   const [stats,setStats]=useState(initialStats)
@@ -129,7 +130,8 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
           result=await comercialPost('/api/atendimentos/chegada',{cliente_id:selectedClient.id,...brokerPayload})
         }else{
           result=await comercialPost('/api/atendimentos/chegada',{
-            novo_cliente:{...newClient,ativo:true},...brokerPayload,
+            novo_cliente:{...newClient,ativo:true,bonificacao_valor:String(newClient.bonificacao_valor||'')
+              .replace(/\./g,'').replace(',','.')},...brokerPayload,
           })
         }
       }else if(modal.type==='brokers'){
@@ -180,7 +182,7 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
         <button className="com-main-button" type="button" onClick={()=>openArrival()}>＋ Registrar chegada</button>
       </div>
     </header>
-    {notice&&<div className="com-alert success" role="status">{notice}<button type="button" onClick={()=>setNotice('')}>Fechar</button></div>}
+    <TransientNotice message={notice} onClose={()=>setNotice('')} />
     {error&&<div className="com-alert error" role="alert">{error}<button type="button" onClick={()=>{setError('');reload().catch(e=>setError(e.message))}}>Tentar novamente</button></div>}
     <div className="com-stats">
       {kpis.map(([label,value,description])=><article key={label}><span>{label}</span><strong>{value}</strong><small>{description}</small></article>)}
@@ -245,10 +247,12 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
                   onClick={()=>navigate(v.operacao_situacao==='VENDA'?'vendas':'pendencias',v)}>
                   {v.operacao_situacao==='VENDA'?'Ver título':'Ver pendência'}
                 </button>}
-                {admin&&!v.operacao_id&&['VENDA','PENDENCIA'].includes(v.status)&&<button type="button"
+                {(admin||gestor&&v.status==='VENDA')&&!v.operacao_id&&['VENDA','PENDENCIA'].includes(v.status)&&<button type="button"
                   className="primary" onClick={()=>navigate(v.status==='VENDA'?'vendas':'pendencias',v)}>
                   {v.status==='VENDA'?'Registrar título':'Abrir pendência financeira'}
                 </button>}
+                {gestor&&v.operacao_id&&v.operacao_situacao==='VENDA'&&<button type="button"
+                  className="primary" onClick={()=>navigate('vendas')}>Ver vendas da gestão</button>}
                 {v.status==='AGUARDANDO'&&<button type="button" className="primary" onClick={()=>openStart(v)}>Iniciar atendimento</button>}
                 {v.status==='ATENDENDO'&&<button type="button" className="primary" onClick={()=>openFinish(v)}>Encerrar atendimento</button>}
                 {canResume&&<button type="button" className="primary"
