@@ -20,7 +20,7 @@ type Plan={id:number;nome:string;codigo:string;valor:string;duracao_meses:number
 type Method={id:number;nome:string;codigo:string;credito:boolean};
 type Person={id:number;nome:string;papeis:string[]};
 type Options={planos:Plan[];formas:Method[];gerentes:{id:number;nome:string}[];pessoas:Person[];pode_corrigir_comissao:boolean};
-type Detail={operacao:{id:number;visita_id:number;numero_titulo:string;sigla_plano:string;valor_cobrado:string;data_venda:string;comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
+type Detail={operacao:{id:number;visita_id:number;situacao:'VENDA'|'PENDENCIA';data_negociacao?:string;numero_titulo:string|null;sigla_plano:string;valor_cobrado:string;data_venda:string|null;comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
 type Allocation={responsavel_pessoa_id:number;beneficiario_pessoa_id:number;papel:string;valor:string;observacoes:string};
 type Rateios={corretor_pessoa_id:number;comissao_bruta:string|null;editavel:boolean;quitada:boolean;aviso:string;rateios:(Allocation & {id:number;beneficiario_nome:string})[]};
 
@@ -82,6 +82,7 @@ export default function VendaMobile(){
   const [choice,setChoice]=useState<{field:string;index?:number}|null>(null);
   const [planId,setPlanId]=useState<number|null>(null),[managerId,setManagerId]=useState<number|null>(null);
   const [titleNumber,setTitleNumber]=useState(''),[discount,setDiscount]=useState('0,00');
+  const [pendingReturn,setPendingReturn]=useState(''),[pendingNotes,setPendingNotes]=useState('');
   const [date,setDate]=useState(nowBR),[startDate,setStartDate]=useState(nowBR);
   const [methodId,setMethodId]=useState<number|null>(null),[amount,setAmount]=useState('');
   const [holder,setHolder]=useState<'CORRETOR'|'EMPRESA'>('CORRETOR');
@@ -96,20 +97,22 @@ export default function VendaMobile(){
   const [photoSaving,setPhotoSaving]=useState(false);
   const photoDisplayUri=stagedPhoto?.uri||photoUri;
   const plan=opts?.planos.find(x=>x.id===planId),method=opts?.formas.find(x=>x.id===methodId);
+  const isPendingNew=isNew&&visit?.status==='PENDENCIA';
+  const isPendingOperation=detail?.operacao.situacao==='PENDENCIA';
   const price=plan?cents(plan.valor):null,discountValue=cents(discount);
   const total=price!==null&&discountValue!==null?price-discountValue:null;
 
   const refresh=useCallback(async(id:number,admin:boolean)=>{
     if(!token)return;
     const d=await apiRequest<Detail>('mobile/vendas/'+id,{token});setDetail(d);
-    if(admin){
+    if(admin&&d.operacao.situacao==='VENDA'){
       const r=await apiRequest<Rateios>('mobile/vendas/'+id+'/rateios',{token});
       setRateios(r);
       setRateioRows(r.rateios.map(x=>({
         responsavel_pessoa_id:x.responsavel_pessoa_id,beneficiario_pessoa_id:x.beneficiario_pessoa_id,
         papel:x.papel,valor:x.valor,observacoes:x.observacoes||'',
       })));
-    }
+    }else{setRateios(null);setRateioRows([]);}
   },[token]);
 
   useEffect(()=>{
@@ -124,9 +127,9 @@ export default function VendaMobile(){
         const v=await apiRequest<VisitDetailsResponse>('mobile/atendimentos/'+visitId,{token});
         if(!active)return;
         setVisit(v.visita);
-        if(v.visita.status!=='VENDA')throw Error('Primeiro conclua o atendimento como Venda fechada.');
+        if(!['VENDA','PENDENCIA'].includes(v.visita.status))throw Error('Encerre o atendimento como Venda ou Pendência antes de continuar.');
         if(v.visita.operacao_id){
-          router.replace({pathname:'/venda/[id]',params:{id:String(v.visita.operacao_id)}});return;
+          router.replace({pathname:v.visita.status==='PENDENCIA'?'/pendencia/[id]':'/venda/[id]',params:{id:String(v.visita.operacao_id)}});return;
         }
       }else{
         if(!Number.isSafeInteger(Number(rawId))||Number(rawId)<1)throw Error('Venda inválida.');
@@ -152,16 +155,27 @@ export default function VendaMobile(){
   }
 
   async function saveTitle(){
-    if(!visit||!planId||total===null||total<=0||!iso(date)||!iso(startDate)){
+    const kind=visit?.status==='PENDENCIA'?'PENDENCIA':'VENDA';
+    if(!visit||!planId||total===null||total<=0||!iso(date)||(kind==='VENDA'&&!iso(startDate))){
       setError('Confira plano, datas e valores.');setConfirm(false);return;
     }
-    if(!/^\d{4}$/.test(titleNumber)){setError('O título precisa ter 4 dígitos.');setConfirm(false);return;}
+    if(kind==='VENDA'&&!/^\d{4}$/.test(titleNumber)){
+      setError('O título precisa ter 4 dígitos.');setConfirm(false);return;
+    }
+    if(kind==='PENDENCIA'&&(pendingNotes.length>4000||
+      (pendingReturn.trim()&&!iso(pendingReturn)))){
+      setError('Confira a data de retorno e as observações da negociação.');setConfirm(false);return;
+    }
     setConfirm(false);
     await action(async()=>{
       const res=await apiRequest<{operacao_id:number}>('mobile/vendas',{method:'POST',token,body:{
-        cliente_id:visit.cliente_id,visita_id:visit.id,plano_versao_id:planId,situacao:'VENDA',
-        historica:false,numero_titulo:titleNumber,data_negociacao:iso(date),data_venda:iso(date),
-        data_inicio:iso(startDate),desconto_corretor:decimal(discountValue||0),
+        cliente_id:visit.cliente_id,visita_id:visit.id,plano_versao_id:planId,situacao:kind,
+        historica:false,numero_titulo:kind==='VENDA'?titleNumber:null,
+        data_negociacao:iso(date),data_venda:kind==='VENDA'?iso(date):null,
+        data_inicio:kind==='VENDA'?iso(startDate):null,
+        retorno_previsto:kind==='PENDENCIA'?(pendingReturn.trim()?iso(pendingReturn):null):null,
+        observacoes:kind==='PENDENCIA'?pendingNotes.trim():null,
+        desconto_corretor:decimal(discountValue||0),
         gerente_pessoa_id:managerId,corretor_pessoa_id:visit.corretor_pessoa_id,
         segundo_corretor_pessoa_id:visit.segundo_corretor_pessoa_id,
         atendente_pessoa_id:visit.atendente_pessoa_id,atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id,
@@ -183,7 +197,11 @@ export default function VendaMobile(){
         }finally{setPhotoBusy(false);}
       }
       setStep('pagamento');
-      setNotice('Venda cadastrada. Agora registre os pagamentos.');
+      if(kind==='PENDENCIA'){
+        router.replace({pathname:'/pendencia/[id]',params:{id:String(res.operacao_id)}});
+      }else{
+        setNotice('Venda cadastrada. Agora registre os pagamentos.');
+      }
     });
   }
 
