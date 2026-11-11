@@ -80,7 +80,7 @@ export default function AtendimentosScreen() {
           <Text style={styles.newVisitText}>Registrar chegada</Text>
           <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" />
         </Pressable>
-        <Pressable style={styles.pendingShortcut} onPress={()=>router.push('/pendencias')}
+        <Pressable style={styles.pendingShortcut} onPress={()=>router.push('/pendencias' as never)}
           accessibilityRole="button">
           <SymbolView name={{ios:'clock.arrow.circlepath',android:'pending_actions'}}
             size={19} tintColor={colors.brandDark}/>
