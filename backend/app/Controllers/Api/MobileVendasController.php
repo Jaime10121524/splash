@@ -43,7 +43,8 @@ final class MobileVendasController extends VendasController
     private function linkedVisit(int $id,array $a): array|ResponseInterface
     {
         $visit=db_connect()->table('visitas')->where('id',$id)->get()->getRowArray();
-        if (!$visit || $visit['status']!=='VENDA') return $this->errorResponse(404,'Visita com venda fechada não encontrada.');
+        if (!$visit || !in_array($visit['status'],['VENDA','PENDENCIA'],true))
+            return $this->errorResponse(404,'Atendimento com negociação não encontrado.');
         if ($a['scope']!==null && !$a['manager'] && !in_array($a['scope'],[(int)$visit['corretor_pessoa_id'],(int)($visit['segundo_corretor_pessoa_id']??0)],true)
             && (int)$visit['criado_por_usuario_id']!==(int)$a['user']->id)
             return $this->errorResponse(404,'Visita não encontrada.');
@@ -163,9 +164,12 @@ final class MobileVendasController extends VendasController
         $data=$this->jsonPayload();
         $visitId=$this->optionalId($data['visita_id']??null);
         if (!$visitId || $visitId===false)
-            return $this->errorResponse(422,'Selecione o atendimento com venda fechada.');
+            return $this->errorResponse(422,'Selecione um atendimento encerrado como venda ou pendência.');
         $visit=$this->linkedVisit($visitId,$a);
         if($visit instanceof ResponseInterface)return $visit;
+        $kind=(string)($data['situacao']??'');
+        if(!in_array($kind,['VENDA','PENDENCIA'],true)||$visit['status']!==$kind)
+            return $this->errorResponse(409,'Encerre primeiro o atendimento com o mesmo resultado da negociação.');
         if ((int)($data['cliente_id']??0)!==(int)$visit['cliente_id'])
             return $this->errorResponse(422,'O cliente deve ser o mesmo do atendimento.');
         // A API web trava corretor/atendentes pelo vínculo com a visita.
@@ -210,8 +214,16 @@ final class MobileVendasController extends VendasController
                 'id'=>(int)$op['id'],'visita_id'=>(int)$op['visita_id'],
                 'situacao'=>$op['situacao'],'numero_titulo'=>$op['numero_titulo'],
                 'sigla_plano'=>$op['sigla_plano'],'valor_cobrado'=>$op['valor_cobrado'],
+                'data_negociacao'=>$op['data_negociacao'],
                 'data_venda'=>$op['data_venda'],'observacao_comissao'=>$op['observacao_comissao'],
             ],
+            'movimentos'=>array_map(static function(array $r):array{return [
+                'id'=>(int)$r['id'],'tipo'=>$r['tipo'],'valor'=>$r['valor'],
+                'data_movimento'=>$r['data_movimento'],'forma_nome'=>$r['forma_nome'],
+            ];},$db->table('venda_recebimentos r')
+                ->select('r.id,r.tipo,r.valor,r.data_movimento,f.nome AS forma_nome')
+                ->join('venda_formas_pagamento f','f.id=r.forma_id')
+                ->where('r.operacao_id',(int)$id)->orderBy('r.id','ASC')->get()->getResultArray()),
             'recebido'=>VendaMoney::decimal($paid),
             'saldo'=>VendaMoney::decimal(max(0,(VendaMoney::cents((string)$op['valor_cobrado'])??0)-$paid)),
             // Mesmo bloqueio do web, sem expor outras contas ao perfil limitado.
@@ -229,8 +241,25 @@ final class MobileVendasController extends VendasController
         $a=$this->actor();if($a instanceof ResponseInterface)return $a;
         $op=$this->ownedOperation((int)$id,$a);
         if($op instanceof ResponseInterface)return $op;
-        if ($op['situacao']!=='VENDA') return $this->errorResponse(409,'Este lançamento não é uma venda fechada.');
+        if (!in_array($op['situacao'],['VENDA','PENDENCIA'],true))
+            return $this->errorResponse(409,'A operação não permite recebimentos.');
         return parent::receber($id);
+    }
+
+    /**
+     * Conversao auditada da mesma operacao: nao duplica venda nem recebimentos.
+     * O guard() da classe base continua usando a autenticacao token-mobile.
+     */
+    public function converter(int|string $id): ResponseInterface
+    {
+        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
+        $op=$this->ownedOperation((int)$id,$a);
+        if($op instanceof ResponseInterface)return $op;
+        if($op['situacao']!=='PENDENCIA')
+            return $this->errorResponse(409,'Esta negociação já foi convertida ou não é uma pendência.');
+        if(ProtecaoVendaFechada::bloqueada(db_connect(),(int)$id))
+            return $this->errorResponse(409,'Operação vinculada a fechamento; conversão bloqueada.');
+        return parent::converter($id);
     }
 
     public function ajustarComissao(int|string $id): ResponseInterface
