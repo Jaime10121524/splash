@@ -29,10 +29,12 @@ export default function PendingDetail(){
   const s=useThemedStyles(lightStyles);
   const {palette}=useTheme();
   const {token}=useAuth();
-  const params=useLocalSearchParams<{id:string}>();
+  const params=useLocalSearchParams<{id:string;cliente?:string}>();
   const id=Number(Array.isArray(params.id)?params.id[0]:params.id);
   const [detail,setDetail]=useState<Detail|null>(null);
-  const [clientName,setClientName]=useState('');
+  const [clientName,setClientName]=useState(
+    typeof params.cliente==='string'?params.cliente:''
+  );
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -67,7 +69,7 @@ export default function PendingDetail(){
     if(!/^\d{4}$/.test(number)){
       setError('O número do título deve ter exatamente quatro dígitos.');return;
     }
-    if(!saleDate||!startDate||saleDate<detail.operacao.data_negociacao){
+    if(!saleDate||!startDate||saleDate>localToday()||saleDate<detail.operacao.data_negociacao){
       setError('A data da venda não pode ser anterior à negociação. Confira as datas.');return;
     }
     setError('');setConfirm(true);
