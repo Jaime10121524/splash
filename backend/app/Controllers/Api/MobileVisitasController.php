@@ -325,7 +325,7 @@ final class MobileVisitasController extends BaseController
         foreach($rows as $r){
             $operation=(int)($r['operacao_id']??0);
             $canManage=!$operator && ($admin || $manager && (
-                (int)($r['operacao_gerente_id']??0)===$personId ||
+                ($personId>0 && (int)($r['operacao_gerente_id']??0)===$personId) ||
                 (int)($r['operacao_criado_por']??0)===(int)$user->id ||
                 $operation===0
             ) || (!$manager && $scope!==0));
