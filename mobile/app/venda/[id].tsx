@@ -432,7 +432,7 @@ export default function VendaMobile(){
             </Text>
           </View>}
           {step==='titulo'&&<View style={s.card}>
-            <Text style={s.section}>{isPendingNew?'📸 Foto da negociação (opcional)':'📸 Foto da venda'}</Text>
+            <Text style={s.section}>{isPendingOperation?'📸 Foto da negociação':'📸 Foto da venda'}</Text>
             <Text style={s.helper}>{opId
               ?'Adicione ou troque a foto do título já cadastrado.'
               :'Selecione agora. A imagem será enviada automaticamente depois de salvar o título.'}</Text>
