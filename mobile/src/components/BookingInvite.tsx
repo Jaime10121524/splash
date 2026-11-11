@@ -142,7 +142,7 @@ export default function BookingInvite({ booking, onClose }: {
           <View style={lightStyles.body}>
             <View style={lightStyles.brokerBox}>
               <Text style={lightStyles.brokerCaption}>VOCÊ SERÁ ATENDIDO PELO CORRETOR:</Text>
-              <Text style={lightStyles.brokerName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.75}>
+              <Text style={lightStyles.brokerName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.65}>
                 {booking.captador_nome || 'Corretor responsável'}
               </Text>
             </View>
@@ -233,9 +233,12 @@ const lightStyles = StyleSheet.create({
   fazendinha: { color: '#D7C8FF', fontWeight: '900', fontSize: 14 },
   tagline: { marginTop: 3, color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: .6 },
   body: { flex: 1, paddingHorizontal: 13, paddingTop: 8, paddingBottom: 8, justifyContent: 'space-between' },
-  brokerBox: { alignItems: 'center' },
-  brokerCaption: { color: colors.brandDark, fontSize: 9, fontWeight: '900', textAlign: 'center' },
-  brokerName: { color: colors.navy, fontSize: 18, fontWeight: '900', lineHeight: 20, textAlign: 'center', marginTop: 3 },
+  brokerBox: { alignItems: 'center', justifyContent:'center', alignSelf:'stretch',
+    backgroundColor:'#F2EEFF',borderRadius:13,paddingHorizontal:10,paddingVertical:12,
+    borderWidth:1,borderColor:'#DED5FF' },
+  brokerCaption: { color: colors.brandDark, fontSize: 9.5, fontWeight: '900', textAlign: 'center',letterSpacing:.3 },
+  brokerName: { color: colors.navy, fontSize: 26, fontWeight: '900', lineHeight: 30,
+    textAlign: 'center', marginTop: 6, width:'100%' },
   visitBox: { backgroundColor: '#F2EEFF', borderRadius: 10, flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 7 },
   visitDate: { flex: 1 },
   visitCount: { minWidth: 74, paddingLeft: 6, borderLeftWidth: 1, borderLeftColor: '#DAD0FC' },
