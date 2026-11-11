@@ -327,9 +327,9 @@ export default function AtendimentoDetailScreen() {
                 <SymbolView name={{ios:'arrow.right',android:'arrow_forward'}} size={19} tintColor="#FFFFFF" />
               </Pressable>}
               {visit.status==='PENDENCIA'&&canManageSales&&<Pressable style={styles.primaryAction}
-                onPress={()=>router.push(visit.operacao_id
+                onPress={()=>router.push((visit.operacao_id
                   ?{pathname:'/pendencia/[id]',params:{id:String(visit.operacao_id)}}
-                  :{pathname:'/venda/[id]',params:{id:'novo',visita:String(visit.id)}})}>
+                  :{pathname:'/venda/[id]',params:{id:'novo',visita:String(visit.id)}}) as never)}>
                 <Text style={styles.primaryText}>{visit.operacao_id
                   ?'Abrir negociação e fechar venda':'Cadastrar negociação pendente'}</Text>
                 <SymbolView name={{ios:'arrow.right',android:'arrow_forward'}} size={19} tintColor="#FFFFFF"/>
