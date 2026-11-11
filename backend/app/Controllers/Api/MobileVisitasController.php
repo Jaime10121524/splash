@@ -373,8 +373,8 @@ final class MobileVisitasController extends BaseController
             return $this->error(404, 'Atendimento não encontrado.');
         }
         $actor=auth('tokens')->user();
-        $canManage=$actor->inGroup('admin','corretor')
-            && !$actor->inGroup('operador');
+        $canManage=$actor->inGroup('admin') ||
+            ($actor->inGroup('corretor')&&!$actor->inGroup('operador'));
         if($actor->inGroup('gerente')&&!$actor->inGroup('admin')){
             $manager=$db->table('pessoas')->select('id')
                 ->where('user_id',(int)$actor->id)->where('ativo',1)->get()->getRowArray();
