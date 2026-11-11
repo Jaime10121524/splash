@@ -11,7 +11,7 @@ import {colors} from '../src/theme';
 type Pending={
   id:number;cliente_nome:string;cliente_telefone:string|null;corretor_nome:string|null;
   chegada_em:string;fim_em:string|null;retorno_previsto:string|null;observacoes:string|null;
-  possui_negociacao:boolean;operacao_id:number|null;pode_gerenciar:boolean;
+  possui_negociacao:boolean;operacao_id:number|null;pode_gerenciar:boolean;sem_atendimento?:boolean;
 };
 type Response={pendencias:Pending[];limitado:boolean};
 
@@ -44,7 +44,9 @@ export default function Pendencias(){
   ),[rows,filter,query]);
   const open=(r:Pending)=>{
     if(!r.pode_gerenciar)return router.push({pathname:'/atendimento/[id]',params:{id:String(r.id)}});
-    if(r.operacao_id)return router.push({pathname:'/pendencia/[id]',params:{id:String(r.operacao_id)}} as never);
+    if(r.operacao_id)return router.push({pathname:'/pendencia/[id]',params:{
+      id:String(r.operacao_id),cliente:r.cliente_nome,
+    }} as never);
     if(r.possui_negociacao)return router.push({pathname:'/atendimento/[id]',params:{id:String(r.id)}});
     router.push({pathname:'/venda/[id]',params:{id:'novo',visita:String(r.id)}});
   };
@@ -96,7 +98,7 @@ export default function Pendencias(){
             <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} size={19} tintColor={palette.brandDark}/>
           </View>
           <Text style={s.name}>{r.cliente_nome}</Text>
-          <Text style={s.meta}>Atendimento nº {r.id} · {displayDate(r.chegada_em)}</Text>
+          <Text style={s.meta}>{r.sem_atendimento?'Negociação direta':'Atendimento nº '+r.id} · {displayDate(r.chegada_em)}</Text>
           {!!r.corretor_nome&&<Text style={s.meta}>Corretor: {r.corretor_nome}</Text>}
           {!!r.retorno_previsto&&<Text style={s.meta}>Retorno previsto: {displayDate(r.retorno_previsto)}</Text>}
           <View style={s.cardBottom}><Text style={s.action}>
