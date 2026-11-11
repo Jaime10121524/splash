@@ -372,6 +372,24 @@ final class MobileVisitasController extends BaseController
         if (! $visit || ! $this->allowed($visit, auth('tokens')->user())) {
             return $this->error(404, 'Atendimento não encontrado.');
         }
+        $actor=auth('tokens')->user();
+        $canManage=$actor->inGroup('admin','corretor')
+            && !$actor->inGroup('operador');
+        if($actor->inGroup('gerente')&&!$actor->inGroup('admin')){
+            $manager=$db->table('pessoas')->select('id')
+                ->where('user_id',(int)$actor->id)->where('ativo',1)->get()->getRowArray();
+            $managerId=(int)($manager['id']??0);
+            $canManage=$managerId>0;
+            if($canManage && $visit['operacao_id']){
+                $op=$db->table('venda_operacoes')->select('gerente_pessoa_id,criado_por_usuario_id')
+                    ->where('id',(int)$visit['operacao_id'])->get()->getRowArray();
+                $canManage=$op && (
+                    (int)($op['gerente_pessoa_id']??0)===$managerId ||
+                    (int)($op['criado_por_usuario_id']??0)===(int)$actor->id
+                );
+            }
+        }
+        $visit['pode_gerenciar_negociacao']=(bool)$canManage;
         foreach (['id', 'cliente_id', 'corretor_pessoa_id', 'segundo_corretor_pessoa_id',
             'atendente_pessoa_id', 'atendente_adicional_pessoa_id', 'motivo_nao_venda_id'] as $key) {
             $visit[$key] = $visit[$key] === null ? null : (int) $visit[$key];
