@@ -33,6 +33,7 @@ export type VisitDetail = Visit & {
   motivo_nome: string | null;
   operacao_situacao: string | null;
   operacao_id?: number | null;
+  pode_gerenciar_negociacao?: boolean;
   cliente_cpf: string | null;
   cliente_email: string | null;
   cliente_nascimento: string | null;
