@@ -283,6 +283,68 @@ final class MobileVisitasController extends BaseController
         ])->setHeader('Cache-Control', 'no-store');
     }
 
+    /**
+     * Carteira de pendencias de TODOS os dias, inclusive sem operacao criada.
+     * O gerente enxerga o atendimento, mas so abre dados de negociacoes
+     * pertencentes a propria gestao; o operador apenas consulta.
+     */
+    public function pendencias(): ResponseInterface
+    {
+        if ($denied=$this->access()) return $denied;
+        $user=auth('tokens')->user();
+        $db=db_connect();
+        $scope=$this->scope($user);
+        $admin=$user->inGroup('admin');
+        $manager=$user->inGroup('gerente');
+        $operator=$user->inGroup('operador') && !$admin && !$manager;
+        $personId=null;
+        if($manager&&!$admin){
+            $person=$db->table('pessoas')->select('id')
+                ->where('user_id',(int)$user->id)->where('ativo',1)->get()->getRowArray();
+            $personId=(int)($person['id']??0);
+        }
+        $query=$db->table('visitas v')
+            ->select('v.id,v.cliente_id,v.chegada_em,v.fim_em,v.retorno_previsto,v.observacoes,
+                c.nome AS cliente_nome,c.telefone AS cliente_telefone,
+                cp.nome AS corretor_nome,op.id AS operacao_id,
+                op.situacao AS operacao_situacao,op.gerente_pessoa_id AS operacao_gerente_id,
+                op.criado_por_usuario_id AS operacao_criado_por')
+            ->join('clientes c','c.id=v.cliente_id')
+            ->join('pessoas cp','cp.id=v.corretor_pessoa_id','left')
+            ->join('venda_operacoes op','op.visita_id=v.id','left')
+            ->where('v.status','PENDENCIA');
+        if($scope!==null){
+            $query->groupStart()->where('v.corretor_pessoa_id',$scope)
+                ->orWhere('v.segundo_corretor_pessoa_id',$scope)
+                ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
+        }
+        $rows=$query->orderBy('v.id','DESC')->limit(151)->get()->getResultArray();
+        $limited=count($rows)>150;
+        if($limited)$rows=array_slice($rows,0,150);
+        $items=[];
+        foreach($rows as $r){
+            $operation=(int)($r['operacao_id']??0);
+            $canManage=!$operator && ($admin || $manager && (
+                (int)($r['operacao_gerente_id']??0)===$personId ||
+                (int)($r['operacao_criado_por']??0)===(int)$user->id ||
+                $operation===0
+            ) || (!$manager && $scope!==0));
+            $items[]=[
+                'id'=>(int)$r['id'],'cliente_nome'=>$r['cliente_nome'],
+                'cliente_telefone'=>$r['cliente_telefone'],
+                'corretor_nome'=>$r['corretor_nome'],
+                'chegada_em'=>$r['chegada_em'],'fim_em'=>$r['fim_em'],
+                'retorno_previsto'=>$r['retorno_previsto'],
+                'observacoes'=>$r['observacoes'],
+                'possui_negociacao'=>$operation>0,
+                'operacao_id'=>$operation>0&&$canManage?$operation:null,
+                'pode_gerenciar'=>(bool)$canManage,
+            ];
+        }
+        return $this->response->setJSON(['pendencias'=>$items,'limitado'=>$limited])
+            ->setHeader('Cache-Control','private, no-store');
+    }
+
     public function show(int|string $id): ResponseInterface
     {
         if ($denied = $this->access()) return $denied;
