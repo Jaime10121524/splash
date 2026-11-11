@@ -80,6 +80,15 @@ export default function AtendimentosScreen() {
           <Text style={styles.newVisitText}>Registrar chegada</Text>
           <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" />
         </Pressable>
+        <Pressable style={styles.pendingShortcut} onPress={()=>router.push('/pendencias')}
+          accessibilityRole="button">
+          <SymbolView name={{ios:'clock.arrow.circlepath',android:'pending_actions'}}
+            size={19} tintColor={colors.brandDark}/>
+          <View style={{flex:1}}><Text style={styles.pendingShortcutTitle}>Pendências</Text>
+            <Text style={styles.pendingShortcutSub}>Negociações de todos os dias · fechar venda</Text>
+          </View>
+          <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} size={18} tintColor={colors.brandDark}/>
+        </Pressable>
         <View style={styles.searchRow}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search' }} size={20} tintColor={colors.muted} />
           <TextInput
