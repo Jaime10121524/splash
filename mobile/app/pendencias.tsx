@@ -44,7 +44,7 @@ export default function Pendencias(){
   ),[rows,filter,query]);
   const open=(r:Pending)=>{
     if(!r.pode_gerenciar)return router.push({pathname:'/atendimento/[id]',params:{id:String(r.id)}});
-    if(r.operacao_id)return router.push({pathname:'/pendencia/[id]',params:{id:String(r.operacao_id)}});
+    if(r.operacao_id)return router.push({pathname:'/pendencia/[id]',params:{id:String(r.operacao_id)}} as never);
     if(r.possui_negociacao)return router.push({pathname:'/atendimento/[id]',params:{id:String(r.id)}});
     router.push({pathname:'/venda/[id]',params:{id:'novo',visita:String(r.id)}});
   };
