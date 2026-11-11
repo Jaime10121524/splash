@@ -3,7 +3,7 @@
     "name": "Splash Next",
     "slug": "splash-mobile",
     "scheme": "splashmobile",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -21,7 +21,7 @@
         "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F7F4FF"
