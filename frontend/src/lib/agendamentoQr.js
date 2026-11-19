@@ -58,10 +58,20 @@ export async function conviteImagem(agenda) {
   text('VOUCHER DE VISITA AGENDADA',540,158,22,'#FFFFFF',900,'center')
 
   rounded(58,183,964,1665,38,'#FFFFFF')
-  text('VOCÊ SERÁ ATENDIDO PELO CORRETOR:',540,238,25,'#624CDE',900,'center')
-  const b=fitLines(broker,840,51,30)
-  b.lines.forEach((line,i)=>text(line,540,304+i*54,b.size,'#24184E',900,'center'))
-  rounded(105,383,870,2,1,'#E6DEFF')
+
+  // Nome do corretor em primeiro plano: quadro exclusivo no topo do voucher.
+  // Em nomes maiores, ajustar para duas linhas sem invadir o bloco do cliente.
+  rounded(100,198,880,186,24,'#F1ECFF')
+  text('VOCÊ SERÁ ATENDIDO PELO CORRETOR:',540,246,24,'#624CDE',900,'center')
+  const initialBroker=fitLines(broker,828,82,50)
+  const brokerFont=initialBroker.lines.length===1
+    ? initialBroker.size
+    : Math.min(initialBroker.size,62)
+  const brokerDisplay=fitLines(broker,828,brokerFont,50)
+  const brokerBase=brokerDisplay.lines.length===1?349:313
+  brokerDisplay.lines.forEach((line,i)=>
+    text(line,540,brokerBase+i*60,brokerDisplay.size,'#24184E',900,'center'))
+  rounded(105,395,870,2,1,'#E6DEFF')
 
   text('NOME DO CLIENTE',115,421,23,'#624CDE',900)
   const client=fitLines(agenda.nome_completo||'',850,36,26)
