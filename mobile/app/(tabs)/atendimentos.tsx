@@ -154,6 +154,17 @@ const lightStyles = StyleSheet.create({
   subtitle: { color: colors.muted, marginTop: 7, fontSize: 13 },
   newVisitButton: { marginTop: 20, minHeight: 51, backgroundColor: colors.brand, borderRadius: 17, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11 },
   newVisitText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', flex: 1 },
+  pendingShortcut: {
+    marginTop: 14, padding: 14, minHeight: 68, flexDirection: 'row',
+    alignItems: 'center', gap: 11, backgroundColor: colors.pale,
+    borderRadius: 16, borderWidth: 1, borderColor: colors.line,
+  },
+  pendingShortcutTitle: {
+    color: colors.brandDark, fontSize: 14, fontWeight: '900',
+  },
+  pendingShortcutSub: {
+    color: colors.muted, fontSize: 11, marginTop: 4, lineHeight: 16,
+  },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, borderColor: colors.line, backgroundColor: '#FFFFFF', borderWidth: 1, marginTop: 24, paddingHorizontal: 15, height: 53 },
   search: { flex: 1, color: colors.ink, fontSize: 13, height: '100%' },
   rangeInfo:{marginBottom:12,padding:12,borderRadius:13,backgroundColor:'#FFFFFF',
