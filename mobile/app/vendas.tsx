@@ -119,7 +119,7 @@ function VendasOperacionais(){
               {!!v.movimento_titulo&&<View style={{backgroundColor:colors.pale,
                 borderRadius:9,paddingVertical:5,paddingHorizontal:9}}>
                 <Text style={{fontSize:10,fontWeight:'900',color:colors.brandDark}}>
-                  {v.movimento_titulo==='RENOVACAO'?'🔄 RENOVAÇÃO':'⬆️ UPGRADE'}
+                  {v.movimento_titulo?.startsWith('RENOVACAO')?'🔄 RENOVAÇÃO':'⬆️ UPGRADE'}
                 </Text>
               </View>}
             </View>
