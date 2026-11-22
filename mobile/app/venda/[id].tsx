@@ -88,6 +88,7 @@ export default function VendaMobile(){
   const [error,setError]=useState(''),[notice,setNotice]=useState('');
   const [choice,setChoice]=useState<{field:string;index?:number}|null>(null);
   const [planId,setPlanId]=useState<number|null>(null),[managerId,setManagerId]=useState<number|null>(null);
+  const [saleBroker,setSaleBroker]=useState<number|null>(null),[saleSecond,setSaleSecond]=useState<number|null>(null);
   const [titleNumber,setTitleNumber]=useState(''),[discount,setDiscount]=useState('0,00');
   const [pendingReturn,setPendingReturn]=useState(''),[pendingNotes,setPendingNotes]=useState('');
   const [date,setDate]=useState(nowBR),[startDate,setStartDate]=useState(nowBR);
@@ -166,6 +167,8 @@ export default function VendaMobile(){
         const v=await apiRequest<VisitDetailsResponse>('mobile/atendimentos/'+visitId,{token});
         if(!active)return;
         setVisit(v.visita);
+        setSaleBroker(v.visita.corretor_pessoa_id);
+        setSaleSecond(v.visita.segundo_corretor_pessoa_id);
         // Ao cadastrar uma venda retroativa, usar a data do atendimento como
         // padrão. O usuário pode ajustá-la antes de confirmar.
         const oldDay=String(v.visita.chegada_em||'').slice(0,10);
@@ -205,6 +208,9 @@ export default function VendaMobile(){
     if(!visit||!planId||total===null||total<=0||!iso(date)||(kind==='VENDA'&&!iso(startDate))){
       setError('Confira plano, datas e valores.');setConfirm(false);return;
     }
+    if(!saleBroker || (saleSecond!==null&&saleSecond===saleBroker)){
+      setError('Selecione corretor principal e um segundo diferente, se houver.');setConfirm(false);return;
+    }
     if(kind==='VENDA'&&!/^\d{4}$/.test(titleNumber)){
       setError('O título precisa ter 4 dígitos.');setConfirm(false);return;
     }
@@ -222,8 +228,9 @@ export default function VendaMobile(){
         retorno_previsto:kind==='PENDENCIA'?(pendingReturn.trim()?iso(pendingReturn):null):null,
         observacoes:kind==='PENDENCIA'?pendingNotes.trim():null,
         desconto_corretor:decimal(discountValue||0),
-        gerente_pessoa_id:managerId,corretor_pessoa_id:visit.corretor_pessoa_id,
-        segundo_corretor_pessoa_id:visit.segundo_corretor_pessoa_id,
+        gerente_pessoa_id:managerId,corretor_pessoa_id:saleBroker,
+        segundo_corretor_pessoa_id:saleSecond,
+        corretores_venda_diferentes_visita:true,
         atendente_pessoa_id:visit.atendente_pessoa_id,atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id,
       }});
       // A operação já existe: não tentar salvá-la outra vez se a imagem falhar.
@@ -418,7 +425,9 @@ export default function VendaMobile(){
       ?salePeople.filter(p=>p.papeis.includes('corretor')||p.papeis.includes('vendedor'))
       :choice?.field==='editManager'
         ?salePeople.filter(p=>p.papeis.includes('gerente')):[];
-  const choices:Choice[]=choice?.field==='editPlan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
+  const choices:Choice[]=choice?.field==='newBroker'||choice?.field==='newSecond'
+    ?salePeople.filter(p=>p.papeis.includes('corretor')).map(p=>({id:p.id,label:p.nome})):
+    choice?.field==='editPlan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
     editingField?editingPeople.map(p=>({id:p.id,label:p.nome})):
     choice?.field==='plan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
     choice?.field==='method'?(opts?.formas||[]).map(m=>({id:m.id,label:m.nome})):
@@ -427,7 +436,8 @@ export default function VendaMobile(){
     choice?.field==='person'?(opts?.pessoas||[]).filter(p=>p.papeis.some(role=>
       chosenRole==='GERENTE'?role==='gerente':chosenRole==='CORRETOR'?role==='corretor':
       role==='vendedor'||role==='corretor')).map(p=>({id:p.id,label:p.nome})):[];
-  const selected=choice?.field==='editPlan'?editSale.plano_versao_id:
+  const selected=choice?.field==='newBroker'?saleBroker:choice?.field==='newSecond'?saleSecond:
+    choice?.field==='editPlan'?editSale.plano_versao_id:
     choice?.field==='editBroker'?editSale.corretor_pessoa_id:
     choice?.field==='editSecond'?editSale.segundo_corretor_pessoa_id:
     choice?.field==='editAttendant'?editSale.atendente_pessoa_id:
@@ -487,6 +497,13 @@ export default function VendaMobile(){
                 onChange={setPendingNotes} placeholder="O que falta para fechar?"/>
             </>:<Input label="Início da vigência * (DD/MM/AAAA)" value={startDate}
               onChange={setStartDate} numeric placeholder="DD/MM/AAAA"/>}
+            <Text style={s.section}>Participantes desta negociação</Text>
+            <Text style={s.helper}>O corretor principal da venda pode ser diferente do captador do convite.
+              Em renovação externa, escolha o corretor que receberá como principal e o captador como segundo.</Text>
+            <Select label="Corretor principal *" value={salePeople.find(p=>p.id===saleBroker)?.nome||'Selecionar'}
+              onPress={()=>setChoice({field:'newBroker'})}/>
+            <Select label="Segundo corretor (opcional)" value={salePeople.find(p=>p.id===saleSecond)?.nome||'Nenhum'}
+              onPress={()=>setChoice({field:'newSecond'})}/>
             <Select label="Gerente (opcional)" value={opts?.gerentes.find(p=>p.id===managerId)?.nome||'Sem gerente'}
               onPress={()=>setChoice({field:'manager'})}/>
             <Text style={s.helper}>Corretor e atendentes são herdados do atendimento. O desconto respeita as regras de comissão do sistema web.</Text>
@@ -745,8 +762,10 @@ export default function VendaMobile(){
         choice?.field==='method'?'Forma de pagamento':
         choice?.field==='manager'?'Gerente':choice?.field==='person'?'Beneficiário':'Quem distribui'}
       choices={choices} selected={selected??null}
-      allowEmpty={['manager','editSecond','editAttendant','editAdditional','editManager'].includes(choice?.field||'')}
+      allowEmpty={['manager','newSecond','editSecond','editAttendant','editAdditional','editManager'].includes(choice?.field||'')}
       onClose={()=>setChoice(null)} onChoose={value=>{
+        if(choice?.field==='newBroker'){setSaleBroker(value);if(value===saleSecond)setSaleSecond(null);}
+        if(choice?.field==='newSecond')setSaleSecond(value);
         if(choice?.field==='editPlan')setEditSale(o=>({...o,plano_versao_id:value}));
         if(choice?.field==='editBroker')setEditSale(o=>({
           ...o,corretor_pessoa_id:value,
