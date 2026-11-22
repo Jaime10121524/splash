@@ -14,6 +14,9 @@ final class GestoresEUsuariosAtivos extends Migration
 {
     public function up()
     {
+        $this->forge->addColumn('venda_operacoes',[
+            'renovacao_externa'=>['type'=>'TINYINT','constraint'=>1,'default'=>0],
+        ]);
         $this->forge->addColumn('pessoas', [
             'usa_sistema'=>['type'=>'TINYINT','constraint'=>1,'default'=>0,'after'=>'ativo'],
         ]);
@@ -35,6 +38,7 @@ final class GestoresEUsuariosAtivos extends Migration
     public function down()
     {
         $this->forge->dropTable('gestor_corretores',true);
+        $this->forge->dropColumn('venda_operacoes','renovacao_externa');
         $this->forge->dropColumn('pessoas','usa_sistema');
     }
 }
