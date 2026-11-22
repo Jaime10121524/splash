@@ -31,6 +31,16 @@ final class GestaoEquipe
             ->where('pessoa_id',$own)->where('papel','gerente')->countAllResults()>0;
     }
 
+    /** Acesso geral somente se configurado explicitamente no cadastro da pessoa. */
+    public static function visaoGlobal($db,$user): bool
+    {
+        if(!self::ehGestor($db,$user))return false;
+        $own=self::pessoaId($db,$user);
+        if($own===null)return false;
+        return $db->table('pessoas')->where('id',$own)
+            ->where('gestor_visao_global',1)->countAllResults()>0;
+    }
+
     /** IDs de todas as pessoas sob gestao, inclusive niveis subordinados. */
     public static function ids($db, $user): array
     {
@@ -38,6 +48,10 @@ final class GestaoEquipe
         if($own===null)return [];
         $ids=[$own];
         if(!self::ehGestor($db,$user))return $ids;
+        if(self::visaoGlobal($db,$user)){
+            return array_map('intval',array_column($db->table('pessoas')->select('id')
+                ->get()->getResultArray(),'id'));
+        }
         $frontier=[$own];
         // Evita ciclos de configuracao. Limite restritivo de profundidade.
         for($level=0;$level<30 && $frontier;$level++){
@@ -61,7 +75,7 @@ final class GestaoEquipe
         if(!$ids)return [(int)$user->id];
         $uids=[(int)$user->id];
         foreach($db->table('pessoas')->select('user_id')->whereIn('id',$ids)
-            ->where('ativo',1)->where('user_id IS NOT NULL',null,false)
+            ->where('user_id IS NOT NULL',null,false)
             ->get()->getResultArray() as $p){
             $uids[]=(int)$p['user_id'];
         }
