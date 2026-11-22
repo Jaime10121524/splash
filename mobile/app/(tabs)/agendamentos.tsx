@@ -299,6 +299,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
   }
 
   const brokers = options?.corretores || [];
+  const agendaBrokers = options?.corretores_agendamento ?? brokers;
   const attendants = options?.atendentes || [];
   const title = mode === 'create' ? 'Nova visita agendada'
     : mode === 'edit' ? 'Editar agendamento'
