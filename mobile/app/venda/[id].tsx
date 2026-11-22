@@ -485,6 +485,14 @@ export default function VendaMobile(){
             </View>}
             <Text style={s.kicker}>{isPendingOperation?'PENDÊNCIA · NEGOCIAÇÃO Nº '+opId:
               'TÍTULO '+(detail.operacao.numero_titulo||'')+' '+detail.operacao.sigla_plano}</Text>
+            {!!(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo)&&
+              <View style={{alignSelf:'flex-start',paddingVertical:7,paddingHorizontal:11,
+                borderRadius:9,backgroundColor:colors.pale,marginTop:8}}>
+                <Text style={{fontSize:12,fontWeight:'900',color:colors.brandDark}}>
+                  {(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo)==='RENOVACAO'
+                    ?'🔄 RENOVAÇÃO':'⬆️ UPGRADE'}
+                </Text>
+              </View>}
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
             <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda||detail.operacao.data_negociacao}</Text>
             <View style={s.two}><View><Text style={s.label}>Recebido do cliente</Text>
