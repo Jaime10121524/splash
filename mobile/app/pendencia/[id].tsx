@@ -10,6 +10,7 @@ import FinanceDatePicker from '../../src/components/FinanceDatePicker';
 import ActionModal from '../../src/components/ActionModal';
 import FeedbackPopup from '../../src/components/FeedbackPopup';
 import {colors} from '../../src/theme';
+import VendaCelebration from '../../src/components/VendaCelebration';
 
 type Detail={
   operacao:{id:number;visita_id:number|null;situacao:string;data_negociacao:string;
@@ -44,6 +45,7 @@ export default function PendingDetail(){
   const [startDate,setStartDate]=useState(localToday);
   const [calendar,setCalendar]=useState<'sale'|'start'|null>(null);
   const [confirm,setConfirm]=useState(false);
+  const [celebrating,setCelebrating]=useState(false);
   const load=useCallback(async()=>{
     if(!token||!Number.isSafeInteger(id)||id<1){
       setError('Negociação inválida.');setLoading(false);return;
@@ -82,7 +84,7 @@ export default function PendingDetail(){
         token,method:'POST',
         body:{numero_titulo:number,data_venda:saleDate,data_inicio:startDate},
       });
-      router.replace({pathname:'/venda/[id]',params:{id:String(id)}});
+      setCelebrating(true);
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível fechar a pendência.');}
     finally{setBusy(false);}
   }
@@ -180,6 +182,10 @@ export default function PendingDetail(){
       primaryLabel="Converter em venda" secondaryLabel="Voltar"
       busy={busy} onPrimary={()=>{void convert();}} onSecondary={()=>setConfirm(false)}/>
     <FeedbackPopup error={notice} onDismiss={()=>setNotice('')}/>
+    <VendaCelebration visible={celebrating} onDone={()=>{
+      setCelebrating(false);
+      router.replace({pathname:'/venda/[id]',params:{id:String(id)}});
+    }}/>
   </SafeAreaView>;
 }
 
