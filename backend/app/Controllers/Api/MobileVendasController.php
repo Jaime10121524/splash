@@ -95,8 +95,8 @@ final class MobileVendasController extends VendasController
         if($start!==''&&$end!==''&&$start>$end)
             return $this->errorResponse(422,'A data inicial não pode superar a final.');
         $query=$db->table('venda_operacoes o')
-            ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,
-                CASE WHEN o.renovacao_externa=1 THEN 'RENOVACAO_EXTERNA' ELSE mov.tipo END AS movimento_titulo,c.nome AS cliente_nome',false)
+            ->select("o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,
+                CASE WHEN o.renovacao_externa=1 THEN 'RENOVACAO_EXTERNA' ELSE mov.tipo END AS movimento_titulo,c.nome AS cliente_nome",false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('plano_versoes pv','pv.id=o.plano_versao_id')
             ->join('visitas v','v.id=o.visita_id','left')
