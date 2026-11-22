@@ -11,7 +11,7 @@ const papelOptions = [
   { value:'operador', label:'Operador de atendimentos' },
 ]
 const userRoles = papelOptions
-const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],responsavel_pessoa_id:'',gestor_pessoa_id:'',dono_corrente_padrao_pessoa_id:'',usa_sistema:false,ativo:true})
+const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],responsavel_pessoa_id:'',gestor_pessoa_id:'',dono_corrente_padrao_pessoa_id:'',gestor_visao_global:false,usa_sistema:false,ativo:true})
 const emptyLogin = () => ({username:'',email:'',password:'',group:'corretor'})
 
 // Todas as rotas passam pelo mesmo cliente HTTP usado no app e no navegador.
@@ -96,7 +96,7 @@ export default function PessoasUsuarios({tab='pessoas'}) {
        responsavel_pessoa_id:person.responsavel_pessoa_id?String(person.responsavel_pessoa_id):'',
         gestor_pessoa_id:person.gestor_pessoa_id?String(person.gestor_pessoa_id):'',
         dono_corrente_padrao_pessoa_id:person.dono_corrente_padrao_pessoa_id?String(person.dono_corrente_padrao_pessoa_id):'',
-        usa_sistema:!!person.usa_sistema,ativo:!!person.ativo,
+        gestor_visao_global:!!person.gestor_visao_global,usa_sistema:!!person.usa_sistema,ativo:!!person.ativo,
     }:emptyPerson())
     setFormError('')
     setModal({kind:'person',person})
@@ -304,6 +304,12 @@ export default function PessoasUsuarios({tab='pessoas'}) {
             ariaLabel="Dono padrão da corrente"/>
           <small>Exemplo: configure James como titular padrão para James, Helena e Marta.
             Este vínculo é independente do gestor e de quem recebe repasses.</small>
+        </label>}
+        {personForm.papeis.includes('gerente')&&<label className="pu-switch">
+          <span><strong>Visão geral de todos os agendamentos e atendimentos</strong>
+            <small>Inclui registros antigos sem vínculo com os corretores atuais. Habilite apenas para a gestão geral, como Helena.</small></span>
+          <input type="checkbox" checked={!!personForm.gestor_visao_global}
+            onChange={e=>setPersonForm(f=>({...f,gestor_visao_global:e.target.checked}))}/>
         </label>}
         <label className="pu-switch"><span><strong>Utiliza o sistema / aparece nos agendamentos</strong>
           <small>Marque apenas corretores que utilizam a plataforma.
