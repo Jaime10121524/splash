@@ -32,7 +32,8 @@ final class AgendamentosController extends BaseController
     {
         $user = $this->user();
         if (!$user || $user->isBanned()) return $this->deny(401, 'Entre novamente para acessar agendamentos.');
-        if (!$user->inGroup('admin','gerente','corretor','operador')) {
+        if (!$user->inGroup('admin','gerente','corretor','operador')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)) {
             return $this->deny(403,'Seu perfil não tem acesso a agendamentos.');
         }
         $manager=\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user);
