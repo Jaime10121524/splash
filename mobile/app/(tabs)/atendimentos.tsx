@@ -26,7 +26,7 @@ const filters = [
 
 export default function AtendimentosScreen() {
   const styles=useThemedStyles(lightStyles);
-  const { token } = useAuth();
+  const { token,user } = useAuth();
   const [periodo, setPeriodo] = useState<'hoje' | 'todos' | 'intervalo'>('hoje');
   const [dateRange,setDateRange]=useState({start:'',end:''});
   const [calendarOpen,setCalendarOpen]=useState(false);
