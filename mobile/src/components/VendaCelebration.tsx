@@ -56,7 +56,7 @@ export default function VendaCelebration({visible,onDone}:Props){
   </View>;
 }
 const styles=StyleSheet.create({
-  overlay:{...StyleSheet.absoluteFillObject,zIndex:999,
+  overlay:{position:'absolute',top:0,right:0,bottom:0,left:0,zIndex:999,
     justifyContent:'center',alignItems:'center'},
   center:{width:W,height:380,justifyContent:'center',alignItems:'center'},
   centerGlow:{backgroundColor:'#291D57',paddingVertical:27,paddingHorizontal:24,
