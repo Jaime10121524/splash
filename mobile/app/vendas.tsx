@@ -87,7 +87,7 @@ function VendasOperacionais(){
       <Pressable style={s.filterToggle} onPress={()=>setFiltersOpen(v=>!v)} accessibilityRole="button">
         <SymbolView name={{ios:'slider.horizontal.3',android:'tune'}} size={20} tintColor={colors.brandDark}/>
         <Text style={s.filterToggleText}>Filtrar por plano e período{activeCount?' · '+activeCount+' ativo(s)':''}</Text>
-        <Text style={s.filterToggleArrow}>{filtersOpen?'⌃':'⌄'}</Text>
+        <SymbolView name={{ios:filtersOpen?'chevron.up':'chevron.down',android:filtersOpen?'expand_less':'expand_more'}} size={16} tintColor={colors.muted}/>
       </Pressable>
       {filtersOpen&&<View style={s.filters}>
         <Text style={s.filterTitle}>Refinar vendas</Text>
