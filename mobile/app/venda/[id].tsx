@@ -240,10 +240,13 @@ export default function VendaMobile(){
     if(!token||photoBusy)return;
     setError('');setNotice('');
     try{
-      const permission=camera?await ImagePicker.requestCameraPermissionsAsync()
-        :await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if(!permission.granted){
-        setError('Autorize a câmera ou galeria nas configurações do Android.');return;
+      // O seletor do sistema Android permite escolher uma imagem SEM pedir
+      // acesso geral à galeria; permissões limitadas podem bloquear o fluxo.
+      if(camera){
+        const permission=await ImagePicker.requestCameraPermissionsAsync();
+        if(!permission.granted){
+          setError('Autorize a câmera nas configurações do Android.');return;
+        }
       }
       const params={mediaTypes:['images'] as ['images'],quality:.65,allowsEditing:false};
       const result=camera?await ImagePicker.launchCameraAsync(params)
