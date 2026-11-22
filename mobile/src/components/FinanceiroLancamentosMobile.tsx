@@ -224,7 +224,7 @@ export default function FinanceiroLancamentosMobile({kind}:{kind:Kind}){
           <Text style={s.fieldCaption}>CONSULTAR CONTA</Text>
           <Text style={s.selectText}>{filterPerson?nameFor(filterPerson):'Todas as pessoas'}</Text>
         </View>
-        <Text style={s.chevron}>⌄</Text>
+        <SymbolView name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={palette.muted}/>
       </Pressable>}
       {isExpense&&<Pressable style={s.select} onPress={()=>setRangeOpen(true)}>
         <View style={{flex:1}}>
@@ -243,7 +243,7 @@ export default function FinanceiroLancamentosMobile({kind}:{kind:Kind}){
             <Text style={s.fieldCaption}>PESSOA RESPONSÁVEL *</Text>
             <Text style={s.selectText}>{nameFor(formPerson)}</Text>
           </View>
-          <Text style={s.chevron}>⌄</Text>
+          <SymbolView name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={palette.muted}/>
         </Pressable>}
         {isExpense&&<>
           <Pressable style={s.select} onPress={()=>setCategorySheet(true)}>
@@ -251,7 +251,7 @@ export default function FinanceiroLancamentosMobile({kind}:{kind:Kind}){
               <Text style={s.fieldCaption}>CATEGORIA *</Text>
               <Text style={s.selectText}>{categoryFor(formCategory)}</Text>
             </View>
-            <Text style={s.chevron}>⌄</Text>
+            <SymbolView name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={palette.muted}/>
           </Pressable>
           <Pressable onPress={()=>setNewCategory(v=>!v)}>
             <Text style={s.link}>{newCategory?'Fechar cadastro de categoria':'+ Nova categoria'}</Text>
