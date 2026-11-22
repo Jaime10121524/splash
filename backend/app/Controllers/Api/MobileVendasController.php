@@ -32,7 +32,8 @@ final class MobileVendasController extends VendasController
             $scope=(int)$p['id'];
         }
         return ['user'=>$u,'admin'=>$admin,'manager'=>$manager,'scope'=>$scope,
-            'team'=>$manager?\App\Libraries\GestaoEquipe::ids(db_connect(),$u):[]];
+            'team'=>$manager?\App\Libraries\GestaoEquipe::ids(db_connect(),$u):[],
+            'team_users'=>$manager?\App\Libraries\GestaoEquipe::usuarios(db_connect(),$u):[]];
     }
 
     protected function guard(): ?ResponseInterface
@@ -48,7 +49,7 @@ final class MobileVendasController extends VendasController
             return $this->errorResponse(404,'Atendimento com negociação não encontrado.');
         if ($a['manager'] && !in_array((int)$visit['corretor_pessoa_id'],$a['team'],true)
             && !in_array((int)($visit['segundo_corretor_pessoa_id']??0),$a['team'],true)
-            && (int)$visit['criado_por_usuario_id']!==(int)$a['user']->id)
+            && !in_array((int)$visit['criado_por_usuario_id'],$a['team_users'],true))
             return $this->errorResponse(404,'Atendimento fora da sua equipe.');
         if ($a['scope']!==null && !$a['manager'] && !in_array($a['scope'],[(int)$visit['corretor_pessoa_id'],(int)($visit['segundo_corretor_pessoa_id']??0)],true)
             && (int)$visit['criado_por_usuario_id']!==(int)$a['user']->id)
@@ -105,9 +106,10 @@ final class MobileVendasController extends VendasController
         if($a['scope']!==null){
             if($a['manager']){
                 $query->groupStart()->where('o.gerente_pessoa_id',$a['scope'])
-                    ->orWhere('o.criado_por_usuario_id',(int)$a['user']->id)
+                    ->orWhereIn('o.criado_por_usuario_id',$a['team_users'])
                     ->orWhereIn('o.corretor_pessoa_id',$a['team'])
-                    ->orWhereIn('o.segundo_corretor_pessoa_id',$a['team'])->groupEnd();
+                    ->orWhereIn('o.segundo_corretor_pessoa_id',$a['team'])
+                    ->orWhereIn('v.criado_por_usuario_id',$a['team_users'])->groupEnd();
             }else{
                 $query->groupStart()->where('o.corretor_pessoa_id',$a['scope'])
                     ->orWhere('o.segundo_corretor_pessoa_id',$a['scope'])
