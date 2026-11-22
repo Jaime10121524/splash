@@ -579,7 +579,8 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
         :picker==='second'?'Segundo corretor':picker==='attendant'?'Atendente':'Cliente'}
       choices={picker==='client'?clients.map(v=>({id:v.id,label:v.nome})):
         picker==='attendant'?attendants.map(v=>({id:v.id,label:v.nome})):
-        brokers.filter(v=>picker!=='second'||v.id!==broker).map(v=>({id:v.id,label:v.nome}))}
+        (picker==='captor'?agendaBrokers:brokers.filter(v=>picker!=='second'||v.id!==broker))
+          .map(v=>({id:v.id,label:v.nome}))}
       selected={picker==='captor'?captor:picker==='broker'?broker:picker==='second'?second:
         picker==='attendant'?attendant:clientId}
       allowEmpty={picker==='second'||picker==='client'}
