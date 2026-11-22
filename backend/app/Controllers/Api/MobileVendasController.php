@@ -154,7 +154,9 @@ final class MobileVendasController extends VendasController
             ->where('pp.papel','gerente')->where('p.ativo',1)->groupBy('p.id,p.nome')
             ->orderBy('p.nome')->get()->getResultArray();
         $people=[];
-        if($a['admin']){
+        // Corretor externo não precisa usar o aplicativo para participar
+        // como titular/segundo corretor de uma renovacao.
+        if($a['admin']||$a['manager']||$a['scope']!==null){
             foreach($db->table('pessoas p')->select('p.id,p.nome,pp.papel')
                 ->join('pessoa_papeis pp','pp.pessoa_id=p.id')
                 ->where('p.ativo',1)->whereIn('pp.papel',['corretor','gerente','vendedor'])
@@ -200,8 +202,21 @@ final class MobileVendasController extends VendasController
         $fechamento=ProtecaoVendaFechada::fechamento($db,(int)$id);
         $moves=$db->table('venda_recebimentos')->select('tipo,valor')
             ->where('operacao_id',(int)$id)->get()->getResultArray();
-        $paid=0;
-        foreach($moves as $m)$paid+=($m['tipo']==='ENTRADA'?1:-1)*(VendaMoney::cents((string)$m['valor'],true)??0);
+        $paid=0;$refunded=false;
+        foreach($moves as $m){
+            $paid+=($m['tipo']==='ENTRADA'?1:-1)*(VendaMoney::cents((string)$m['valor'],true)??0);
+            if($m['tipo']==='DEVOLUCAO')$refunded=true;
+        }
+        $rateIds=array_column($db->table('comissao_rateios')->select('id')
+            ->where('operacao_id',(int)$id)->get()->getResultArray(),'id');
+        $repasses=$rateIds && $db->table('comissao_repasses')
+            ->whereIn('rateio_id',$rateIds)->countAllResults()>0;
+        $ownerPaid=$db->table('comissao_titular_movimentos')
+            ->where('operacao_id',(int)$id)->countAllResults()>0;
+        $linked=$db->table('titulo_vinculos')
+            ->groupStart()->where('operacao_origem_id',(int)$id)
+            ->orWhere('operacao_nova_id',(int)$id)->groupEnd()->countAllResults()>0;
+        $editable=$fechamento===null&&!$repasses&&!$ownerPaid&&!$refunded&&!$linked;
         $base=$op['comissao_ajustada']??$op['comissao_prevista'];
         $gross=$base===null?null:VendaMoney::cents((string)$base,true);
         $own=null;
@@ -233,6 +248,15 @@ final class MobileVendasController extends VendasController
                 'data_venda'=>$op['data_venda'],
                 'retorno_previsto'=>$op['retorno_previsto'],
                 'observacoes'=>$op['observacoes'],
+                'historica'=>(bool)$op['historica'],
+                'plano_versao_id'=>(int)$op['plano_versao_id'],
+                'corretor_pessoa_id'=>(int)$op['corretor_pessoa_id'],
+                'segundo_corretor_pessoa_id'=>$op['segundo_corretor_pessoa_id']===null?null:(int)$op['segundo_corretor_pessoa_id'],
+                'atendente_pessoa_id'=>$op['atendente_pessoa_id']===null?null:(int)$op['atendente_pessoa_id'],
+                'atendente_adicional_pessoa_id'=>$op['atendente_adicional_pessoa_id']===null?null:(int)$op['atendente_adicional_pessoa_id'],
+                'gerente_pessoa_id'=>$op['gerente_pessoa_id']===null?null:(int)$op['gerente_pessoa_id'],
+                'desconto_corretor'=>$op['desconto_corretor'],
+                'data_inicio'=>$op['data_inicio'],
                 'observacao_comissao'=>$op['observacao_comissao'],
             ],
             'movimentos'=>array_map(static function(array $r):array{return [
@@ -242,6 +266,7 @@ final class MobileVendasController extends VendasController
                 ->select('r.id,r.tipo,r.valor,r.data_movimento,f.nome AS forma_nome')
                 ->join('venda_formas_pagamento f','f.id=r.forma_id')
                 ->where('r.operacao_id',(int)$id)->orderBy('r.id','ASC')->get()->getResultArray()),
+            'editavel'=>$editable,
             'recebido'=>VendaMoney::decimal($paid),
             'saldo'=>VendaMoney::decimal(max(0,(VendaMoney::cents((string)$op['valor_cobrado'])??0)-$paid)),
             // Mesmo bloqueio do web, sem expor outras contas ao perfil limitado.
@@ -278,6 +303,25 @@ final class MobileVendasController extends VendasController
         if(ProtecaoVendaFechada::bloqueada(db_connect(),(int)$id))
             return $this->errorResponse(409,'Operação vinculada a fechamento; conversão bloqueada.');
         return parent::converter($id);
+    }
+
+    public function editar(int|string $id): ResponseInterface
+    {
+        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
+        $op=$this->ownedOperation((int)$id,$a);
+        if($op instanceof ResponseInterface)return $op;
+        $data=$this->jsonPayload();
+        // Mudanca de titularidade por um corretor/gestor exige que ele continue
+        // autorizado na operacao. Admin pode corrigir sem essa restricao.
+        if(!$a['admin']){
+            $first=(int)($data['corretor_pessoa_id']??0);
+            $second=(int)($data['segundo_corretor_pessoa_id']??0);
+            $actorId=(int)$a['scope'];
+            $allowed=$a['manager']?$a['team']:[$actorId];
+            if(!in_array($first,$allowed,true)&&!in_array($second,$allowed,true))
+                return $this->errorResponse(403,'Selecione ao menos um corretor da sua equipe.');
+        }
+        return parent::editar($id);
     }
 
     public function ajustarComissao(int|string $id): ResponseInterface
