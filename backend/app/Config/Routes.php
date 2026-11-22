@@ -76,6 +76,7 @@ $routes->group('api', static function ($routes): void {
             $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaMobile/$1');
             $routes->post('vendas/(:num)/foto', 'Api\MidiasSplashController::uploadVendaMobile/$1');
             $routes->post('vendas/(:num)/receber', 'Api\MobileVendasController::receber/$1');
+            $routes->post('vendas/(:num)/corrigir-recebimento', 'Api\MobileVendasController::corrigirRecebimento/$1');
             $routes->post('vendas/(:num)/ajustar-comissao', 'Api\MobileVendasController::ajustarComissao/$1');
             $routes->get('vendas/(:num)/rateios', 'Api\MobileRateiosController::rateiosVenda/$1');
             $routes->post('vendas/(:num)/rateios', 'Api\MobileRateiosController::ratear/$1');
@@ -172,6 +173,7 @@ $routes->group('api', static function ($routes): void {
     $routes->post('vendas/(:num)/receber', 'Api\VendasController::receber/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/devolver', 'Api\VendasController::devolver/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/estornar', 'Api\VendasController::estornar/$1', ['filter'=>'csrf']);
+    $routes->post('vendas/(:num)/corrigir-recebimento', 'Api\VendasController::corrigirRecebimento/$1', ['filter'=>'csrf']);
     $routes->post('vendas/(:num)/ajustar-comissao', 'Api\VendasController::ajustarComissao/$1', ['filter'=>'csrf']);
     $routes->post('vendas/regras', 'Api\VendasCatalogosController::regra', ['filter'=>'csrf']);
     $routes->post('vendas/regras/(:num)/editar', 'Api\VendasCatalogosController::regra/$1', ['filter'=>'csrf']);
