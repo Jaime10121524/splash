@@ -12,6 +12,7 @@ import {colors} from '../src/theme';
 type FinanceItem={
   operacao_id:number;titulo:string;data_venda:string;descricao:string;
   total:string;recebidas:string;abatidas:string;a_receber:string;
+  tipo?:'NEGOCIACAO';valor_negociado?:string;
 };
 type FinanceAccount={
   pessoa_id:number;nome:string;total:string;a_receber:string;recebidas:string;
@@ -177,12 +178,17 @@ export default function FinanceiroMobile(){
             {account.detalhes.map((item,index)=><View key={item.operacao_id+'-'+index} style={s.detailItem}>
               <Text style={s.detailTitle}>{item.titulo}</Text>
               <Text style={s.detailMeta}>{formatDate(item.data_venda)} · {item.descricao}</Text>
+              {item.tipo==='NEGOCIACAO'?<View style={s.line}>
+                <Text style={s.lineName}>Em negociação · sem comissão apurada</Text>
+                <Text style={s.lineValue}>{money(item.valor_negociado)}</Text>
+              </View>:<>
               <View style={s.line}><Text style={s.lineName}>Direito</Text>
                 <Text style={s.lineValue}>{money(item.total)}</Text></View>
               <View style={s.line}><Text style={s.lineName}>Recebido</Text>
                 <Text style={s.lineValue}>{money(item.recebidas)}</Text></View>
               <View style={s.line}><Text style={s.lineName}>A receber</Text>
                 <Text style={s.lineValue}>{money(item.a_receber)}</Text></View>
+              </>}
             </View>)}
             {account.detalhes_limitados&&<Text style={s.note}>
               Exibindo até 30 participações. Escolha um período menor para consultar as restantes.
