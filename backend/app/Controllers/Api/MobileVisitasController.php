@@ -38,7 +38,8 @@ final class MobileVisitasController extends BaseController
         if ($user === null || $user->isBanned()) {
             return $this->error(401, 'Sua sessão expirou. Entre novamente.');
         }
-        if (! $user->inGroup('admin', 'operador', 'gerente', 'corretor')) {
+        if (! $user->inGroup('admin', 'operador', 'gerente', 'corretor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)) {
             return $this->error(403, 'Seu perfil não tem acesso aos atendimentos.');
         }
         if ($this->scope($user) === 0) {
