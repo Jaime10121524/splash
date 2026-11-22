@@ -122,7 +122,7 @@ export default function VendasGestor({initialVisit=null,onVisitAccepted=()=>{}})
           {filtered.map(s=><article key={s.id} className="vg-item">
             <div><strong>{s.cliente_nome}</strong>
               <small>Título {s.numero_titulo} {s.sigla_plano} · {dateBR(s.data_venda)}</small>
-              <small>Corretor: {s.corretor_nome||'Não informado'}</small></div>
+              <small>Corretores: {s.corretor_nome||'Não informado'}{s.segundo_corretor_nome?' + '+s.segundo_corretor_nome:''}</small></div>
             <strong className="vg-amount">{brl(s.valor_cobrado)}</strong>
           </article>)}
         </div>}
