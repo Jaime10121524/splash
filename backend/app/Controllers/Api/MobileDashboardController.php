@@ -56,11 +56,11 @@ final class MobileDashboardController extends BaseController
             if($scope!==null)$q->groupStart()
                 ->where('v.corretor_pessoa_id',$scope)
                 ->orWhere('v.segundo_corretor_pessoa_id',$scope)
-                ->orWhereIn('v.criado_por_usuario_id',$teamUsers)->groupEnd();
+                ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
             if($team!==null)$q->groupStart()
                 ->whereIn('v.corretor_pessoa_id',$team)
                 ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
-                ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
+                ->orWhereIn('v.criado_por_usuario_id',$teamUsers)->groupEnd();
             return $q;
         };
         $visitStats=$visitQuery()->select("
