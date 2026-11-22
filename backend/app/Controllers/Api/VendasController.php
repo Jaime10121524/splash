@@ -174,14 +174,15 @@ class VendasController extends CommercialBaseController
         $periodo=ProtecaoVendaFechada::fechamento($db,(int)$id);
         $tituloAnterior=$db->table('titulo_vinculos')->where('operacao_nova_id',(int)$id)->get()->getRowArray();
         $tituloPosterior=$db->table('titulo_vinculos')->where('operacao_origem_id',(int)$id)->get()->getRowArray();
-        $editavel=$periodo===null && !$tituloAnterior && !$tituloPosterior && $op['comissao_ajustada']===null;
-        if($this->temRateio($db,(int)$id)||$this->temPagamentoTitular($db,(int)$id))$editavel=false;
-        foreach($movements as $mov){
-            if($mov['tipo']==='DEVOLUCAO') $editavel=false;
-        }
-        // Só pode alterar condições com todos os lançamentos estornados
-        // (ou quando não houve entrada). Devolução real NÃO libera edição.
-        if($received!==0) $editavel=false;
+        // Recebimentos de CLIENTE não impedem ajuste. Rateios automaticos
+        // sem repasse podem ser recalculados, preservando o historico.
+        $editavel=$periodo===null && !$tituloAnterior && !$tituloPosterior
+            && !$this->temPagamentoTitular($db,(int)$id);
+        foreach($movements as $mov)if($mov['tipo']==='DEVOLUCAO')$editavel=false;
+        $rateIds=array_column($db->table('comissao_rateios')->select('id')
+            ->where('operacao_id',(int)$id)->get()->getResultArray(),'id');
+        if($rateIds&&$db->table('comissao_repasses')->whereIn('rateio_id',$rateIds)
+            ->countAllResults()>0)$editavel=false;
         $comissaoStatus=$this->comissoesNoDetalhe($db,$op);
         $recClube=null;
         if($periodo){
