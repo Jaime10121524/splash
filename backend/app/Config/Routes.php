@@ -135,6 +135,7 @@ $routes->group('api', static function ($routes): void {
     $routes->get('clientes/(:num)/corrente', 'Api\ClientesController::corrente/$1');
     $routes->get('atendimentos', 'Api\VisitasController::index');
     $routes->post('atendimentos/chegada', 'Api\VisitasController::chegada', ['filter'=>'csrf']);
+    $routes->post('atendimentos/retroativo', 'Api\MobileVisitasController::historico', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/iniciar', 'Api\VisitasController::iniciar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/finalizar', 'Api\VisitasController::finalizar/$1', ['filter'=>'csrf']);
     $routes->post('atendimentos/(:num)/retomar', 'Api\VisitasController::retomar/$1', ['filter'=>'csrf']);
