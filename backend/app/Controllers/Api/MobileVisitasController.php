@@ -497,6 +497,14 @@ final class MobileVisitasController extends BaseController
         $db->transBegin();
         try {
             $scope = $this->scope($user);
+            $team=$user->inGroup('gerente')&&!$user->inGroup('admin')
+                ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
+            if($team!==null &&
+                !in_array((int)$brokers['corretor_pessoa_id'],$team,true) &&
+                !in_array((int)($brokers['segundo_corretor_pessoa_id']??0),$team,true)){
+                $db->transRollback();
+                return $this->error(403,'Selecione ao menos um corretor da sua equipe.');
+            }
             if (is_array($newClient)) {
                 // Mesmo validador e regras de corrente utilizados pelo cadastro web.
                 // Nunca confiar em um usuário, status ou dono de corrente enviado pelo celular
@@ -511,7 +519,8 @@ final class MobileVisitasController extends BaseController
                     $db->transRollback();
                     return $this->error(422, $clean['error']);
                 }
-                if ($scope !== null && (int) $clean['dono_corrente_pessoa_id'] !== $scope) {
+                if (($scope !== null && (int) $clean['dono_corrente_pessoa_id'] !== $scope)
+                    || ($team!==null&&!in_array((int)$clean['dono_corrente_pessoa_id'],$team,true))) {
                     $db->transRollback();
                     return $this->error(403, 'Cliente indicado pertence a outra corrente.');
                 }
@@ -541,7 +550,8 @@ final class MobileVisitasController extends BaseController
                     $db->transRollback();
                     return $this->error(422, 'O cliente deve estar ativo.');
                 }
-                if ($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope) {
+                if (($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope)
+                    || ($team!==null&&!in_array((int)$client['dono_corrente_pessoa_id'],$team,true))) {
                     $db->transRollback();
                     return $this->error(403, 'Cliente fora da sua corrente.');
                 }
