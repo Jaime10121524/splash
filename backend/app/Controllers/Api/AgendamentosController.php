@@ -35,7 +35,8 @@ final class AgendamentosController extends BaseController
         if (!$user->inGroup('admin','gerente','corretor','operador')) {
             return $this->deny(403,'Seu perfil não tem acesso a agendamentos.');
         }
-        $restricted = $user->inGroup('corretor') && !$user->inGroup('admin','gerente','operador');
+        $manager=\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user);
+        $restricted = $user->inGroup('corretor') && !$manager && !$user->inGroup('admin','operador');
         $personId=null;
         if ($restricted) {
             $person = db_connect()->table('pessoas')->select('id')
@@ -43,7 +44,7 @@ final class AgendamentosController extends BaseController
             if (!$person) return $this->deny(403,'Seu usuário não possui corretor ativo vinculado.');
             $personId=(int)$person['id'];
         }
-        $team=$user->inGroup('gerente')&&!$user->inGroup('admin')
+        $team=$manager&&!$user->inGroup('admin')
             ?\App\Libraries\GestaoEquipe::ids(db_connect(),$user):null;
         $teamUsers=$team!==null
             ?\App\Libraries\GestaoEquipe::usuarios(db_connect(),$user):null;
