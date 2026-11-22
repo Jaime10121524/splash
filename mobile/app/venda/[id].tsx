@@ -26,7 +26,7 @@ type Detail={editavel?:boolean;operacao:{id:number;visita_id:number|null;movimen
   plano_versao_id?:number;historica?:boolean;renovacao_externa?:boolean;corretor_pessoa_id?:number;segundo_corretor_pessoa_id?:number|null;
   atendente_pessoa_id?:number|null;atendente_adicional_pessoa_id?:number|null;gerente_pessoa_id?:number|null;
   desconto_corretor?:string;data_inicio?:string|null;retorno_previsto?:string|null;observacoes?:string|null;
-  comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};titulo_anterior?:{tipo:string}|null;fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
+  comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};titulo_anterior?:{tipo:string}|null;fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string;detentor?:string;forma_id?:number;referencia_entrada_id?:number|null}[]};
 type Allocation={responsavel_pessoa_id:number;beneficiario_pessoa_id:number;papel:string;valor:string;observacoes:string};
 type Rateios={corretor_pessoa_id:number;comissao_bruta:string|null;editavel:boolean;quitada:boolean;aviso:string;rateios:(Allocation & {id:number;beneficiario_nome:string})[]};
 
@@ -205,7 +205,7 @@ export default function VendaMobile(){
 
   function makePayment(amountValue:number){
     return {forma_id:methodId,valor:decimal(amountValue),data_movimento:iso(date),
-      detentor:method?.codigo==='PIX'?'CORRETOR':method?.credito?'EMPRESA':holder};
+      detentor:method?.credito?'EMPRESA':holder};
   }
 
   async function saveTitle(){
@@ -646,14 +646,17 @@ export default function VendaMobile(){
             {!saleLocked&&Number(detail.saldo)>0?<>
               <Select label="Forma de pagamento *" value={method?.nome||'Selecionar'} onPress={()=>setChoice({field:'method'})}/>
               <Input label="Valor recebido (R$) *" value={amount} onChange={setAmount} numeric placeholder={money(detail.saldo)}/>
-              {!method?.credito&&method?.codigo!=='PIX'?
+              {!method?.credito?
                 <View style={s.two}>{(['CORRETOR','EMPRESA'] as const).map(v=><Pressable key={v}
                   style={[s.chip,holder===v&&s.chipActive]} onPress={()=>setHolder(v)}>
                   <Text style={s.chipText}>{v==='CORRETOR'?'Ficou com o corretor':'Ficou com a empresa'}</Text>
                 </Pressable>)}</View>:
-                <Text style={s.helper}>{method?.credito?'Cartão: valor com a empresa.':method?.codigo==='PIX'?'PIX: valor com o corretor.':''}</Text>}
+                <Text style={s.helper}>{method?.credito?'Cartão: valor com o clube.':''}</Text>}
               <Btn text={busy?'Registrando...':'Registrar pagamento'} disabled={busy} onPress={()=>{void savePayment();}}/>
             </>:<Text style={s.done}>{saleLocked?'Venda protegida pelo fechamento. Não é possível registrar novos recebimentos.':isPendingOperation?'Valor da negociação recebido. Agora converta a pendência em venda.':'Título quitado. Comissão calculada pelo servidor.'}</Text>}
+            {!saleLocked&&detail.editavel!==false&&(detail.movimentos||[]).some(r=>r.tipo==='ENTRADA')&&
+              <Btn text="Corrigir forma de pagamento ou valor" muted
+                onPress={()=>router.push({pathname:'/venda/recebimentos/[id]',params:{id:String(opId)}} as never)}/>}
             {(detail.movimentos||[]).map(r=><View key={r.id} style={s.row}>
               <Text style={s.helper}>{r.forma_nome} · {r.data_movimento}</Text>
               <Text style={s.lineTitle}>{r.tipo==='ENTRADA'?'+':'−'} {money(r.valor)}</Text></View>)}
