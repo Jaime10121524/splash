@@ -181,7 +181,7 @@ final class MobileVendasController extends VendasController
         return $this->response->setJSON([
             'planos'=>$plans,'formas'=>$methods,'gerentes'=>$managers,
             'pessoas'=>array_values($people),
-            'pode_corrigir_comissao'=>(bool)$a['admin'],
+            'pode_corrigir_comissao'=>(bool)($a['admin']||$a['manager']),
         ])->setHeader('Cache-Control','no-store');
     }
 
@@ -216,7 +216,9 @@ final class MobileVendasController extends VendasController
         $a=$this->actor();if($a instanceof ResponseInterface)return $a;
         $op=$this->ownedOperation((int)$id,$a);
         if($op instanceof ResponseInterface)return $op;
-        if($a['admin'])return parent::detalhe($id);
+        // O gestor vê todas as participações das vendas sob sua gestão;
+        // o corretor comum continua limitado a seu próprio direito financeiro.
+        if($a['admin']||$a['manager'])return parent::detalhe($id);
         // Corretores não recebem rateios, dados pessoais ou pagamentos de terceiros.
         $db=db_connect();
         $fechamento=ProtecaoVendaFechada::fechamento($db,(int)$id);
@@ -349,7 +351,9 @@ final class MobileVendasController extends VendasController
     public function ajustarComissao(int|string $id): ResponseInterface
     {
         $a=$this->actor();if($a instanceof ResponseInterface)return $a;
-        if (!$a['admin'])return $this->errorResponse(403,'Ajustes de comissão são exclusivos do administrador.');
+        if (!$a['admin']&&!$a['manager'])return $this->errorResponse(403,'Ajustes de comissão são permitidos apenas ao administrador ou gestor responsável.');
+        $op=$this->ownedOperation((int)$id,$a);
+        if($op instanceof ResponseInterface)return $op;
         return parent::ajustarComissao($id);
     }
 
