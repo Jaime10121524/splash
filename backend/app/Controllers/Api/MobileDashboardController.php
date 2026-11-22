@@ -48,14 +48,15 @@ final class MobileDashboardController extends BaseController
         $team=$managerScope!==null?\App\Libraries\GestaoEquipe::ids($db,$user):null;
         $start=date('Y-m-d',strtotime('-'.($days-1).' days'));
         $end=date('Y-m-d');
-        $visitQuery=static function () use ($db,$scope,$team,$user,$start,$end){
+        $teamUsers=$team!==null?\App\Libraries\GestaoEquipe::usuarios($db,$user):null;
+        $visitQuery=static function () use ($db,$scope,$team,$teamUsers,$user,$start,$end){
             $q=$db->table('visitas v')
                 ->where('v.chegada_em >=',$start.' 00:00:00')
                 ->where('v.chegada_em <=',$end.' 23:59:59');
             if($scope!==null)$q->groupStart()
                 ->where('v.corretor_pessoa_id',$scope)
                 ->orWhere('v.segundo_corretor_pessoa_id',$scope)
-                ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
+                ->orWhereIn('v.criado_por_usuario_id',$teamUsers)->groupEnd();
             if($team!==null)$q->groupStart()
                 ->whereIn('v.corretor_pessoa_id',$team)
                 ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
@@ -81,7 +82,7 @@ final class MobileDashboardController extends BaseController
             ->join('pessoas cp','cp.id=v.corretor_pessoa_id','left')
             ->orderBy('v.chegada_em','DESC')->limit(4)->get()->getResultArray();
 
-        $salesQuery=static function()use($db,$scope,$managerScope,$team,$user,$start,$end){
+        $salesQuery=static function()use($db,$scope,$managerScope,$team,$teamUsers,$user,$start,$end){
             $q=$db->table('venda_operacoes o')
                 ->join('visitas v','v.id=o.visita_id','left')
                 ->where('o.situacao','VENDA')
@@ -94,7 +95,7 @@ final class MobileDashboardController extends BaseController
                 ->where('o.visita_id IS NOT NULL',null,false);
             if($managerScope!==null)$q->groupStart()
                 ->where('o.gerente_pessoa_id',$managerScope)
-                ->orWhere('o.criado_por_usuario_id',(int)$user->id)
+                ->orWhereIn('o.criado_por_usuario_id',$teamUsers)
                 ->orWhereIn('o.corretor_pessoa_id',$team)
                 ->orWhereIn('o.segundo_corretor_pessoa_id',$team)->groupEnd();
             // Operador acompanha visitas, mas não consulta indicadores de vendas.
