@@ -123,7 +123,8 @@ final class MobileController extends BaseController
     {
         $user = auth('tokens')->user();
         if ($user === null || $user->isBanned()) return $this->error(401, 'Sessão expirada.');
-        if (! $user->inGroup('admin', 'operador', 'gerente', 'corretor')) {
+        if (! $user->inGroup('admin', 'operador', 'gerente', 'corretor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)) {
             return $this->error(403, 'Seu perfil não possui acesso a atendimentos.');
         }
 
