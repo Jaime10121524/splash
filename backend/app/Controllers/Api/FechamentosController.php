@@ -396,7 +396,7 @@ class FechamentosController extends CommercialBaseController
             $canSeeOutgoing=$mobile ? false : ExtratoPermissoes::repasses(false,$user->inGroup('corretor'),$delegado);
         }
         $operations=$this->rows($db,$start,$end);
-        $team=$mobile&&!$admin&&$user->inGroup('gerente')
+        $team=$mobile&&!$admin&&\App\Libraries\GestaoEquipe::ehGestor($db,$user)
             ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
         if($team!==null){
             $accounts=[];
