@@ -48,6 +48,8 @@ class PessoasController extends BaseController
             $pessoa['responsavel_pessoa_id'] = $responsabilidades[$pessoa['id']]??null;
             $pessoa['gestor_pessoa_id']=$gestores[$pessoa['id']]??null;
             $pessoa['usa_sistema']=(bool)($pessoa['usa_sistema']??false);
+            $pessoa['dono_corrente_padrao_pessoa_id']=isset($pessoa['dono_corrente_padrao_pessoa_id'])
+                ?(int)$pessoa['dono_corrente_padrao_pessoa_id']:null;
         }
         unset($pessoa);
 
@@ -174,6 +176,18 @@ class PessoasController extends BaseController
         $manager=$rawManager===null||$rawManager===''?null:
             filter_var($rawManager,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
         if($manager===false)return ['error'=>'Gestor comercial inválido.'];
+        $rawOwner=$data['dono_corrente_padrao_pessoa_id']??null;
+        $owner=$rawOwner===null||$rawOwner===''?null:
+            filter_var($rawOwner,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        if($owner===false)return ['error'=>'Dono padrão da corrente inválido.'];
+        if($owner!==null){
+            $db=db_connect();
+            if(!$db->table('pessoas')->where('id',(int)$owner)->where('ativo',1)->countAllResults()
+                || !$db->table('pessoa_papeis')->where('pessoa_id',(int)$owner)
+                    ->where('papel','corretor')->countAllResults()){
+                return ['error'=>'O dono padrão da corrente precisa ser um corretor ativo.'];
+            }
+        }
         if ($name === '' || mb_strlen($name)>160) return ['error'=>'Informe o nome (até 160 caracteres).'];
         if ($email !== '' && (strlen($email)>254 || !filter_var($email,FILTER_VALIDATE_EMAIL))) {
             return ['error'=>'E-mail inválido.'];
@@ -201,6 +215,7 @@ class PessoasController extends BaseController
             'telefone'=>$phone ?: null, 'observacoes'=>$note ?: null,
             'papeis'=>array_values($roles),'responsavel_pessoa_id'=>$boss,
             'gestor_pessoa_id'=>$manager,'usa_sistema'=>$data['usa_sistema'] ? 1 : 0,
+            'dono_corrente_padrao_pessoa_id'=>$owner===null?null:(int)$owner,
             'ativo'=>$data['ativo'] ? 1 : 0,
         ];
     }
