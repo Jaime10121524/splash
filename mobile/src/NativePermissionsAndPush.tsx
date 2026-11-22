@@ -132,17 +132,13 @@ export default function NativePermissionsAndPush(){
     const foreground=AppState.addEventListener('change',state=>{
       if(state==='active')void register();
     });
-    const changed=Notifications.addPushTokenListener(event=>{
-      // O token ja vem no evento: NAO chamar getDevicePushTokenAsync de novo
-      // no listener (isso pode gerar nova notificacao e ciclos de registro).
-      if(event.type==='android'&&typeof event.data==='string'){
-        void registerValue(event.data,true);
-      }
-    });
+    // NAO usar addPushTokenListener: no Expo Go Android (SDK 53+)
+    // ele lança uma excecao durante a inscricao e interrompe o app.
+    // No APK nativo, o token continua sincronizado no login e quando o
+    // app volta ao primeiro plano, sem depender deste listener.
     return()=>{
       mounted=false;
       foreground.remove();
-      changed.remove();
     };
   },[asked,ready,token,user?.id]);
 
