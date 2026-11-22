@@ -379,9 +379,16 @@ class VendasController extends CommercialBaseController
                 $net += $move['tipo']==='ENTRADA' ? $cent : -$cent;
                 if($move['tipo']==='DEVOLUCAO')$hasRealRefund=true;
             }
-            if($net!==0 || $hasRealRefund || $op['comissao_ajustada']!==null || ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
+            // Recebimentos do cliente permanecem; recalculamos as comissoes
+            // na mesma transacao. Repasses efetivos exigem compensacao auditada.
+            $rateIds=array_column($db->table('comissao_rateios')->select('id')
+                ->where('operacao_id',(int)$id)->get()->getResultArray(),'id');
+            $hasRepasses=$rateIds && $db->table('comissao_repasses')
+                ->whereIn('rateio_id',$rateIds)->countAllResults()>0;
+            if($hasRealRefund || $hasRepasses || $this->temPagamentoTitular($db,(int)$id)){
                 $db->transRollback();
-                return $this->errorResponse(409,'Cadastro protegido: existem pagamentos não estornados, devoluções reais ou comissão já ajustada. Apenas operações sem movimentação financeira válida podem ser corrigidas.');
+                return $this->errorResponse(409,
+                    'Há devoluções ou repasses efetivos de comissão. É necessário um ajuste compensatório auditado antes de alterar responsáveis.');
             }
             $versionId=$this->optionalId($data['plano_versao_id']??null);
             if(!$versionId){
@@ -400,6 +407,10 @@ class VendasController extends CommercialBaseController
             if($discount===null || $discount>=$table){
                 $db->transRollback();
                 return $this->errorResponse(422,'Desconto inválido ou superior ao valor de tabela.');
+            }
+            if($net>$table-$discount){
+                $db->transRollback();
+                return $this->errorResponse(422,'O novo valor não pode ser menor que o total já recebido do cliente.');
             }
             $estimate=['valor'=>null,'aviso'=>'Aguardando pagamento do cliente para calcular a comissão automaticamente.'];
             $day=(string)($data['data_negociacao']??'');
@@ -441,13 +452,13 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Observações com mais de 4000 caracteres.');
             }
-            $visit=$op['visita_id'] ? $db->table('visitas')->where('id',$op['visita_id'])->get()->getRowArray():null;
-            $brokers=$this->participants($db,$data,$visit);
+            // Captador da visita e titular financeiro podem ser diferentes.
+            $brokers=$this->participants($db,$data,null);
             if(isset($brokers['error'])){
                 $db->transRollback();
                 return $this->errorResponse(422,$brokers['error']);
             }
-            $attendants=$this->attendants($db,$data,$visit);
+            $attendants=$this->attendants($db,$data,null);
             if(isset($attendants['error'])){
                 $db->transRollback();
                 return $this->errorResponse(422,$attendants['error']);
@@ -476,8 +487,14 @@ class VendasController extends CommercialBaseController
                 'retorno_previsto'=>$returnDay,'observacoes'=>$notes,
             ];
             $before=array_intersect_key($op,$new);
+            // Nunca apagar movimentos de recebimento, somente invalidar
+            // a apuracao de direitos sem repasse e refazer o rateio.
+            if($rateIds)$db->table('comissao_rateios')->where('operacao_id',(int)$id)->delete();
+            $db->table('comissao_auto_apuracoes')->where('operacao_id',(int)$id)->delete();
             $db->table('venda_operacoes')->where('id',(int)$id)
                 ->update([...$new,'atualizado_em'=>$this->nowLocal()]);
+            $this->updateEstimate($db,(int)$id,[...$op,...$new]);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $db->table('venda_operacoes_auditoria')->insert([
                 'operacao_id'=>(int)$id,'acao'=>'EDITAR_DADOS',
                 'dados_antes'=>json_encode($before,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
@@ -487,7 +504,7 @@ class VendasController extends CommercialBaseController
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->commitOrFail($db);
-            return $this->responseOK('Cadastro corrigido. O histórico anterior foi preservado.');
+            return $this->responseOK('Venda corrigida. Recebimentos preservados e comissões recalculadas com auditoria.');
         }catch(Throwable $e){
             $db->transRollback();
             return $this->unexpected($e,'edição de venda');
