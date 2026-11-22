@@ -22,7 +22,7 @@ type Method={id:number;nome:string;codigo:string;credito:boolean};
 type Person={id:number;nome:string;papeis:string[]};
 type Options={planos:Plan[];formas:Method[];gerentes:{id:number;nome:string}[];pessoas:Person[];pode_corrigir_comissao:boolean};
 type Detail={editavel?:boolean;operacao:{id:number;visita_id:number|null;movimento_titulo?:string|null;situacao:'VENDA'|'PENDENCIA';data_negociacao?:string;numero_titulo:string|null;sigla_plano:string;valor_cobrado:string;data_venda:string|null;
-  plano_versao_id?:number;historica?:boolean;corretor_pessoa_id?:number;segundo_corretor_pessoa_id?:number|null;
+  plano_versao_id?:number;historica?:boolean;renovacao_externa?:boolean;corretor_pessoa_id?:number;segundo_corretor_pessoa_id?:number|null;
   atendente_pessoa_id?:number|null;atendente_adicional_pessoa_id?:number|null;gerente_pessoa_id?:number|null;
   desconto_corretor?:string;data_inicio?:string|null;retorno_previsto?:string|null;observacoes?:string|null;
   comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};titulo_anterior?:{tipo:string}|null;fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
@@ -89,6 +89,7 @@ export default function VendaMobile(){
   const [choice,setChoice]=useState<{field:string;index?:number}|null>(null);
   const [planId,setPlanId]=useState<number|null>(null),[managerId,setManagerId]=useState<number|null>(null);
   const [saleBroker,setSaleBroker]=useState<number|null>(null),[saleSecond,setSaleSecond]=useState<number|null>(null);
+  const [externalRenewal,setExternalRenewal]=useState(false);
   const [titleNumber,setTitleNumber]=useState(''),[discount,setDiscount]=useState('0,00');
   const [pendingReturn,setPendingReturn]=useState(''),[pendingNotes,setPendingNotes]=useState('');
   const [date,setDate]=useState(nowBR),[startDate,setStartDate]=useState(nowBR);
@@ -100,6 +101,7 @@ export default function VendaMobile(){
   const [celebrating,setCelebrating]=useState(false);
   const [editingSale,setEditingSale]=useState(false);
   const [editSale,setEditSale]=useState({
+    renovacao_externa:false,
     plano_versao_id:null as number|null,
     corretor_pessoa_id:null as number|null,
     segundo_corretor_pessoa_id:null as number|null,
@@ -131,6 +133,7 @@ export default function VendaMobile(){
     const d=await apiRequest<Detail>('mobile/vendas/'+id,{token});setDetail(d);
     const o=d.operacao;
     setEditSale({
+      renovacao_externa:!!o.renovacao_externa,
       plano_versao_id:o.plano_versao_id??null,
       corretor_pessoa_id:o.corretor_pessoa_id??null,
       segundo_corretor_pessoa_id:o.segundo_corretor_pessoa_id??null,
@@ -231,6 +234,7 @@ export default function VendaMobile(){
         gerente_pessoa_id:managerId,corretor_pessoa_id:saleBroker,
         segundo_corretor_pessoa_id:saleSecond,
         corretores_venda_diferentes_visita:true,
+        renovacao_externa:externalRenewal,
         atendente_pessoa_id:visit.atendente_pessoa_id,atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id,
       }});
       // A operação já existe: não tentar salvá-la outra vez se a imagem falhar.
@@ -497,6 +501,11 @@ export default function VendaMobile(){
                 onChange={setPendingNotes} placeholder="O que falta para fechar?"/>
             </>:<Input label="Início da vigência * (DD/MM/AAAA)" value={startDate}
               onChange={setStartDate} numeric placeholder="DD/MM/AAAA"/>}
+            <Pressable onPress={()=>setExternalRenewal(x=>!x)} style={s.select}>
+              <Text style={s.selectValue}>{externalRenewal?'☑️ Renovação de outro corretor':'☐ Renovação de outro corretor'}</Text>
+              <Text style={s.helper}>Marque quando o título anterior foi emitido fora do sistema;
+                o corretor externo que recebe deve ser principal.</Text>
+            </Pressable>
             <Text style={s.section}>Participantes desta negociação</Text>
             <Text style={s.helper}>O corretor principal da venda pode ser diferente do captador do convite.
               Em renovação externa, escolha o corretor que receberá como principal e o captador como segundo.</Text>
@@ -561,6 +570,11 @@ export default function VendaMobile(){
               recebimentos do cliente preservados e direitos recalculados.</Text>
             {!editingSale?<Btn text="Editar dados e comissão da venda" muted onPress={()=>setEditingSale(true)}/>:
               <>
+                <Pressable style={s.select}
+                  onPress={()=>setEditSale(o=>({...o,renovacao_externa:!o.renovacao_externa}))}>
+                  <Text style={s.selectValue}>{editSale.renovacao_externa
+                    ?'☑️ Renovação de corretor externo':'☐ Renovação de corretor externo'}</Text>
+                </Pressable>
                 <Select label="Plano" value={editPlan?.nome||'Selecionar'}
                   onPress={()=>setChoice({field:'editPlan'})}/>
                 <Select label="Corretor principal" value={editPerson(editSale.corretor_pessoa_id)}
@@ -656,11 +670,12 @@ export default function VendaMobile(){
             </View>}
             <Text style={s.kicker}>{isPendingOperation?'PENDÊNCIA · NEGOCIAÇÃO Nº '+opId:
               'TÍTULO '+(detail.operacao.numero_titulo||'')+' '+detail.operacao.sigla_plano}</Text>
-            {!!(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo)&&
+            {!!(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo||detail.operacao.renovacao_externa)&&
               <View style={{alignSelf:'flex-start',paddingVertical:7,paddingHorizontal:11,
                 borderRadius:9,backgroundColor:colors.pale,marginTop:8}}>
                 <Text style={{fontSize:12,fontWeight:'900',color:colors.brandDark}}>
-                  {(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo)==='RENOVACAO'
+                  {(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo||
+                    (detail.operacao.renovacao_externa?'RENOVACAO_EXTERNA':null))?.startsWith('RENOVACAO')
                     ?'🔄 RENOVAÇÃO':'⬆️ UPGRADE'}
                 </Text>
               </View>}
