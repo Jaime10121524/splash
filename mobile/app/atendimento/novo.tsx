@@ -17,6 +17,9 @@ import ResumeAttendantModal from '../../src/components/ResumeAttendantModal';
 import ClientPickerModal from '../../src/components/ClientPickerModal';
 import { editMaskedPhoneBR, maskPhoneBR, phoneDigits } from '../../src/phone';
 import { colors } from '../../src/theme';
+import FinanceDatePicker from '../../src/components/FinanceDatePicker';
+
+const todayLocal=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');};
 
 type BrokerField = 'main' | 'second' | 'origin' | 'owner' | null;
 
@@ -55,6 +58,8 @@ export default function NewVisitScreen() {
   const [second, setSecond] = useState<number | null>(null);
   const [sheet, setSheet] = useState<BrokerField>(null);
   const [error, setError] = useState('');
+  const [visitDate,setVisitDate]=useState(todayLocal);
+  const [calendarOpen,setCalendarOpen]=useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -122,12 +127,15 @@ export default function NewVisitScreen() {
       setError('O segundo corretor deve ser diferente do primeiro.');
       return;
     }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)||visitDate>todayLocal()){
+      setError('Escolha hoje ou uma data anterior para a chegada.');return;
+    }
     const owner = options?.minha_pessoa_id ?? ownerId ?? main;
     setSaving(true);
     setError('');
     Keyboard.dismiss();
     try {
-      if (clientMode === 'existing') {
+      if (clientMode === 'existing' && visitDate === todayLocal()) {
         const preview = await apiRequest<{
           retomavel: boolean;
           visita_id?: number;
@@ -160,6 +168,7 @@ export default function NewVisitScreen() {
           body: {
             ...clientData, corretor_pessoa_id: main,
             segundo_corretor_pessoa_id: second,
+            data_visita: visitDate,
           },
         },
       );
@@ -371,6 +380,15 @@ export default function NewVisitScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.fieldLabel}>Data da chegada *</Text>
+          <Pressable style={styles.selectBox} onPress={()=>setCalendarOpen(true)} accessibilityRole="button">
+            <Text style={styles.selectValue}>{visitDate.slice(8,10)+'/'+visitDate.slice(5,7)+'/'+visitDate.slice(0,4)}</Text>
+            <SymbolView name={{ios:'calendar',android:'event'}} size={20} tintColor={colors.brandDark}/>
+          </Pressable>
+          <Text style={styles.hint}>Hoje é a data padrão. Para visitas anteriores, escolha o dia no calendário.</Text>
+        </View>
+
+        <View style={styles.section}>
           <View style={styles.titleRow}>
             <Text style={styles.stepNumber}>02</Text>
             <Text style={styles.sectionTitle}>Equipe da visita</Text>
@@ -399,6 +417,8 @@ export default function NewVisitScreen() {
         <Text style={styles.note}>O horário e as permissões são confirmados no servidor. O cliente novo fica disponível também no Splash web.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
+    <FinanceDatePicker open={calendarOpen} value={visitDate}
+      onClose={()=>setCalendarOpen(false)} onChange={value=>{if(value<=todayLocal())setVisitDate(value);else setError('A chegada não pode ter data futura.');}}/>
     <ChoiceSheet open={sheet !== null}
       title={sheet === 'main' ? 'Corretor responsável' : sheet === 'second' ? 'Segundo corretor'
         : sheet === 'origin' ? 'Origem do lead' : 'Dono da corrente'}
