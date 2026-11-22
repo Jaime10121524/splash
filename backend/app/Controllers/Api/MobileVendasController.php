@@ -96,7 +96,7 @@ final class MobileVendasController extends VendasController
             return $this->errorResponse(422,'A data inicial não pode superar a final.');
         $query=$db->table('venda_operacoes o')
             ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,
-                mov.tipo AS movimento_titulo,c.nome AS cliente_nome')
+                CASE WHEN o.renovacao_externa=1 THEN 'RENOVACAO_EXTERNA' ELSE mov.tipo END AS movimento_titulo,c.nome AS cliente_nome',false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('plano_versoes pv','pv.id=o.plano_versao_id')
             ->join('visitas v','v.id=o.visita_id','left')
@@ -248,8 +248,10 @@ final class MobileVendasController extends VendasController
         return $this->response->setJSON([
             'operacao'=>[
                 'id'=>(int)$op['id'],'visita_id'=>$op['visita_id']===null?null:(int)$op['visita_id'],
-                'movimento_titulo'=>$db->table('titulo_vinculos')
+                'movimento_titulo'=>(bool)($op['renovacao_externa']??false)?'RENOVACAO_EXTERNA':
+                    $db->table('titulo_vinculos')
                     ->select('tipo')->where('operacao_nova_id',(int)$id)->get()->getRow('tipo'),
+                'renovacao_externa'=>(bool)($op['renovacao_externa']??false),
                 'situacao'=>$op['situacao'],'numero_titulo'=>$op['numero_titulo'],
                 'sigla_plano'=>$op['sigla_plano'],'valor_cobrado'=>$op['valor_cobrado'],
                 'data_negociacao'=>$op['data_negociacao'],
