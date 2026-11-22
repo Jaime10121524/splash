@@ -125,6 +125,8 @@ export default function Agendamentos({navigate=()=>{}}) {
   },[q,notice])
 
   const brokers=useMemo(()=>options(catalogs,['corretor']),[catalogs])
+  const agendaBrokers=useMemo(()=>brokers.filter(p=>catalogs.pessoas?.some(person=>
+    String(person.id)===String(p.value)&&person.usa_sistema)),[brokers,catalogs])
   const attendants=useMemo(()=>options(catalogs,['vendedor','corretor']),[catalogs])
   const set=(key,v)=>setForm(f=>({...f,[key]:v}))
 
