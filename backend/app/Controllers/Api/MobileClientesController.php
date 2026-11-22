@@ -29,7 +29,10 @@ final class MobileClientesController extends BaseController
             if (!$p) return $this->error(403,'Conta sem corretor vinculado.');
             $scope=(int)$p['id'];
         }
-        return ['user'=>$u,'scope'=>$scope];
+        $team=$u->inGroup('gerente')&&!$u->inGroup('admin')
+            ?\App\Libraries\GestaoEquipe::ids(db_connect(),$u):null;
+        if($team!==null && !$team)return $this->error(403,'Gestor sem pessoa ativa vinculada.');
+        return ['user'=>$u,'scope'=>$scope,'team'=>$team];
     }
     private function id($value): ?int
     {
@@ -61,6 +64,7 @@ final class MobileClientesController extends BaseController
         $limit=max(1,min(50,(int)($this->request->getGet('limit')?:25)));
         $builder=$this->row(db_connect());
         if($a['scope']!==null)$builder->where('c.dono_corrente_pessoa_id',$a['scope']);
+        if($a['team']!==null)$builder->whereIn('c.dono_corrente_pessoa_id',$a['team']);
         if($q!==''){
             $digits=preg_replace('/\D/','',$q);
             $builder->groupStart()->like('c.nome',$q);
@@ -81,6 +85,7 @@ final class MobileClientesController extends BaseController
         $n=$this->id($id);if(!$n)return $this->error(404,'Cliente não encontrado.');
         $builder=$this->row(db_connect())->where('c.id',$n);
         if($a['scope']!==null)$builder->where('c.dono_corrente_pessoa_id',$a['scope']);
+        if($a['team']!==null)$builder->whereIn('c.dono_corrente_pessoa_id',$a['team']);
         $row=$builder->get()->getRowArray();
         if(!$row)return $this->error(404,'Cliente não encontrado.');
         return $this->response->setJSON(['cliente'=>$this->cast($row)])
@@ -92,12 +97,17 @@ final class MobileClientesController extends BaseController
         $input=$this->request->getJSON(true);
         if(!is_array($input))return $this->error(422,'Informe os dados do cliente.');
         if($a['scope']!==null)$input['dono_corrente_pessoa_id']=$a['scope'];
+        elseif($a['team']!==null){
+            $chosen=(int)($input['dono_corrente_pessoa_id']??0);
+            if(!in_array($chosen,$a['team'],true))$input['dono_corrente_pessoa_id']=$a['team'][0];
+        }
         $input['ativo']=true;
         $db=db_connect();$db->transBegin();
         try {
             $clean=ClienteRules::validate($db,$input);
             if(isset($clean['error'])){$db->transRollback();return $this->error(422,$clean['error']);}
-            if($a['scope']!==null&&(int)$clean['dono_corrente_pessoa_id']!==$a['scope']){
+            if(($a['scope']!==null&&(int)$clean['dono_corrente_pessoa_id']!==$a['scope'])
+                || ($a['team']!==null&&!in_array((int)$clean['dono_corrente_pessoa_id'],$a['team'],true))){
                 $db->transRollback();return $this->error(403,'A indicação pertence a outra corrente.');
             }
             $now=date('Y-m-d H:i:s');
@@ -126,7 +136,8 @@ final class MobileClientesController extends BaseController
         $db=db_connect();$db->transBegin();
         try {
             $old=$db->query('SELECT * FROM clientes WHERE id=? FOR UPDATE',[$n])->getRowArray();
-            if(!$old||($a['scope']!==null&&(int)$old['dono_corrente_pessoa_id']!==$a['scope'])){
+            if(!$old||($a['scope']!==null&&(int)$old['dono_corrente_pessoa_id']!==$a['scope'])
+                || ($a['team']!==null&&!in_array((int)$old['dono_corrente_pessoa_id'],$a['team'],true))){
                 $db->transRollback();return $this->error(404,'Cliente não encontrado.');
             }
             $fields=['nome','telefone','cpf','email','data_nascimento','endereco',
@@ -139,7 +150,8 @@ final class MobileClientesController extends BaseController
             $combined['ativo']=(bool)$old['ativo'];
             $clean=ClienteRules::validate($db,$combined,$old);
             if(isset($clean['error'])){$db->transRollback();return $this->error(422,$clean['error']);}
-            if($a['scope']!==null&&(int)$clean['dono_corrente_pessoa_id']!==$a['scope']){
+            if(($a['scope']!==null&&(int)$clean['dono_corrente_pessoa_id']!==$a['scope'])
+                || ($a['team']!==null&&!in_array((int)$clean['dono_corrente_pessoa_id'],$a['team'],true))){
                 $db->transRollback();return $this->error(403,'Corrente de outro corretor.');
             }
             $oldOwner=(int)$old['dono_corrente_pessoa_id'];
