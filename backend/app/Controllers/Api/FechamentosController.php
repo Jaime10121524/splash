@@ -364,7 +364,8 @@ class FechamentosController extends CommercialBaseController
         $user=auth($mobile?'tokens':'session')->user();
         if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
         $admin=$user->inGroup('admin')&&($mobile||$user->can('visits.manage'));
-        if($mobile&&!$user->inGroup('admin','gerente','corretor','vendedor')){
+        if($mobile&&!$user->inGroup('admin','gerente','corretor','vendedor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)){
             return $this->errorResponse(403,'Seu perfil nao possui acesso ao financeiro.');
         }
         $period=$this->period();
