@@ -353,14 +353,11 @@ export default function NewVisitScreen() {
             </View>}
             {!indicator && <View style={styles.fieldSpace}>
               <Text style={styles.fieldLabel}>Dono da corrente *</Text>
-              {options?.minha_pessoa_id != null ? <View style={styles.ownerFixed}>
-                <SymbolView name={{ ios: 'person.crop.circle', android: 'account_circle' }} size={19} tintColor={colors.brandDark} />
-                <Text style={styles.ownerText}>{ownerName || 'Sua corrente'}</Text>
-              </View> : <Pressable style={styles.selectBox} onPress={() => { Keyboard.dismiss(); setSheet('owner'); }}
-                accessibilityRole="button">
-                <Text style={[styles.selectValue, !ownerName && styles.placeholder]}>{ownerName || 'Selecionar responsável'}</Text>
-                <SymbolView name={{ ios: 'chevron.up.chevron.down', android: 'unfold_more' }} size={18} tintColor={colors.brandDark} />
-              </Pressable>}
+              <View style={styles.ownerFixed}>
+                <SymbolView name={{ios:'person.crop.circle',android:'account_circle'}}
+                  size={19} tintColor={colors.brandDark}/>
+                <Text style={styles.ownerText}>{ownerName || 'Titular configurado no cadastro'}</Text>
+              </View>
             </View>}
             <Pressable onPress={() => setExtraFields(!extraFields)} style={styles.moreButton} accessibilityRole="button">
               <SymbolView name={{ ios: extraFields ? 'minus.circle' : 'plus.circle', android: extraFields ? 'remove_circle_outline' : 'add_circle_outline' }}
