@@ -27,6 +27,10 @@ export default function VendasGestor({initialVisit=null,onVisitAccepted=()=>{}})
   const [error,setError]=useState('')
   const [formError,setFormError]=useState('')
   const [notice,setNotice]=useState('')
+  const [selectedSale,setSelectedSale]=useState(null)
+  const [selectedData,setSelectedData]=useState(null)
+  const [detailLoading,setDetailLoading]=useState(false)
+  const [detailError,setDetailError]=useState('')
   const load=useCallback(async()=>{
     const [list,opts]=await Promise.all([
       comercialGet('/api/gestor/vendas'),
@@ -58,6 +62,14 @@ export default function VendasGestor({initialVisit=null,onVisitAccepted=()=>{}})
     (r.cliente_nome+' '+r.numero_titulo+' '+r.sigla_plano+' '+r.corretor_nome)
       .toLocaleLowerCase('pt-BR').includes(filter.trim().toLocaleLowerCase('pt-BR'))
   ),[rows,filter])
+  async function openManagedSale(sale){
+    setSelectedSale(sale);setSelectedData(null);setDetailError('');setDetailLoading(true)
+    try {
+      const result=await comercialGet('/api/gestor/vendas/'+sale.id)
+      setSelectedData(result)
+    }catch(e){setDetailError(e.message)}
+    finally{setDetailLoading(false)}
+  }
   function openNew(){
     setForm(initialForm());setFormError('');setDialog(true)
   }
@@ -109,7 +121,7 @@ export default function VendasGestor({initialVisit=null,onVisitAccepted=()=>{}})
     </div>}
     <section className="com-panel">
       <div className="com-panel-head"><div><h2>Vendas registradas</h2>
-        <p>Vendas em que você é o gerente ou responsável pelo cadastro.</p></div>
+        <p>Vendas dos corretores sob sua gestão, inclusive registros anteriores ao vínculo atual.</p></div>
         <span className="com-count">{rows.length} vendas</span>
       </div>
       <div className="com-toolbar"><input value={filter} onChange={e=>setFilter(e.target.value)}
@@ -124,9 +136,43 @@ export default function VendasGestor({initialVisit=null,onVisitAccepted=()=>{}})
               <small>Título {s.numero_titulo} {s.sigla_plano} · {dateBR(s.data_venda)}</small>
               <small>Corretores: {s.corretor_nome||'Não informado'}{s.segundo_corretor_nome?' + '+s.segundo_corretor_nome:''}</small></div>
             <strong className="vg-amount">{brl(s.valor_cobrado)}</strong>
+            <button type="button" className="com-refresh-button"
+              onClick={()=>{void openManagedSale(s)}}>Abrir venda</button>
           </article>)}
         </div>}
     </section>
+    {selectedSale&&<SurfaceModal title={'Venda · Título '+(selectedSale.numero_titulo||selectedSale.id)}
+      subtitle={selectedSale.cliente_nome} onClose={()=>{setSelectedSale(null);setSelectedData(null)}}>
+      {detailLoading?<div className="com-empty">Carregando dados da venda...</div>:
+        detailError?<div className="com-alert error" role="alert">{detailError}</div>:
+        selectedData&&<div className="cm-form">
+          <div className="com-inform">
+            Você acessa esta venda por ser gestora da equipe, independentemente de
+            participar como corretora ou beneficiária de comissão.
+          </div>
+          <div className="vg-visit">
+            <strong>Corretores</strong>
+            <span>{selectedSale.corretor_nome||'Não informado'}{selectedSale.segundo_corretor_nome?' + '+selectedSale.segundo_corretor_nome:''}</span>
+          </div>
+          <div className="vg-visit">
+            <strong>Valor do título: {brl(selectedData.operacao.valor_cobrado)}</strong>
+            <span>Cliente pagou: {brl(selectedData.recebido)}</span>
+            <span>Saldo do cliente: {brl(selectedData.saldo)}</span>
+          </div>
+          <strong>Movimentações financeiras registradas</strong>
+          {(selectedData.movimentos||[]).length===0?
+            <p>Nenhum recebimento informado.</p>:
+            selectedData.movimentos.map(m=><div key={m.id} className="vg-visit">
+              <strong>{m.forma_nome} · {m.tipo==='ENTRADA'?'Recebimento':m.tipo==='ESTORNO'?'Estorno':'Devolução'}
+                {' · '}{brl(m.valor)}</strong>
+              <span>{dateBR(m.data_movimento)} · {m.detentor==='EMPRESA'?'Com o clube':'Com o corretor'}</span>
+            </div>)}
+          <div className="vg-actions">
+            <button type="button" className="com-main-button"
+              onClick={()=>{setSelectedSale(null);setSelectedData(null)}}>Fechar consulta</button>
+          </div>
+        </div>}
+    </SurfaceModal>}
     {dialog&&<SurfaceModal title="Cadastrar venda" subtitle="A venda precisa estar vinculada a um atendimento concluído."
       onClose={()=>{if(!busy)setDialog(false)}} busy={busy}>
       <form className="vg-form" onSubmit={save}>
