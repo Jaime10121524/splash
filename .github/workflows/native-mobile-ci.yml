@@ -78,6 +78,7 @@ jobs:
           php -l backend/app/Controllers/Api/MobileRateiosController.php
           php -l backend/app/Controllers/Api/MobileDashboardController.php
           php -l backend/app/Database/Migrations/2026-11-21-000001_GestoresEUsuariosAtivos.php
+          php -l backend/app/Database/Migrations/2026-11-22-000001_CorrentePadraoDaEquipe.php
           php -l backend/app/Libraries/GestaoEquipe.php
           php -l backend/app/Controllers/Api/PessoasController.php
           php -l backend/app/Controllers/Api/CatalogosController.php
