@@ -21,7 +21,9 @@ final class MobileClientesController extends BaseController
     {
         $u=auth('tokens')->user();
         if (!$u || $u->isBanned()) return $this->error(401,'Sessão expirada.');
-        if (!$u->inGroup('admin','operador','gerente','corretor')) return $this->error(403,'Perfil sem acesso a clientes.');
+        if (!$u->inGroup('admin','operador','gerente','corretor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$u))
+            return $this->error(403,'Perfil sem acesso a clientes.');
         $manager=\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$u);
         $scope=null;
         if ($u->inGroup('corretor') && !$manager && !$u->inGroup('admin','operador')) {
