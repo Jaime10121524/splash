@@ -6,7 +6,8 @@ import {apiRequest} from '../../../src/api';
 import {useAuth} from '../../../src/AuthContext';
 import {useTheme} from '../../../src/ThemeContext';
 import FeedbackPopup from '../../../src/components/FeedbackPopup';
-const parse=(raw:string)=>{const s=raw.trim().replace(/\s|R\$/g,'');const n=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s;return /^\d+(?:\.\d{1,2})?$/.test(n)?Math.round(Number(n)*100):null;};
+import {maskBRL,decimalToBRL,brlToCents} from '../../../src/moneyMask';
+
 export default function AjustarComissao(){
   const {id}=useLocalSearchParams<{id:string}>();
   const saleId=Number(id),{token}=useAuth(),{palette}=useTheme();
@@ -17,13 +18,13 @@ export default function AjustarComissao(){
     let active=true;
     apiRequest<{comissoes:{bruta:string|null};fechamento?:{id:number}|null}>('mobile/vendas/'+saleId,{token})
       .then(data=>{if(active){if(data.fechamento)setError('Venda bloqueada por fechamento.');
-        else setValue(data.comissoes.bruta||'0.00');}})
+        else setValue(decimalToBRL(data.comissoes.bruta||'0.00'));}})
       .catch(e=>{if(active)setError(e instanceof Error?e.message:'Não foi possível abrir a venda.');})
       .finally(()=>{if(active)setLoading(false);});
     return()=>{active=false;};
   },[token,saleId]);
   async function save(){
-    const n=parse(value);
+    const n=brlToCents(value);
     if(n===null||reason.trim().length<5){setError('Informe valor válido e justificativa com pelo menos cinco caracteres.');return;}
     if(!token||busy)return;
     setBusy(true);setError('');
@@ -44,7 +45,7 @@ export default function AjustarComissao(){
       <View style={s.content}>
         <Text style={{color:palette.muted,fontWeight:'800'}}>Comissão bruta (R$)</Text>
         <TextInput style={[s.input,{borderColor:palette.line,color:palette.ink,backgroundColor:palette.surface}]}
-          value={value} onChangeText={setValue} keyboardType="decimal-pad" placeholder="0,00"
+          value={value} onChangeText={v=>setValue(maskBRL(v))} keyboardType="number-pad" placeholder="R$ 0,00"
           placeholderTextColor={palette.muted}/>
         <Text style={{color:palette.muted,fontWeight:'800'}}>Justificativa obrigatória</Text>
         <TextInput style={[s.input,{borderColor:palette.line,color:palette.ink,backgroundColor:palette.surface}]}
