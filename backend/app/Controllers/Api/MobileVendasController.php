@@ -187,7 +187,15 @@ final class MobileVendasController extends VendasController
             return $this->errorResponse(409,'Encerre primeiro o atendimento com o mesmo resultado da negociação.');
         if ((int)($data['cliente_id']??0)!==(int)$visit['cliente_id'])
             return $this->errorResponse(422,'O cliente deve ser o mesmo do atendimento.');
-        // A API web trava corretor/atendentes pelo vínculo com a visita.
+        if(($data['corretores_venda_diferentes_visita']??false)===true && !$a['admin']){
+            $main=(int)($data['corretor_pessoa_id']??0);
+            $second=(int)($data['segundo_corretor_pessoa_id']??0);
+            $team=$a['manager']?$a['team']:[$a['scope']];
+            if(!in_array($main,$team,true)&&!in_array($second,$team,true))
+                return $this->errorResponse(403,'A venda deve manter ao menos um corretor autorizado da sua equipe.');
+        }
+        // Autorizacao e historico vinculados ao atendimento; participantes
+        // financeiros podem ser diferentes do captador do voucher.
         return parent::create();
     }
 
