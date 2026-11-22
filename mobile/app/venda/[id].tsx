@@ -14,6 +14,7 @@ import {SymbolView} from 'expo-symbols';
 import { apiRequest, uploadMobilePhoto, VisitDetailsResponse } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import ChoiceSheet, { Choice } from '../../src/components/ChoiceSheet';
+import FinanceDatePicker from '../../src/components/FinanceDatePicker';
 import ActionModal from '../../src/components/ActionModal';
 import { colors } from '../../src/theme';
 
@@ -71,7 +72,7 @@ function Btn({text,onPress,muted=false,disabled=false}:{text:string;onPress:()=>
 export default function VendaMobile(){
   const s=useThemedStyles(lightStyles);
   const {palette}=useTheme();
-  const params=useLocalSearchParams<{id:string;visita?:string}>();
+  const params=useLocalSearchParams<{id:string;visita?:string;notice?:string}>();
   const rawId=Array.isArray(params.id)?params.id[0]:params.id;
   const rawVisit=Array.isArray(params.visita)?params.visita[0]:params.visita;
   const visitId=Number(rawVisit);
@@ -86,10 +87,11 @@ export default function VendaMobile(){
   const [step,setStep]=useState<'titulo'|'pagamento'|'comissao'>(isNew?'titulo':'pagamento');
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
   const [error,setError]=useState(''),[notice,setNotice]=useState('');
+  useEffect(()=>{if(params.notice)setNotice(params.notice);},[params.notice]);
   const [choice,setChoice]=useState<{field:string;index?:number}|null>(null);
   const [planId,setPlanId]=useState<number|null>(null),[managerId,setManagerId]=useState<number|null>(null);
   const [saleBroker,setSaleBroker]=useState<number|null>(null),[saleSecond,setSaleSecond]=useState<number|null>(null);
-  const [externalRenewal,setExternalRenewal]=useState(false);
+  const [datePicker,setDatePicker]=useState<'date'|'pendingReturn'|'startDate'|null>(null);
   const [titleNumber,setTitleNumber]=useState(''),[discount,setDiscount]=useState('0,00');
   const [pendingReturn,setPendingReturn]=useState(''),[pendingNotes,setPendingNotes]=useState('');
   const [date,setDate]=useState(nowBR),[startDate,setStartDate]=useState(nowBR);
@@ -234,7 +236,6 @@ export default function VendaMobile(){
         gerente_pessoa_id:managerId,corretor_pessoa_id:saleBroker,
         segundo_corretor_pessoa_id:saleSecond,
         corretores_venda_diferentes_visita:true,
-        renovacao_externa:externalRenewal,
         atendente_pessoa_id:visit.atendente_pessoa_id,atendente_adicional_pessoa_id:visit.atendente_adicional_pessoa_id,
       }});
       // A operação já existe: não tentar salvá-la outra vez se a imagem falhar.
@@ -492,20 +493,21 @@ export default function VendaMobile(){
               onChange={v=>{setDiscount(v);}}/>
             <View style={s.total}><Text style={s.label}>Valor cobrado do cliente</Text>
               <Text style={s.totalValue}>{total===null||total<=0?'Inválido':money(decimal(total))}</Text></View>
-            <Input label={isPendingNew?'Data da negociação * (DD/MM/AAAA)':'Data da venda * (DD/MM/AAAA)'}
-              value={date} onChange={setDate} numeric placeholder="DD/MM/AAAA"/>
+            <Pressable style={s.select} onPress={()=>setDatePicker('date')}>
+              <View style={{flex:1}}><Text style={s.label}>{isPendingNew?'Data da negociação *':'Data da venda *'}</Text>
+                <Text style={s.selectValue}>{date}  📅</Text></View>
+            </Pressable>
             {isPendingNew?<>
-              <Input label="Retorno previsto (opcional, DD/MM/AAAA)" value={pendingReturn}
-                onChange={setPendingReturn} numeric placeholder="DD/MM/AAAA"/>
+              <Pressable style={s.select} onPress={()=>setDatePicker('pendingReturn')}>
+                <View style={{flex:1}}><Text style={s.label}>Retorno previsto (opcional)</Text>
+                  <Text style={s.selectValue}>{pendingReturn||'Selecionar data'}  📅</Text></View>
+              </Pressable>
               <Input label="Observações da negociação" value={pendingNotes}
                 onChange={setPendingNotes} placeholder="O que falta para fechar?"/>
-            </>:<Input label="Início da vigência * (DD/MM/AAAA)" value={startDate}
-              onChange={setStartDate} numeric placeholder="DD/MM/AAAA"/>}
-            <Pressable onPress={()=>setExternalRenewal(x=>!x)} style={s.select}>
-              <Text style={s.selectValue}>{externalRenewal?'☑️ Renovação de outro corretor':'☐ Renovação de outro corretor'}</Text>
-              <Text style={s.helper}>Marque quando o título anterior foi emitido fora do sistema;
-                o corretor externo que recebe deve ser principal.</Text>
-            </Pressable>
+            </>:<Pressable style={s.select} onPress={()=>setDatePicker('startDate')}>
+              <View style={{flex:1}}><Text style={s.label}>Início da vigência *</Text>
+                <Text style={s.selectValue}>{startDate}  📅</Text></View>
+            </Pressable>}
             <Text style={s.section}>Participantes desta negociação</Text>
             <Text style={s.helper}>O corretor principal da venda pode ser diferente do captador do convite.
               Em renovação externa, escolha o corretor que receberá como principal e o captador como segundo.</Text>
@@ -565,52 +567,11 @@ export default function VendaMobile(){
             </Text>
           </View>}
           {step==='titulo'&&detail.editavel!==false&&<View style={s.card}>
-            <Text style={s.section}>Corrigir cadastro e responsáveis</Text>
-            <Text style={s.helper}>Até o fechamento: mudanças registradas em auditoria,
-              recebimentos do cliente preservados e direitos recalculados.</Text>
-            {!editingSale?<Btn text="Editar dados e comissão da venda" muted onPress={()=>setEditingSale(true)}/>:
-              <>
-                <Pressable style={s.select}
-                  onPress={()=>setEditSale(o=>({...o,renovacao_externa:!o.renovacao_externa}))}>
-                  <Text style={s.selectValue}>{editSale.renovacao_externa
-                    ?'☑️ Renovação de corretor externo':'☐ Renovação de corretor externo'}</Text>
-                </Pressable>
-                <Select label="Plano" value={editPlan?.nome||'Selecionar'}
-                  onPress={()=>setChoice({field:'editPlan'})}/>
-                <Select label="Corretor principal" value={editPerson(editSale.corretor_pessoa_id)}
-                  onPress={()=>setChoice({field:'editBroker'})}/>
-                <Select label="Segundo corretor (opcional)" value={editPerson(editSale.segundo_corretor_pessoa_id)}
-                  onPress={()=>setChoice({field:'editSecond'})}/>
-                <Text style={s.helper}>Renovação externa: o corretor que recebe fica como principal;
-                  o corretor que convidou fica como segundo, mantendo o captador original na visita.</Text>
-                <Select label="Atendente" value={editPerson(editSale.atendente_pessoa_id)}
-                  onPress={()=>setChoice({field:'editAttendant'})}/>
-                <Select label="Segundo atendente" value={editPerson(editSale.atendente_adicional_pessoa_id)}
-                  onPress={()=>setChoice({field:'editAdditional'})}/>
-                <Select label="Gerente" value={editPerson(editSale.gerente_pessoa_id)}
-                  onPress={()=>setChoice({field:'editManager'})}/>
-                <Input label="Desconto (R$)" value={editSale.desconto_corretor} numeric
-                  placeholder="0,00" onChange={v=>setEditSale(o=>({...o,desconto_corretor:v}))}/>
-                {detail.operacao.situacao==='VENDA'&&
-                  <Input label="Número do título" value={editSale.numero_titulo} numeric
-                    placeholder="4 dígitos" onChange={v=>setEditSale(o=>({...o,numero_titulo:v.replace(/\D/g,'').slice(0,4)}))}/>}
-                <Input label="Data da negociação (DD/MM/AAAA)" value={editSale.data_negociacao} numeric
-                  placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,data_negociacao:v}))}/>
-                {detail.operacao.situacao==='VENDA'?<>
-                  <Input label="Data da venda (DD/MM/AAAA)" value={editSale.data_venda} numeric
-                    placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,data_venda:v}))}/>
-                  <Input label="Início da vigência" value={editSale.data_inicio} numeric
-                    placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,data_inicio:v}))}/>
-                </>:<Input label="Retorno previsto (opcional)" value={editSale.retorno_previsto} numeric
-                  placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,retorno_previsto:v}))}/>}
-                <Input label="Observações" value={editSale.observacoes} placeholder="Observações da operação"
-                  onChange={v=>setEditSale(o=>({...o,observacoes:v}))}/>
-                <Input label="Motivo da correção *" value={editSale.justificativa}
-                  placeholder="Explique a alteração" onChange={v=>setEditSale(o=>({...o,justificativa:v}))}/>
-                <Btn text={busy?'Salvando...':'Salvar correção e recalcular'} disabled={busy}
-                  onPress={()=>{void saveSaleChanges();}}/>
-                <Btn text="Cancelar edição" muted onPress={()=>setEditingSale(false)}/>
-              </>}
+            <Text style={s.section}>Dados e responsáveis</Text>
+            <Text style={s.helper}>Edite os valores preenchidos na tela exclusiva.
+              Alterações são auditadas e as comissões recalculadas.</Text>
+            <Btn text="Editar dados da venda" muted onPress={()=>router.push({
+              pathname:'/venda/editar/[id]',params:{id:String(opId)}} as never)}/>
           </View>}
           {step==='titulo'&&detail.editavel===false&&<Text style={s.helper}>
             Dados protegidos por fechamento, renovação vinculada ou repasse já realizado.
@@ -670,19 +631,10 @@ export default function VendaMobile(){
             </View>}
             <Text style={s.kicker}>{isPendingOperation?'PENDÊNCIA · NEGOCIAÇÃO Nº '+opId:
               'TÍTULO '+(detail.operacao.numero_titulo||'')+' '+detail.operacao.sigla_plano}</Text>
-            {!!(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo||detail.operacao.renovacao_externa)&&
-              <View style={{alignSelf:'flex-start',paddingVertical:7,paddingHorizontal:11,
-                borderRadius:9,backgroundColor:colors.pale,marginTop:8}}>
-                <Text style={{fontSize:12,fontWeight:'900',color:colors.brandDark}}>
-                  {(detail.operacao.movimento_titulo||detail.titulo_anterior?.tipo||
-                    (detail.operacao.renovacao_externa?'RENOVACAO_EXTERNA':null))?.startsWith('RENOVACAO')
-                    ?'🔄 RENOVAÇÃO':'⬆️ UPGRADE'}
-                </Text>
-              </View>}
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
             <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda||detail.operacao.data_negociacao}</Text>
             {detail.editavel!==false&&<Btn text="Editar responsáveis e dados da venda" muted
-              onPress={()=>{setStep('titulo');setEditingSale(true);}}/>}
+              onPress={()=>router.push({pathname:'/venda/editar/[id]',params:{id:String(opId)}} as never)}/>}
             <View style={s.two}><View><Text style={s.label}>Recebido do cliente</Text>
               <Text style={s.lineTitle}>{money(detail.recebido)}</Text></View>
               <View><Text style={s.label}>Saldo do cliente</Text>
@@ -732,36 +684,12 @@ export default function VendaMobile(){
             {opts?.pode_corrigir_comissao&&rateios&&<View style={s.panel}>
               <Text style={s.section}>Participações e rateio</Text>
               <Text style={s.helper}>{rateios.aviso}</Text>
-              {editingRateio?<>
-                {rateioRows.map((r,i)=><View key={i} style={s.allocation}>
-                  <Text style={s.lineTitle}>Participação {i+1}</Text>
-                  <View style={s.two}>{allowedRoles.map(role=><Pressable key={role}
-                    style={[s.chip,r.papel===role&&s.chipActive]}
-                    onPress={()=>changeRow(i,{papel:role,beneficiario_pessoa_id:0})}>
-                    <Text style={s.chipText}>{roles[role]}</Text></Pressable>)}</View>
-                  <Select label="Beneficiário" value={opts.pessoas.find(p=>p.id===r.beneficiario_pessoa_id)?.nome||'Selecionar'}
-                    onPress={()=>setChoice({field:'person',index:i})}/>
-                  <Select label="Quem distribui" value={opts.pessoas.find(p=>p.id===r.responsavel_pessoa_id)?.nome||'Selecionar'}
-                    onPress={()=>setChoice({field:'source',index:i})}/>
-                  <Input label="Valor (R$)" value={r.valor} numeric onChange={v=>changeRow(i,{valor:v})} placeholder="0,00"/>
-                  <Pressable onPress={()=>setRateioRows(old=>old.filter((_,j)=>j!==i))}>
-                    <Text style={s.remove}>Remover</Text></Pressable></View>)}
-                <View style={s.total}><Text style={s.label}>Restante do titular</Text>
-                  <Text style={s.totalValue}>{left===null?'A apurar':left<0?'Inválido':money(decimal(left))}</Text></View>
-                <Btn text="+ Adicionar participação" muted onPress={()=>setRateioRows(old=>[...old,{
-                  responsavel_pessoa_id:rateios.corretor_pessoa_id,beneficiario_pessoa_id:0,
-                  papel:'ATENDENTE',valor:'',observacoes:''}])}/>
-                <Input label="Motivo da correção *" value={reason} onChange={setReason} placeholder="Explique o ajuste"/>
-                <Btn text={busy?'Salvando...':'Salvar rateio auditado'} disabled={busy} onPress={()=>{void adjustRateios();}}/>
-                <Btn text="Cancelar edição" muted onPress={()=>setEditingRateio(false)}/>
-              </>:<>
-                {rateios.rateios.map((r,i)=><View key={i} style={s.row}>
-                  <View style={{flex:1}}><Text style={s.lineTitle}>{r.beneficiario_nome}</Text>
-                    <Text style={s.helper}>{roles[r.papel]||r.papel}</Text></View>
-                  <Text style={s.lineTitle}>{money(r.valor)}</Text></View>)}
-                {!saleLocked&&rateios.editavel?<Btn text="Conferir / corrigir participações" muted
-                  onPress={()=>{setEditingRateio(true);setReason('');}}/>:null}
-              </>}
+              {rateios.rateios.map((r,i)=><View key={i} style={s.row}>
+                <View style={{flex:1}}><Text style={s.lineTitle}>{r.beneficiario_nome}</Text>
+                  <Text style={s.helper}>{roles[r.papel]||r.papel}</Text></View>
+                <Text style={s.lineTitle}>{money(r.valor)}</Text></View>)}
+              {!saleLocked&&rateios.editavel&&<Btn text="Ajustar / adicionar participação" muted
+                onPress={()=>router.push({pathname:'/venda/participacoes/[id]',params:{id:String(opId)}} as never)}/>}
             </View>}
             <Btn text="Voltar ao pagamento" muted onPress={()=>setStep('pagamento')}/>
             <Btn text={detail.operacao.visita_id?'Concluir e voltar ao atendimento':'Voltar para Vendas'}
@@ -772,6 +700,13 @@ export default function VendaMobile(){
         </>}
       </ScrollView>
     </KeyboardAvoidingView>
+    <FinanceDatePicker open={datePicker!==null}
+      title={datePicker==='pendingReturn'?'Retorno previsto':datePicker==='startDate'?'Início da vigência':'Data da negociação / venda'}
+      value={datePicker==='pendingReturn'?iso(pendingReturn)||'':datePicker==='startDate'?iso(startDate)||'':iso(date)||''}
+      onClose={()=>setDatePicker(null)}
+      onChange={chosen=>{if(datePicker==='pendingReturn')setPendingReturn(displayISO(chosen));
+        else if(datePicker==='startDate')setStartDate(displayISO(chosen));
+        else setDate(displayISO(chosen));}}/>
     <ChoiceSheet open={choice!==null}
       title={editingField?'Corrigir dados da venda':choice?.field==='plan'?'Escolher plano':
         choice?.field==='method'?'Forma de pagamento':
