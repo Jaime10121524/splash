@@ -102,9 +102,9 @@ export default function Participacoes(){
               <Text style={{fontSize:11,color:palette.brandDark,fontWeight:'800'}}>{roles[role]}</Text>
             </Pressable>)}</View>
             <Pressable style={[s.select,{borderColor:palette.line}]} onPress={()=>setChoice({index:i,field:'beneficiario_pessoa_id'})}>
-              <Text style={{color:palette.ink}}>Beneficiário: {names(r.beneficiario_pessoa_id)}  ⌄</Text></Pressable>
+              <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text style={{color:palette.ink,flex:1}}>Beneficiário: {names(r.beneficiario_pessoa_id)}</Text><SymbolView name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={palette.muted}/></View></Pressable>
             <Pressable style={[s.select,{borderColor:palette.line}]} onPress={()=>setChoice({index:i,field:'responsavel_pessoa_id'})}>
-              <Text style={{color:palette.ink}}>Distribuído por: {names(r.responsavel_pessoa_id)}  ⌄</Text></Pressable>
+              <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text style={{color:palette.ink,flex:1}}>Distribuído por: {names(r.responsavel_pessoa_id)}</Text><SymbolView name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={palette.muted}/></View></Pressable>
             <TextInput style={[s.select,{color:palette.ink,borderColor:palette.line}]} value={r.valor}
               onChangeText={v=>change(i,{valor:v})} keyboardType="decimal-pad"
               placeholder="Valor da participação (R$)"/>
