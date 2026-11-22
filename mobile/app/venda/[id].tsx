@@ -1,5 +1,6 @@
 import {useProtectedPhoto} from '../../src/useProtectedPhoto';
 import FeedbackPopup from '../../src/components/FeedbackPopup';
+import VendaCelebration from '../../src/components/VendaCelebration';
 import {useThemedStyles,useTheme} from '../../src/ThemeContext';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -89,6 +90,7 @@ export default function VendaMobile(){
   const [editingRateio,setEditingRateio]=useState(false),[editingGross,setEditingGross]=useState(false);
   const [grossValue,setGrossValue]=useState(''),[reason,setReason]=useState('');
   const [confirm,setConfirm]=useState(false);
+  const [celebrating,setCelebrating]=useState(false);
   const {uri:photoUri,error:photoError,reload:reloadPhoto,setUri:setPhotoUri}=
     useProtectedPhoto(opId?'mobile/vendas/'+opId+'/foto':null,token);
   const [photoBusy,setPhotoBusy]=useState(false);
@@ -201,6 +203,7 @@ export default function VendaMobile(){
         router.replace({pathname:'/pendencia/[id]',params:{id:String(res.operacao_id)}} as never);
       }else{
         setNotice('Venda cadastrada. Agora registre os pagamentos.');
+        setCelebrating(true);
       }
     });
   }
@@ -215,6 +218,7 @@ export default function VendaMobile(){
       await refresh(opId,!!opts?.pode_corrigir_comissao);
       setAmount('');
       setStep(isPendingOperation?'pagamento':balance-paid===0?'comissao':'pagamento');
+      if(!isPendingOperation && balance-paid===0)setCelebrating(true);
       setNotice(isPendingOperation
         ?'Recebimento registrado na pendência. O valor será preservado ao converter em venda.'
         :balance-paid===0
@@ -579,8 +583,10 @@ export default function VendaMobile(){
               </>}
             </View>}
             <Btn text="Voltar ao pagamento" muted onPress={()=>setStep('pagamento')}/>
-            <Btn text="Concluir e voltar ao atendimento" onPress={()=>router.replace({
-              pathname:'/atendimento/[id]',params:{id:String(detail.operacao.visita_id)}})}/>
+            <Btn text={detail.operacao.visita_id?'Concluir e voltar ao atendimento':'Voltar para Vendas'}
+              onPress={()=>detail.operacao.visita_id
+                ?router.replace({pathname:'/atendimento/[id]',params:{id:String(detail.operacao.visita_id)}})
+                :router.replace('/vendas')}/>
           </View>}
         </>}
       </ScrollView>
@@ -624,6 +630,7 @@ export default function VendaMobile(){
       description="Primeiro registramos a venda. Depois os pagamentos e a apuração de comissões serão registrados com auditoria."
       primaryLabel="Sim, cadastrar" secondaryLabel="Revisar" busy={busy}
       onPrimary={()=>{void saveTitle();}} onSecondary={()=>setConfirm(false)}/>
+    <VendaCelebration visible={celebrating} onDone={()=>setCelebrating(false)}/>
   </SafeAreaView>;
 }
 const lightStyles = StyleSheet.create({
