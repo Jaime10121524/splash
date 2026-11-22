@@ -40,6 +40,13 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
   const [secondBroker,setSecondBroker]=useState('')
   const [additional,setAdditional]=useState('')
   const [outcome,setOutcome]=useState('RETORNO')
+  const [arrivalDate,setArrivalDate]=useState(localDateISO())
+  const [historicalStatus,setHistoricalStatus]=useState('VENDA')
+  const [historicalAttendant,setHistoricalAttendant]=useState('')
+  const [historicalTimes,setHistoricalTimes]=useState({chegada:'08:00',inicio:'08:30',fim:'09:30'})
+  const [historicalNotes,setHistoricalNotes]=useState('')
+  const [historicalReturn,setHistoricalReturn]=useState('')
+  const [historicalReason,setHistoricalReason]=useState('')
   const [returnDate,setReturnDate]=useState('')
   const [reason,setReason]=useState('')
   const [notes,setNotes]=useState('')
@@ -52,7 +59,10 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
     if(!initialClient?.id)return
     setMode('existing');setSelectedClient(initialClient)
     setBroker(catalogs.pessoa_logada?String(catalogs.pessoa_logada):'');setSecondBroker('')
-    setNewClient({...emptyClient(),dono_corrente_pessoa_id:catalogs.pessoa_logada?String(catalogs.pessoa_logada):''});setFormError('');setModal({type:'arrival'})
+    setNewClient({...emptyClient(),dono_corrente_pessoa_id:catalogs.pessoa_logada?String(catalogs.pessoa_logada):''})
+    setArrivalDate(localDateISO());setHistoricalStatus('VENDA');setHistoricalAttendant('')
+    setHistoricalTimes({chegada:'08:00',inicio:'08:30',fim:'09:30'});setHistoricalNotes('')
+    setFormError('');setModal({type:'arrival'})
     onClientAccepted()
   },[initialClient?.id])
   useEffect(()=>{
@@ -125,7 +135,21 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
       const brokerPayload={corretor_pessoa_id:broker?Number(broker):null,
         segundo_corretor_pessoa_id:secondBroker?Number(secondBroker):null}
       if(modal.type==='arrival'){
-        if(mode==='existing'){
+        if(arrivalDate>localDateISO())throw new Error('A chegada deve ser hoje ou em uma data anterior.')
+        if(arrivalDate<localDateISO()){
+          if(!admin&&!gestor)throw new Error('Registro retroativo reservado à gestão.')
+          if(mode!=='existing'||!selectedClient)throw new Error('Para o registro retroativo, cadastre o cliente antes e selecione Cliente existente.')
+          if(!historicalAttendant)throw new Error('Selecione o atendente do registro anterior.')
+          result=await comercialPost('/api/atendimentos/retroativo',{
+            cliente_id:selectedClient.id,...brokerPayload,
+            data_visita:arrivalDate,status:historicalStatus,
+            atendente_pessoa_id:Number(historicalAttendant),
+            chegada_hora:historicalTimes.chegada,inicio_hora:historicalTimes.inicio,
+            fim_hora:historicalTimes.fim,observacoes:historicalNotes,
+            retorno_previsto:historicalStatus==='RETORNO'?historicalReturn:null,
+            motivo_nao_venda_id:historicalStatus==='SEM_VENDA'?Number(historicalReason):null,
+          })
+        }else if(mode==='existing'){
           if(!selectedClient)throw new Error('Escolha um cliente existente.')
           result=await comercialPost('/api/atendimentos/chegada',{cliente_id:selectedClient.id,...brokerPayload})
         }else{
@@ -277,7 +301,36 @@ export default function Atendimentos({initialClient=null,onClientAccepted=()=>{}
             <button className={mode==='new'?'active':''} onClick={()=>setMode('new')}>Novo cliente</button></div>
           {mode==='existing'?<ClientFinder label="Cliente" value={selectedClient} onChange={setSelectedClient}/>:
             <ClientFields compact fields={newClient} onChange={setNewClient} catalogs={catalogs}/>}
-          <div className="com-inform">A chegada será registrada com a hora do servidor. O cronômetro começa ao clicar em Iniciar atendimento.</div>
+          {(admin||gestor)&&<label>Data do atendimento
+            <FormControl type="date" value={arrivalDate} onChange={setArrivalDate}
+              ariaLabel="Data da chegada"/></label>}
+          {arrivalDate<localDateISO()&&(admin||gestor)?<>
+            <div className="com-inform">Atendimento anterior: preencha horários reais e resultado. O histórico será gravado completo, sem inventar horários atuais. Escolha um cliente já cadastrado.</div>
+            <label>Resultado anterior
+              <FormControl type="select" ariaLabel="Resultado anterior" value={historicalStatus}
+                onChange={setHistoricalStatus} options={stateOptions}/></label>
+            <label>Atendente responsável
+              <FormControl type="select" ariaLabel="Atendente do histórico" value={historicalAttendant}
+                onChange={setHistoricalAttendant} options={personOptions(catalogs.pessoas,['vendedor','corretor'])}
+                placeholder="Escolha o atendente"/></label>
+            <div className="com-date-filter">
+              <label>Chegada<input type="time" value={historicalTimes.chegada}
+                onChange={e=>setHistoricalTimes(v=>({...v,chegada:e.target.value}))}/></label>
+              <label>Início<input type="time" value={historicalTimes.inicio}
+                onChange={e=>setHistoricalTimes(v=>({...v,inicio:e.target.value}))}/></label>
+              <label>Fim<input type="time" value={historicalTimes.fim}
+                onChange={e=>setHistoricalTimes(v=>({...v,fim:e.target.value}))}/></label>
+            </div>
+            {historicalStatus==='RETORNO'&&<label>Retorno previsto
+              <FormControl type="date" ariaLabel="Retorno anterior" value={historicalReturn}
+                onChange={setHistoricalReturn}/></label>}
+            {historicalStatus==='SEM_VENDA'&&<label>Motivo de não venda
+              <FormControl type="select" ariaLabel="Motivo do histórico" value={historicalReason}
+                onChange={setHistoricalReason} options={(catalogs.motivos||[]).filter(m=>m.ativo)
+                  .map(m=>({value:String(m.id),label:m.descricao}))} placeholder="Escolha o motivo"/></label>}
+            <label>Observações do atendimento anterior<textarea value={historicalNotes}
+              onChange={e=>setHistoricalNotes(e.target.value)} rows={2} maxLength={3000}/></label>
+          </>:<div className="com-inform">A chegada de hoje usa o horário do servidor. O cronômetro começa ao clicar em Iniciar atendimento.</div>}
         </>}
         {['arrival','brokers','resume'].includes(modal.type)&&<>
           <label><span className="field-caption">Corretor responsável <em>*</em></span>
