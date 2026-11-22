@@ -22,14 +22,15 @@ final class MobileClientesController extends BaseController
         $u=auth('tokens')->user();
         if (!$u || $u->isBanned()) return $this->error(401,'Sessão expirada.');
         if (!$u->inGroup('admin','operador','gerente','corretor')) return $this->error(403,'Perfil sem acesso a clientes.');
+        $manager=\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$u);
         $scope=null;
-        if ($u->inGroup('corretor') && !$u->inGroup('admin','operador','gerente')) {
+        if ($u->inGroup('corretor') && !$manager && !$u->inGroup('admin','operador')) {
             $p=db_connect()->table('pessoas')->select('id')
                 ->where('user_id',(int)$u->id)->where('ativo',1)->get()->getRowArray();
             if (!$p) return $this->error(403,'Conta sem corretor vinculado.');
             $scope=(int)$p['id'];
         }
-        $team=$u->inGroup('gerente')&&!$u->inGroup('admin')
+        $team=$manager&&!$u->inGroup('admin')
             ?\App\Libraries\GestaoEquipe::ids(db_connect(),$u):null;
         if($team!==null && !$team)return $this->error(403,'Gestor sem pessoa ativa vinculada.');
         return ['user'=>$u,'scope'=>$scope,'team'=>$team];
