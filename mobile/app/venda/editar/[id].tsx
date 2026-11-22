@@ -34,7 +34,7 @@ type Field='plano_versao_id'|'corretor_pessoa_id'|'segundo_corretor_pessoa_id'|
   'atendente_pessoa_id'|'atendente_adicional_pessoa_id'|'gerente_pessoa_id';
 const money=(n:string)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0));
 const display=(d:string)=>/^\d{4}-\d{2}-\d{2}$/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'Escolher data';
-const cents=(raw:string)=>{const s=raw.trim().replace(/\s|R\$/g,'').replace(/\./g,'').replace(',','.');return /^\d+(?:\.\d{1,2})?$/.test(s)?Math.round(Number(s)*100):null;};
+const cents=(raw:string)=>{const text=raw.trim().replace(/\s|R\$/g,'');const n=text.includes(',')?text.replace(/\./g,'').replace(',','.'):text;return /^\d+(?:\.\d{1,2})?$/.test(n)?Math.round(Number(n)*100):null;};
 const empty:Form={plano_versao_id:null,corretor_pessoa_id:null,segundo_corretor_pessoa_id:null,
   atendente_pessoa_id:null,atendente_adicional_pessoa_id:null,gerente_pessoa_id:null,
   desconto_corretor:'0.00',numero_titulo:'',data_negociacao:'',data_venda:'',data_inicio:'',
