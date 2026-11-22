@@ -80,6 +80,16 @@ export default function AtendimentosScreen() {
           <Text style={styles.newVisitText}>Registrar chegada</Text>
           <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" />
         </Pressable>
+        {!!user?.groups?.some(g=>g==='admin'||g==='gerente')&&
+          <Pressable style={styles.pendingShortcut}
+            onPress={()=>router.push('/atendimento/retroativo' as never)}
+            accessibilityRole="button">
+            <SymbolView name={{ios:'clock.arrow.circlepath',android:'history'}}
+              size={19} tintColor={colors.brandDark}/>
+            <View style={{flex:1}}><Text style={styles.pendingShortcutTitle}>Registrar venda anterior</Text>
+              <Text style={styles.pendingShortcutSub}>Atendimento de data passada, com horários reais</Text>
+            </View>
+          </Pressable>}
         <Pressable style={styles.pendingShortcut} onPress={()=>router.push('/pendencias' as never)}
           accessibilityRole="button">
           <SymbolView name={{ios:'clock.arrow.circlepath',android:'pending_actions'}}
