@@ -18,7 +18,7 @@ final class GestorVendasController extends VendasController
     {
         $user = auth('session')->user();
         if (!$user || $user->isBanned()) return $this->errorResponse(401, 'Faça login novamente.');
-        if (!$user->inGroup('gerente') || $user->inGroup('admin')) {
+        if ((!\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user) || $user->inGroup('admin'))) {
             return $this->errorResponse(403, 'Apenas gestores podem utilizar esta consulta.');
         }
         $person = db_connect()->table('pessoas')->select('id')
@@ -53,6 +53,12 @@ final class GestorVendasController extends VendasController
             ->join('venda_operacoes o', 'o.visita_id=v.id', 'left')
             ->where('v.status', 'VENDA')->where('o.id', null)
             ->orderBy('v.id', 'DESC')->limit(200)->get()->getResultArray();
+        $managerUser=auth('session')->user();
+        $team=\App\Libraries\GestaoEquipe::ids($db,$managerUser);
+        $userIds=\App\Libraries\GestaoEquipe::usuarios($db,$managerUser);
+        $visits=array_values(array_filter($visits,static fn($v)=>
+            in_array((int)$v['corretor_pessoa_id'],$team,true)
+            || in_array((int)($v['segundo_corretor_pessoa_id']??0),$team,true)));
         return $this->response->setJSON([
             'planos'=>$plans, 'visitas'=>$visits,
             'gerente_pessoa_id'=>$actor['pessoa_id'],
@@ -64,17 +70,30 @@ final class GestorVendasController extends VendasController
         $actor = $this->manager();
         if ($actor instanceof ResponseInterface) return $actor;
         $db = db_connect();
-        // A gestão vê vendas ligadas ao seu cadastro de gerente ou criadas
-        // por seu login. Nunca vê comissões, rateios nem contas alheias.
-        $rows = $db->table('venda_operacoes o')
+        // Histórico gerenciado = todos os corretores vinculados, inclusive
+        // vendas anteriores à atribuição do gerente. A visibilidade geral é
+        // opcional e depende da permissão gestor_visao_global.
+        $user=auth('session')->user();
+        $team=\App\Libraries\GestaoEquipe::ids($db,$user);
+        $users=\App\Libraries\GestaoEquipe::usuarios($db,$user);
+        $query=$db->table('venda_operacoes o')
             ->select('o.id,o.numero_titulo,o.sigla_plano,o.data_venda,o.valor_cobrado,
-                o.situacao,c.nome AS cliente_nome,p.nome AS corretor_nome')
+                o.situacao,c.nome AS cliente_nome,p.nome AS corretor_nome,
+                s.nome AS segundo_corretor_nome')
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas p','p.id=o.corretor_pessoa_id','left')
-            ->where('o.situacao','VENDA')
-            ->groupStart()->where('o.gerente_pessoa_id',$actor['pessoa_id'])
-                ->orWhere('o.criado_por_usuario_id',$actor['user_id'])->groupEnd()
-            ->orderBy('o.id','DESC')->limit(150)->get()->getResultArray();
+            ->join('pessoas s','s.id=o.segundo_corretor_pessoa_id','left')
+            ->join('visitas v','v.id=o.visita_id','left')
+            ->where('o.situacao','VENDA');
+        $query->groupStart()->where('o.gerente_pessoa_id',$actor['pessoa_id'])
+            ->orWhereIn('o.criado_por_usuario_id',$users)
+            ->orWhereIn('o.corretor_pessoa_id',$team)
+            ->orWhereIn('o.segundo_corretor_pessoa_id',$team)
+            ->orWhereIn('v.corretor_pessoa_id',$team)
+            ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
+            ->orWhereIn('v.criado_por_usuario_id',$users)->groupEnd();
+        $rows=$query->orderBy('o.data_venda','DESC')->orderBy('o.id','DESC')
+            ->limit(150)->get()->getResultArray();
         return $this->response->setJSON(['vendas'=>$rows, 'limite'=>150])
             ->setHeader('Cache-Control', 'private, no-store');
     }
