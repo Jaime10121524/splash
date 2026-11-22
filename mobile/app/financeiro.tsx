@@ -22,6 +22,8 @@ type FinanceData={
   inicio:string;fim:string;admin:boolean;
   resumo:{a_pagar:string|null;a_receber:string;recebidas:string;pagas:string|null};
   contas:FinanceAccount[];possivel_truncamento:boolean;aviso:string;
+  visao_equipe?:boolean;
+  pendencias?:{quantidade:number;valor_negociado:string;valor_recebido:string;saldo:string;limitado:boolean};
 };
 function toIso(date:Date){
   return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),
@@ -80,14 +82,14 @@ export default function FinanceiroMobile(){
         </Pressable>
         <View style={{flex:1}}>
           <Text style={s.kicker}>SPLASH / FINANCEIRO</Text>
-          <Text style={s.title}>{admin?'Comissões da equipe':'Meu financeiro'}</Text>
+          <Text style={s.title}>{admin?'Comissões da equipe':data?.visao_equipe?'Financeiro da equipe':'Meu financeiro'}</Text>
         </View>
       </View>
       <View style={s.hero}>
         <Text style={s.heroTitle}>{admin?'Controle financeiro':'Suas comissões'}</Text>
         <Text style={s.heroDescription}>{admin
           ?'Acompanhe os valores devidos à equipe e seus próprios recebimentos.'
-          :'Consulte apenas seus direitos, pagamentos e abatimentos.'}</Text>
+          :data?.visao_equipe?'Consulte sua comissão e a de corretores vinculados à sua gestão.':'Consulte apenas seus direitos, pagamentos e abatimentos.'}</Text>
         <Pressable style={s.periodButton} onPress={()=>setCalendar(true)}>
           <SymbolView name={{ios:'calendar',android:'calendar_month'}} size={20} tintColor="#FFFFFF"/>
           <Text style={s.periodText}>{formatDate(period.start)} até {formatDate(period.end)}</Text>
@@ -113,7 +115,23 @@ export default function FinanceiroMobile(){
       </View>}
       {loading?<ActivityIndicator size="large" color={palette.brand} style={{marginTop:26}}/>:
       data&&<>
-        <Text style={s.section}>Resumo das vendas do período</Text>
+        {data.pendencias&&<View style={s.hero}>
+          <Text style={s.heroTitle}>Negociações pendentes</Text>
+          <Text style={s.heroDescription}>{data.pendencias.quantidade} negociação(ões) no período.
+            Não são comissões de vendas concluídas.</Text>
+          <View style={{flexDirection:'row',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+            <View><Text style={s.heroDescription}>Valor negociado</Text>
+              <Text style={s.heroTitle}>{money(data.pendencias.valor_negociado)}</Text></View>
+            <View><Text style={s.heroDescription}>Já recebido</Text>
+              <Text style={s.heroTitle}>{money(data.pendencias.valor_recebido)}</Text></View>
+          </View>
+          <Text style={s.heroDescription}>Saldo em aberto: {money(data.pendencias.saldo)}</Text>
+          <Pressable onPress={()=>router.push('/pendencias' as never)}
+            style={{paddingVertical:11,alignItems:'center',borderWidth:1,borderColor:'#FFFFFF',borderRadius:12}}>
+            <Text style={{color:'#FFFFFF',fontWeight:'900'}}>Consultar Pendências</Text>
+          </Pressable>
+        </View>}
+        <Text style={s.section}>Comissões apuradas no período</Text>
         <View style={s.grid}>
           {data.admin&&<View style={s.metric}>
             <Text style={s.metricName}>A pagar à equipe</Text>
