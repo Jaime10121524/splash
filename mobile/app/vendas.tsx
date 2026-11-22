@@ -14,7 +14,9 @@ import {colors} from '../src/theme';
 
 type Sale={id:number;visita_id:number|null;situacao:string;numero_titulo:string;plano_versao_id:number;
   sigla_plano:string;data_venda:string;valor_cobrado:string;cliente_nome:string;
-  movimento_titulo?:'RENOVACAO'|'UPGRADE'|null};
+  movimento_titulo?:'RENOVACAO'|'RENOVACAO_EXTERNA'|'UPGRADE'|null;
+  corretor_nome:string|null;segundo_corretor_nome:string|null;
+  responsavel_financeiro_nome?:string|null;};
 type Plan={id:number;codigo:string;duracao_meses:number};
 type SaleList={vendas:Sale[];planos:Plan[];limitado:boolean};
 const dateISO=(input:string):string|null=>{const m=input.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!m)return null;const d=new Date(Date.UTC(+m[3],+m[2]-1,+m[1]));return d.getUTCDate()===+m[1]&&d.getUTCMonth()+1===+m[2]&&d.getUTCFullYear()===+m[3]?m[3]+'-'+m[2]+'-'+m[1]:null;};
@@ -125,6 +127,10 @@ function VendasOperacionais(){
             </View>
             <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} size={21} tintColor={colors.brandDark}/>
           </View>
+          <Text style={s.brokers} numberOfLines={2}>
+            {v.corretor_nome||'Corretor não informado'}
+            {v.segundo_corretor_nome?' + '+v.segundo_corretor_nome:''}
+          </Text>
           <Text style={s.client}>{v.cliente_nome}</Text>
           <View style={s.row}><Text style={s.price}>{money(v.valor_cobrado)}</Text>
             <Text style={s.date}>{v.data_venda}</Text></View>
@@ -147,6 +153,7 @@ function VendasOperacionais(){
 const lightStyles = StyleSheet.create({
   root:{flex:1,backgroundColor:colors.background},
   content:{padding:18,paddingBottom:45,gap:13},
+  brokers:{color:colors.muted,fontSize:12,fontWeight:'700',flexShrink:1},
   heading:{flexDirection:'row',alignItems:'center',gap:12},
   back:{width:43,height:43,backgroundColor:'#FFFFFF',borderRadius:13,alignItems:'center',justifyContent:'center'},
   kicker:{fontSize:10,color:colors.brandDark,fontWeight:'900',letterSpacing:.9},
