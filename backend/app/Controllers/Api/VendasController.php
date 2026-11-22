@@ -312,10 +312,17 @@ class VendasController extends CommercialBaseController
                 }
             }
             $now=$this->nowLocal();
+            $external=\App\Libraries\GestaoEquipe::renovacaoExterna(
+                $db,(int)$clientId,(int)$brokers['corretor_pessoa_id'],$visit);
+            $currentOwner=$external
+                ?(int)$brokers['corretor_pessoa_id']
+                :\App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']);
+            \App\Libraries\GestaoEquipe::atribuirCorrente($db,(int)$clientId,$currentOwner,
+                $this->saleActorId(),'Titularidade da corrente conforme equipe ou renovação externa.');
             $db->table('venda_operacoes')->insert([
                 'cliente_id'=>$clientId,'visita_id'=>$visitId,'plano_versao_id'=>$versionId,
                 'situacao'=>$kind,'historica'=>$historic?1:0,'numero_titulo'=>$number,
-                'renovacao_externa'=>($data['renovacao_externa']??false)===true?1:0,
+                'renovacao_externa'=>$external?1:0,
                 'sigla_plano'=>$plan['codigo'],'prazo_meses'=>(int)$plan['duracao_meses'],
                 'valor_tabela'=>VendaMoney::decimal($table),
                 'desconto_corretor'=>VendaMoney::decimal($discount),
@@ -326,7 +333,7 @@ class VendasController extends CommercialBaseController
                 'comissao_prevista'=>$estimate['valor'],
                 'observacao_comissao'=>$estimate['aviso'],
                 ...$brokers,
-                'dono_corrente_pessoa_id'=>(int)$client['dono_corrente_pessoa_id'],
+                'dono_corrente_pessoa_id'=>$currentOwner,
                 'gerente_pessoa_id'=>$managerId,
                 ...$attendants,
                 'data_negociacao'=>$day,'data_venda'=>$saleDate,'data_inicio'=>$start,
@@ -475,8 +482,16 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Gerente inválido ou sem função gerente.');
             }
+            $visit=$op['visita_id']?$db->table('visitas')->where('id',(int)$op['visita_id'])->get()->getRowArray():null;
+            $external=\App\Libraries\GestaoEquipe::renovacaoExterna(
+                $db,(int)$op['cliente_id'],(int)$brokers['corretor_pessoa_id'],$visit);
+            $currentOwner=$external?(int)$brokers['corretor_pessoa_id']:
+                \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']);
+            \App\Libraries\GestaoEquipe::atribuirCorrente($db,(int)$op['cliente_id'],
+                $currentOwner,$this->saleActorId(),'Ajuste de responsáveis antes do fechamento.');
             $new=[
-                'renovacao_externa'=>($data['renovacao_externa']??(bool)($op['renovacao_externa']??false))===true?1:0,
+                'dono_corrente_pessoa_id'=>$currentOwner,
+                'renovacao_externa'=>$external?1:0,
                 'gerente_pessoa_id'=>$managerId,
                 'plano_versao_id'=>$versionId,'sigla_plano'=>$plan['codigo'],
                 'prazo_meses'=>(int)$plan['duracao_meses'],
