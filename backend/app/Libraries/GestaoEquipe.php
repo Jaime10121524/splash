@@ -22,13 +22,22 @@ final class GestaoEquipe
         return $p?(int)$p['id']:null;
     }
 
+    /** Gerencia pode ser atribuida a Pessoa mesmo que o login tenha grupo corretor. */
+    public static function ehGestor($db,$user): bool
+    {
+        if($user->inGroup('gerente'))return true;
+        $own=self::pessoaId($db,$user);
+        return $own!==null && $db->table('pessoa_papeis')
+            ->where('pessoa_id',$own)->where('papel','gerente')->countAllResults()>0;
+    }
+
     /** IDs de todas as pessoas sob gestao, inclusive niveis subordinados. */
     public static function ids($db, $user): array
     {
         $own=self::pessoaId($db,$user);
         if($own===null)return [];
         $ids=[$own];
-        if(!$user->inGroup('gerente'))return $ids;
+        if(!self::ehGestor($db,$user))return $ids;
         $frontier=[$own];
         // Evita ciclos de configuracao. Limite restritivo de profundidade.
         for($level=0;$level<30 && $frontier;$level++){
