@@ -456,6 +456,34 @@ class FechamentosController extends CommercialBaseController
                         VendaMoney::cents((string)$m['valor'],true);
                 }
             }
+            // Inclui pessoas que possuem somente negociações pendentes.
+            // Uma conta vazia de comissoes nao deve esconder a pendencia.
+            $existingPersons=array_map(static fn($a)=>(int)$a['pessoa_id'],$accounts);
+            $pendingPersons=[];
+            foreach($pendingRows as $p){
+                foreach(['corretor_pessoa_id','segundo_corretor_pessoa_id','gerente_pessoa_id'] as $field){
+                    $who=(int)($p[$field]??0);
+                    if($who<1||in_array($who,$existingPersons,true))continue;
+                    if(!$admin && $team!==null && !in_array($who,$team,true))continue;
+                    if(!$admin && $team===null && $who!==$personId)continue;
+                    $pendingPersons[$who]=$who;
+                }
+            }
+            if($pendingPersons){
+                $pendingNames=[];
+                foreach($db->table('pessoas')->select('id,nome')->whereIn('id',array_values($pendingPersons))
+                    ->get()->getResultArray() as $p)$pendingNames[(int)$p['id']]=$p['nome'];
+                foreach($pendingPersons as $who){
+                    $accounts[]=[
+                        'pessoa_id'=>$who,'nome'=>$pendingNames[$who]??'Pessoa #'.$who,
+                        'resumo'=>[
+                            'total'=>'0.00','pendente'=>'0.00','recebido'=>'0.00',
+                            'abatido'=>'0.00','pago'=>'0.00',
+                        ],
+                        'itens'=>[],
+                    ];
+                }
+            }
             $items=[];$ownOpen=0;$ownReceived=0;$teamPayable=0;$teamPaid=0;
             foreach($accounts as $account){
                 $id=(int)$account['pessoa_id'];
