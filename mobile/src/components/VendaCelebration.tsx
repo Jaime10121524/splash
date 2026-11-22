@@ -38,7 +38,7 @@ export default function VendaCelebration({visible,onDone}:Props){
     <View style={styles.center}>
       {pieces.map((p,i)=><Animated.Text key={i} style={{
         position:'absolute',fontSize:p.size,color:p.color,fontWeight:'900',
-        opacity:progress.interpolate({inputRange:[0,p.delay/2050,.22,.72,1],
+        opacity:progress.interpolate({inputRange:[0,Math.max(.012,p.delay/2050),.22,.72,1],
           outputRange:[0,0,1,.9,0],extrapolate:'clamp'}),
         transform:[
           {translateX:progress.interpolate({inputRange:[0,1],outputRange:[0,p.x]})},
