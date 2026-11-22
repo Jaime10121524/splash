@@ -67,7 +67,12 @@ final class MobileVendasController extends VendasController
             return $this->errorResponse(404,'Venda não encontrada entre as vendas da sua gestão.');
         }
         $visitId=(int)($op['visita_id']??0);
-        if ($visitId<1) return $this->errorResponse(404,'Venda não encontrada.');
+        if($visitId<1){
+            if(in_array((int)($op['corretor_pessoa_id']??0),[$a['scope']],true)
+                || in_array((int)($op['segundo_corretor_pessoa_id']??0),[$a['scope']],true))
+                return $op;
+            return $this->errorResponse(404,'Venda não encontrada.');
+        }
         $visit=$this->linkedVisit($visitId,$a);
         return $visit instanceof ResponseInterface?$visit:$op;
     }
@@ -90,10 +95,12 @@ final class MobileVendasController extends VendasController
         if($start!==''&&$end!==''&&$start>$end)
             return $this->errorResponse(422,'A data inicial não pode superar a final.');
         $query=$db->table('venda_operacoes o')
-            ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,c.nome AS cliente_nome')
+            ->select('o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,
+                mov.tipo AS movimento_titulo,c.nome AS cliente_nome')
             ->join('clientes c','c.id=o.cliente_id')
             ->join('plano_versoes pv','pv.id=o.plano_versao_id')
             ->join('visitas v','v.id=o.visita_id','left')
+            ->join('titulo_vinculos mov','mov.operacao_nova_id=o.id','left')
             ->where('o.situacao','VENDA');
         if($a['scope']!==null){
             if($a['manager']){
@@ -104,8 +111,7 @@ final class MobileVendasController extends VendasController
             }else{
                 $query->groupStart()->where('o.corretor_pessoa_id',$a['scope'])
                     ->orWhere('o.segundo_corretor_pessoa_id',$a['scope'])
-                    ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd()
-                    ->where('o.visita_id IS NOT NULL',null,false);
+                    ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd();
             }
         }
         if($planParam!=='')$query->where('pv.plano_id',(int)$planParam);
@@ -218,7 +224,9 @@ final class MobileVendasController extends VendasController
         }
         return $this->response->setJSON([
             'operacao'=>[
-                'id'=>(int)$op['id'],'visita_id'=>(int)$op['visita_id'],
+                'id'=>(int)$op['id'],'visita_id'=>$op['visita_id']===null?null:(int)$op['visita_id'],
+                'movimento_titulo'=>$db->table('titulo_vinculos')
+                    ->select('tipo')->where('operacao_nova_id',(int)$id)->get()->getRow('tipo'),
                 'situacao'=>$op['situacao'],'numero_titulo'=>$op['numero_titulo'],
                 'sigla_plano'=>$op['sigla_plano'],'valor_cobrado'=>$op['valor_cobrado'],
                 'data_negociacao'=>$op['data_negociacao'],
