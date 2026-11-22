@@ -32,9 +32,16 @@ final class MobileVisitasController extends BaseController
             ->setHeader('Cache-Control', 'no-store');
     }
 
+    private function historicalUser()
+    {
+        // Sessão web na rota retroativa; Bearer Shield nas rotas do aplicativo.
+        return str_contains((string)$this->request->getUri()->getPath(),'/api/mobile/')
+            ?auth('tokens')->user():auth('session')->user();
+    }
+
     private function access(): ?ResponseInterface
     {
-        $user = auth('tokens')->user();
+        $user = $this->historicalUser();
         if ($user === null || $user->isBanned()) {
             return $this->error(401, 'Sua sessão expirou. Entre novamente.');
         }
@@ -491,8 +498,9 @@ final class MobileVisitasController extends BaseController
     public function historico(): ResponseInterface
     {
         if($denied=$this->access())return $denied;
-        $user=auth('tokens')->user();
-        if(!$user->inGroup('admin','gerente'))
+        $user=$this->historicalUser();
+        if(!$user->inGroup('admin','gerente')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user))
             return $this->error(403,'Registro retroativo permitido somente para gestor ou administrador.');
         $data=$this->request->getJSON(true);
         if(!is_array($data))return $this->error(422,'Informe os dados da visita anterior.');
@@ -500,8 +508,8 @@ final class MobileVisitasController extends BaseController
         if(!$this->dateValid($day)||$day>=substr($this->now(),0,10))
             return $this->error(422,'Selecione uma data anterior a hoje.');
         $status=(string)($data['status']??'');
-        if(!in_array($status,['VENDA','PENDENCIA'],true))
-            return $this->error(422,'Informe Venda ou Pendência como resultado.');
+        if(!in_array($status,self::RESULTS,true))
+            return $this->error(422,'Selecione o resultado do atendimento anterior.');
         $times=[];
         foreach(['chegada','inicio','fim'] as $field){
             $time=(string)($data[$field.'_hora']??'');
@@ -517,11 +525,21 @@ final class MobileVisitasController extends BaseController
             return $this->error(422,'Selecione cliente e atendente responsável.');
         $note=trim((string)($data['observacoes']??''));
         if(mb_strlen($note)>3000)return $this->error(422,'Observações com mais de 3000 caracteres.');
+        $returnDay=$data['retorno_previsto']??null;
+        if($returnDay==='' || $status!=='RETORNO')$returnDay=null;
+        if($status==='RETORNO' && (!is_string($returnDay)
+            || !$this->dateValid($returnDay) || $returnDay<$day))
+            return $this->error(422,'Informe a data prevista do retorno.');
+        $reason=$status==='SEM_VENDA'?$this->validId($data['motivo_nao_venda_id']??null):null;
+        if($status==='SEM_VENDA' && !$reason)
+            return $this->error(422,'Selecione o motivo de não venda.');
         $db=db_connect();
         $broker=$this->brokers($db,$data,$user);
         if(isset($broker['error']))return $this->error(422,$broker['error']);
         if(!$this->personWithRole($db,$attendant,['corretor','vendedor']))
             return $this->error(422,'Selecione um atendente ativo.');
+        if($reason!==null && !$db->table('motivos_nao_venda')->where('id',$reason)->where('ativo',1)->countAllResults())
+            return $this->error(422,'Motivo de não venda inválido.');
         $client=$db->table('clientes')->select('id,dono_corrente_pessoa_id,ativo')
             ->where('id',$clientId)->get()->getRowArray();
         if(!$client||!(bool)$client['ativo'])
@@ -550,7 +568,7 @@ final class MobileVisitasController extends BaseController
                 'atendente_pessoa_id'=>$attendant,'atendente_adicional_pessoa_id'=>null,
                 'status'=>$status,'chegada_em'=>$times['chegada'],
                 'inicio_em'=>$times['inicio'],'fim_em'=>$times['fim'],
-                'retorno_previsto'=>null,'motivo_nao_venda_id'=>null,
+                'retorno_previsto'=>$returnDay,'motivo_nao_venda_id'=>$reason,
                 'observacoes'=>$note?:null,'criado_por_usuario_id'=>(int)$user->id,
                 'atualizado_em'=>$now,
             ]);
@@ -562,7 +580,7 @@ final class MobileVisitasController extends BaseController
             ]);
             $db->table('visita_resultados_historico')->insert([
                 'visita_id'=>$id,'resultado'=>$status,
-                'motivo_nao_venda_id'=>null,'retorno_previsto'=>null,
+                'motivo_nao_venda_id'=>$reason,'retorno_previsto'=>$returnDay,
                 'observacoes'=>$note?:null,'criado_em'=>$times['fim'],
                 'usuario_id'=>(int)$user->id,
             ]);
