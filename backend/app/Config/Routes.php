@@ -156,6 +156,7 @@ $routes->group('api', static function ($routes): void {
     // administrativas de recebimento, estorno ou rateio.
     $routes->get('gestor/vendas', 'Api\\GestorVendasController::index');
     $routes->get('gestor/vendas/opcoes', 'Api\\GestorVendasController::opcoes');
+    $routes->get('gestor/vendas/(:num)', 'Api\GestorVendasController::detalhe/$1');
     $routes->post('gestor/vendas', 'Api\\GestorVendasController::create', ['filter'=>'csrf']);
 
     // Consulta individual exclusivamente pela pessoa vinculada ao login Shield.
