@@ -285,9 +285,11 @@ final class MobileVendasController extends VendasController
             ],
             'movimentos'=>array_map(static function(array $r):array{return [
                 'id'=>(int)$r['id'],'tipo'=>$r['tipo'],'valor'=>$r['valor'],
+                'forma_id'=>(int)$r['forma_id'],'detentor'=>$r['detentor'],
+                'referencia_entrada_id'=>$r['referencia_entrada_id']===null?null:(int)$r['referencia_entrada_id'],
                 'data_movimento'=>$r['data_movimento'],'forma_nome'=>$r['forma_nome'],
             ];},$db->table('venda_recebimentos r')
-                ->select('r.id,r.tipo,r.valor,r.data_movimento,f.nome AS forma_nome')
+                ->select('r.id,r.tipo,r.valor,r.forma_id,r.detentor,r.referencia_entrada_id,r.data_movimento,f.nome AS forma_nome')
                 ->join('venda_formas_pagamento f','f.id=r.forma_id')
                 ->where('r.operacao_id',(int)$id)->orderBy('r.id','ASC')->get()->getResultArray()),
             'editavel'=>$editable,
@@ -317,6 +319,16 @@ final class MobileVendasController extends VendasController
      * Conversao auditada da mesma operacao: nao duplica venda nem recebimentos.
      * O guard() da classe base continua usando a autenticacao token-mobile.
      */
+    public function corrigirRecebimento(int|string $id): ResponseInterface
+    {
+        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
+        $op=$this->ownedOperation((int)$id,$a);
+        if($op instanceof ResponseInterface)return $op;
+        if(!in_array($op['situacao'],['VENDA','PENDENCIA'],true))
+            return $this->errorResponse(409,'Operação não permite correção financeira.');
+        return parent::corrigirRecebimento($id);
+    }
+
     public function converter(int|string $id): ResponseInterface
     {
         $a=$this->actor();if($a instanceof ResponseInterface)return $a;
