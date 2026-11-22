@@ -61,10 +61,12 @@ final class MobileVisitasController extends BaseController
     {
         if($user->inGroup('admin','operador'))return true;
         if($user->inGroup('gerente')){
-            $ids=\App\Libraries\GestaoEquipe::ids(db_connect(),$user);
+            $db=db_connect();
+            $ids=\App\Libraries\GestaoEquipe::ids($db,$user);
+            $users=\App\Libraries\GestaoEquipe::usuarios($db,$user);
             return in_array((int)($visit['corretor_pessoa_id']??0),$ids,true)
                 || in_array((int)($visit['segundo_corretor_pessoa_id']??0),$ids,true)
-                || (int)($visit['criado_por_usuario_id']??0)===(int)$user->id;
+                || in_array((int)($visit['criado_por_usuario_id']??0),$users,true);
         }
         $scope=$this->scope($user);
         return $scope!==null && $scope>0 && (
@@ -316,6 +318,7 @@ final class MobileVisitasController extends BaseController
         $manager=$user->inGroup('gerente');
         $operator=$user->inGroup('operador') && !$admin && !$manager;
         $team=$manager&&!$admin?\App\Libraries\GestaoEquipe::ids($db,$user):null;
+        $teamUsers=$team!==null?\App\Libraries\GestaoEquipe::usuarios($db,$user):null;
         $personId=null;
         if($manager&&!$admin){
             $person=$db->table('pessoas')->select('id')
@@ -341,7 +344,7 @@ final class MobileVisitasController extends BaseController
         if($team!==null){
             $query->groupStart()->whereIn('v.corretor_pessoa_id',$team)
                 ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
-                ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
+                ->orWhereIn('v.criado_por_usuario_id',$teamUsers)->groupEnd();
         }
         $rows=$query->orderBy('v.id','DESC')->limit(151)->get()->getResultArray();
         $limited=count($rows)>150;
@@ -358,6 +361,7 @@ final class MobileVisitasController extends BaseController
                 )) ||
                 in_array((int)($r['corretor_pessoa_id']??0),$team??[],true) ||
                 in_array((int)($r['segundo_corretor_pessoa_id']??0),$team??[],true)
+                || in_array((int)($r['operacao_criado_por']??0),$teamUsers??[],true)
             ) || (!$manager && $scope!==0));
             $items[]=[
                 'id'=>(int)$r['id'],'cliente_nome'=>$r['cliente_nome'],
@@ -382,7 +386,9 @@ final class MobileVisitasController extends BaseController
                 ->where('o.situacao','PENDENCIA')->where('o.visita_id',null);
             if(!$admin){
                 $standalone->groupStart()->where('o.gerente_pessoa_id',$personId)
-                    ->orWhere('o.criado_por_usuario_id',(int)$user->id)->groupEnd();
+                    ->orWhereIn('o.criado_por_usuario_id',$teamUsers)
+                    ->orWhereIn('o.corretor_pessoa_id',$team)
+                    ->orWhereIn('o.segundo_corretor_pessoa_id',$team)->groupEnd();
             }
             $otherRows=$standalone->orderBy('o.id','DESC')->limit(151)->get()->getResultArray();
             if(count($otherRows)>150)$limited=true;
