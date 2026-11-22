@@ -13,7 +13,8 @@ import {useAuth} from '../src/AuthContext';
 import {colors} from '../src/theme';
 
 type Sale={id:number;visita_id:number|null;situacao:string;numero_titulo:string;plano_versao_id:number;
-  sigla_plano:string;data_venda:string;valor_cobrado:string;cliente_nome:string};
+  sigla_plano:string;data_venda:string;valor_cobrado:string;cliente_nome:string;
+  movimento_titulo?:'RENOVACAO'|'UPGRADE'|null};
 type Plan={id:number;codigo:string;duracao_meses:number};
 type SaleList={vendas:Sale[];planos:Plan[];limitado:boolean};
 const dateISO=(input:string):string|null=>{const m=input.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!m)return null;const d=new Date(Date.UTC(+m[3],+m[2]-1,+m[1]));return d.getUTCDate()===+m[1]&&d.getUTCMonth()+1===+m[2]&&d.getUTCFullYear()===+m[3]?m[3]+'-'+m[2]+'-'+m[1]:null;};
