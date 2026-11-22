@@ -240,11 +240,7 @@ final class MobileVisitasController extends BaseController
         $builder = $db->table('clientes c')
             ->select('c.id,c.nome,c.telefone')->where('c.ativo', 1);
         $scope = $this->scope(auth('tokens')->user());
-        if ($scope !== null) $builder->where('c.dono_corrente_pessoa_id', $scope);
-        $actor=auth('tokens')->user();
-        if($actor->inGroup('gerente')&&!$actor->inGroup('admin'))
-            $builder->whereIn('c.dono_corrente_pessoa_id',
-                \App\Libraries\GestaoEquipe::ids($db,$actor));
+        \App\Libraries\GestaoEquipe::filtrarClientes($db,auth('tokens')->user(),$builder);
         $digits = preg_replace('/\D/', '', $query);
         $builder->groupStart()->like('c.nome', $query);
         if (strlen($digits) >= 3) $builder->orLike('c.telefone', $digits);
@@ -275,8 +271,7 @@ final class MobileVisitasController extends BaseController
         $team=$user->inGroup('gerente')&&!$user->inGroup('admin')
             ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
         if (! $client || ! (bool) $client['ativo']
-            || ($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope)
-            || ($team!==null&&!in_array((int)$client['dono_corrente_pessoa_id'],$team,true))) {
+            || !\App\Libraries\GestaoEquipe::podeVerCliente($db,$user,$clientId)) {
             return $this->error(404, 'Cliente não encontrado.');
         }
 
@@ -523,7 +518,7 @@ final class MobileVisitasController extends BaseController
             return $this->error(404,'Cliente ativo não encontrado.');
         if($user->inGroup('gerente')&&!$user->inGroup('admin')){
             $ids=\App\Libraries\GestaoEquipe::ids($db,$user);
-            if(!in_array((int)$client['dono_corrente_pessoa_id'],$ids,true)
+            if(!\App\Libraries\GestaoEquipe::podeVerCliente($db,$user,$clientId)
                 || (!in_array($broker['corretor_pessoa_id'],$ids,true)
                     && !in_array((int)($broker['segundo_corretor_pessoa_id']??0),$ids,true)))
                 return $this->error(403,'Cliente ou corretores fora da equipe do gestor.');
@@ -584,6 +579,12 @@ final class MobileVisitasController extends BaseController
             || ($clientId !== null && array_key_exists('novo_cliente', $input))) {
             return $this->error(422, 'Escolha um cliente existente ou preencha os dados do novo cliente.');
         }
+        $nowRecorded=$this->now();
+        $arrivalDay=(string)($input['data_visita']??substr($nowRecorded,0,10));
+        if(!$this->dateValid($arrivalDay)||$arrivalDay>substr($nowRecorded,0,10))
+            return $this->error(422,'A data da chegada deve ser hoje ou um dia anterior.');
+        if($arrivalDay<substr($nowRecorded,0,10) && !$user->inGroup('admin','gerente'))
+            return $this->error(403,'Registrar chegada anterior exige permissão de gestor.');
         $db = db_connect();
         $brokers = $this->brokers($db, $input, $user);
         if (isset($brokers['error'])) return $this->error(422, $brokers['error']);
@@ -644,8 +645,7 @@ final class MobileVisitasController extends BaseController
                     $db->transRollback();
                     return $this->error(422, 'O cliente deve estar ativo.');
                 }
-                if (($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope)
-                    || ($team!==null&&!in_array((int)$client['dono_corrente_pessoa_id'],$team,true))) {
+                if (!\App\Libraries\GestaoEquipe::podeVerCliente($db,$user,(int)$clientId)) {
                     $db->transRollback();
                     return $this->error(403, 'Cliente fora da sua corrente.');
                 }
@@ -656,10 +656,12 @@ final class MobileVisitasController extends BaseController
                 $db->transRollback();
                 return $this->error(409, 'O cliente já está em atendimento.');
             }
-            $now = $this->now();
+            // Data declarada pelo gestor; o momento da inclusao continua auditado.
+            // Sem campo de horario historico, usa-se a hora do registro atual.
+            $now = $arrivalDay.' '.substr($nowRecorded,11);
             $sameDay = $db->table('visitas')->where('cliente_id', $clientId)
-                ->where('chegada_em >=', substr($now, 0, 10) . ' 00:00:00')
-                ->where('chegada_em <=', substr($now, 0, 10) . ' 23:59:59')
+                ->where('chegada_em >=', $arrivalDay . ' 00:00:00')
+                ->where('chegada_em <=', $arrivalDay . ' 23:59:59')
                 ->orderBy('id', 'DESC')->get(1)->getRowArray();
             if ($sameDay && in_array($sameDay['status'], ['SEM_VENDA', 'RETORNO', 'PENDENCIA'], true)) {
                 $db->transRollback();
@@ -679,6 +681,7 @@ final class MobileVisitasController extends BaseController
                 'status' => 'AGUARDANDO',
                 'chegada_em' => $now,
                 'criado_por_usuario_id' => (int) $user->id,
+                'atualizado_em'=>$nowRecorded,
             ]);
             $visitId = (int) $db->insertID();
             if ($visitId < 1) throw new \RuntimeException('Falha na inclusão da visita.');
@@ -686,7 +689,9 @@ final class MobileVisitasController extends BaseController
             if ($db->transStatus() === false) throw new \RuntimeException('Falha ao registrar visita.');
             $db->transCommit();
             $this->notice($visitId, 'CHEGADA');
-            return $this->ok('Chegada registrada. Horário marcado automaticamente.',
+            return $this->ok($arrivalDay===substr($nowRecorded,0,10)
+                ?'Chegada registrada. Horário marcado automaticamente.'
+                :'Chegada anterior registrada na data escolhida. Horário da inclusão usado como referência.',
                 ['visita_id' => $visitId, 'cliente_id' => $clientId, 'cliente_cadastrado' => is_array($newClient)], 201);
         } catch (Throwable $e) {
             return $this->fail($e, 'chegada', $db);
