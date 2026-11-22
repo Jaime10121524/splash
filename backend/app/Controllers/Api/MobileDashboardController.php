@@ -19,7 +19,8 @@ final class MobileDashboardController extends BaseController
         $user=auth('tokens')->user();
         if(!$user||$user->isBanned())
             return $this->response->setStatusCode(401)->setJSON(['message'=>'Sessão expirada.']);
-        if(!$user->inGroup('admin','gerente','operador','corretor'))
+        if(!$user->inGroup('admin','gerente','operador','corretor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user))
             return $this->response->setStatusCode(403)->setJSON(['message'=>'Sem acesso aos indicadores comerciais.']);
 
         $range=(string)($this->request->getGet('dias')??'7');
