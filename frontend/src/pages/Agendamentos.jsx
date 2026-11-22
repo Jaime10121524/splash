@@ -297,7 +297,7 @@ export default function Agendamentos({navigate=()=>{}}) {
         </div>
         <label>Corretor que captou *<SearchSelectInput ariaLabel="Corretor que captou"
           placeholder="Buscar corretor pelo nome" value={form.captador_pessoa_id}
-          onChange={v=>set('captador_pessoa_id',String(v))} options={brokers}/></label>
+          onChange={v=>set('captador_pessoa_id',String(v))} options={agendaBrokers}/></label>
         <label>Observações (opcional)<textarea maxLength={500} value={form.observacoes} onChange={e=>set('observacoes',e.target.value)} /></label>
         <div className="agenda-form-actions"><button type="button" onClick={()=>setModal(null)}>Cancelar</button>
           <button className="agenda-primary" disabled={busy}>{busy?'Salvando...':'Salvar e gerar convite'}</button></div>
