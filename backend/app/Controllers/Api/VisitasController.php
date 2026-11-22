@@ -33,12 +33,23 @@ class VisitasController extends CommercialBaseController
         }
         $db=db_connect();
         $scope=$this->visitorScopeId();
-        $userId=(int)auth('session')->user()->id;
-        $build=static function() use($db,$dayStart,$dayEnd,$filterStatus,$scope,$userId) {
+        $actor=auth('session')->user();
+        $userId=(int)$actor->id;
+        $manager=!$actor->inGroup('admin','operador')
+            && \App\Libraries\GestaoEquipe::ehGestor($db,$actor);
+        $team=$manager?\App\Libraries\GestaoEquipe::ids($db,$actor):null;
+        $teamUsers=$manager?\App\Libraries\GestaoEquipe::usuarios($db,$actor):null;
+        $build=static function() use($db,$dayStart,$dayEnd,$filterStatus,$scope,$userId,$team,$teamUsers) {
             $builder=$db->table('visitas v');
-            if($scope!==null)$builder->groupStart()->where('v.corretor_pessoa_id',$scope)
-                ->orWhere('v.segundo_corretor_pessoa_id',$scope)
-                ->orWhere('v.criado_por_usuario_id',$userId)->groupEnd();
+            if($team!==null){
+                $builder->groupStart()->whereIn('v.corretor_pessoa_id',$team)
+                    ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
+                    ->orWhereIn('v.criado_por_usuario_id',$teamUsers)->groupEnd();
+            }elseif($scope!==null){
+                $builder->groupStart()->where('v.corretor_pessoa_id',$scope)
+                    ->orWhere('v.segundo_corretor_pessoa_id',$scope)
+                    ->orWhere('v.criado_por_usuario_id',$userId)->groupEnd();
+            }
             if($dayStart) $builder->where('v.chegada_em >=',$dayStart.' 00:00:00');
             if($dayEnd) $builder->where('v.chegada_em <=',$dayEnd.' 23:59:59');
             if($filterStatus!=='')$builder->where('v.status',$filterStatus);
