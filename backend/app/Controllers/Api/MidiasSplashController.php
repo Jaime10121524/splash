@@ -46,8 +46,7 @@ final class MidiasSplashController extends BaseController
             if(!$person)return $this->fail(403,'Conta sem pessoa ativa vinculada.');
             $pid=(int)$person['id'];
             if($a['user']->inGroup('gerente')){
-                $allowed=(int)($op['gerente_pessoa_id']??0)===$pid
-                    ||(int)($op['criado_por_usuario_id']??0)===(int)$a['user']->id;
+                $allowed=\App\Libraries\GestaoEquipe::podeGerirOperacao($db,$a['user'],$op);
             }else{
                 $allowed=in_array($pid,[(int)$op['corretor_pessoa_id'],
                     (int)($op['segundo_corretor_pessoa_id']??0)],true);
