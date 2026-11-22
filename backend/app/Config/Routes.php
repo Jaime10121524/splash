@@ -59,6 +59,7 @@ $routes->group('api', static function ($routes): void {
             $routes->post('clientes/(:num)/editar', 'Api\MobileClientesController::update/$1');
             $routes->get('cliente-visita-retomavel', 'Api\MobileVisitasController::resumableClientVisit');
             $routes->post('atendimentos/chegada', 'Api\MobileVisitasController::arrival');
+            $routes->post('atendimentos/retroativo', 'Api\MobileVisitasController::historico');
             $routes->get('atendimentos/(:num)', 'Api\MobileVisitasController::show/$1');
             $routes->post('atendimentos/(:num)/iniciar', 'Api\MobileVisitasController::start/$1');
             $routes->post('atendimentos/(:num)/finalizar', 'Api\MobileVisitasController::finish/$1');
