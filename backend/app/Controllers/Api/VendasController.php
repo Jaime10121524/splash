@@ -731,6 +731,14 @@ class VendasController extends CommercialBaseController
             if(!in_array($holder,['CORRETOR','EMPRESA'],true)){
                 $db->transRollback();return $this->errorResponse(422,'Selecione se o valor ficou com o clube ou corretor.');
             }
+            if($op['situacao']==='PENDENCIA' && $db->tableExists('pendencia_adiantamentos')){
+                $custodia=$this->saldosCustodia($db,(int)$id);
+                $custodia[(string)$original['detentor']]-=$oldValue;
+                $custodia[$holder]+=$amount;
+                if($custodia['CORRETOR']<0||$custodia['EMPRESA']<0){
+                    $db->transRollback();return $this->errorResponse(409,'Há adiantamentos usando este dinheiro. Estorne os adiantamentos antes de mudar o recebimento.');
+                }
+            }
             $now=$this->nowLocal();
             if($audit){
                 $oldRates=$db->table('comissao_rateios')->where('operacao_id',(int)$id)->get()->getResultArray();
@@ -766,6 +774,135 @@ class VendasController extends CommercialBaseController
         }catch(Throwable $e){
             $db->transRollback();return $this->unexpected($e,'correção de recebimento');
         }
+    }
+
+    /** Saldo por detentor, considerando recebimentos e adiantamentos registrados. */
+    private function saldosCustodia($db,int $id): array
+    {
+        $saldos=['CORRETOR'=>0,'EMPRESA'=>0];
+        foreach($db->table('venda_recebimentos')->select('tipo,detentor,valor')
+            ->where('operacao_id',$id)->get()->getResultArray() as $r){
+            $source=(string)$r['detentor'];
+            if(!array_key_exists($source,$saldos))continue;
+            $value=VendaMoney::cents((string)$r['valor'],true)??0;
+            $saldos[$source]+=($r['tipo']==='ENTRADA'?1:-1)*$value;
+        }
+        if($db->tableExists('pendencia_adiantamentos')){
+            foreach($db->table('pendencia_adiantamentos')->select('tipo,origem,valor')
+                ->where('operacao_id',$id)->get()->getResultArray() as $r){
+                $source=(string)$r['origem'];
+                if(!array_key_exists($source,$saldos))continue;
+                $value=VendaMoney::cents((string)$r['valor'],true)??0;
+                $saldos[$source]+=($r['tipo']==='ESTORNO'?1:-1)*$value;
+            }
+        }
+        return $saldos;
+    }
+
+    public function custodiaPendencia(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $db=db_connect();
+        if(!$db->tableExists('pendencia_adiantamentos'))
+            return $this->errorResponse(503,'Execute as migrations de custódia das pendências.');
+        $op=$db->table('venda_operacoes')->where('id',(int)$id)->get()->getRowArray();
+        if(!$op)return $this->errorResponse(404,'Negociação não encontrada.');
+        $moves=$db->table('pendencia_adiantamentos a')
+            ->select('a.*,p.nome AS beneficiario_nome')
+            ->join('pessoas p','p.id=a.beneficiario_pessoa_id')
+            ->where('a.operacao_id',(int)$id)->orderBy('a.id','DESC')->get()->getResultArray();
+        $sal=$this->saldosCustodia($db,(int)$id);
+        return $this->response->setJSON([
+            'operacao_id'=>(int)$id,'situacao'=>$op['situacao'],
+            'saldos'=>['CORRETOR'=>VendaMoney::decimal($sal['CORRETOR']),
+                'EMPRESA'=>VendaMoney::decimal($sal['EMPRESA'])],
+            'movimentos'=>$moves,
+            'aviso'=>'Adiantamentos movimentam custódia, não quitam comissões. Conciliar manualmente ao fechar a venda.',
+        ])->setHeader('Cache-Control','no-store');
+    }
+
+    public function registrarAdiantamento(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $person=$this->optionalId($data['beneficiario_pessoa_id']??null);
+        $value=VendaMoney::cents($data['valor']??null);
+        $origem=(string)($data['origem']??'');
+        $day=(string)($data['data_movimento']??'');
+        $reason=$this->cleanText($data['observacoes']??null,500,true);
+        if(!$person||$value===null||!in_array($origem,['CORRETOR','EMPRESA'],true)
+            ||!$this->validateDate($day,false)||$reason===false)
+            return $this->errorResponse(422,'Informe origem do valor, vendedor/gestor, valor, data e justificativa.');
+        $db=db_connect();$db->transBegin();
+        try{
+            if(!$db->tableExists('pendencia_adiantamentos')){
+                $db->transRollback();return $this->errorResponse(503,'Execute as migrations de custódia.');
+            }
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op||$op['situacao']!=='PENDENCIA'){
+                $db->transRollback();return $this->errorResponse(409,'Adiantamentos devem ser registrados enquanto a negociação está pendente.');
+            }
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
+            if($day<$op['data_negociacao']){
+                $db->transRollback();return $this->errorResponse(422,'Data anterior à negociação.');
+            }
+            $valid=$db->table('pessoas p')->join('pessoa_papeis r','r.pessoa_id=p.id')
+                ->where('p.id',$person)->where('p.ativo',1)
+                ->whereIn('r.papel',['vendedor','gerente'])->countAllResults()>0;
+            if(!$valid){
+                $db->transRollback();return $this->errorResponse(422,'Destinatário precisa ser vendedor ou gestor ativo.');
+            }
+            $sal=$this->saldosCustodia($db,(int)$id);
+            if($value>$sal[$origem]){
+                $db->transRollback();return $this->errorResponse(422,'Adiantamento supera o saldo que está com o clube ou corretor.');
+            }
+            $db->table('pendencia_adiantamentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'SAIDA','referencia_adiantamento_id'=>null,
+                'origem'=>$origem,'beneficiario_pessoa_id'=>$person,
+                'valor'=>VendaMoney::decimal($value),'data_movimento'=>$day,
+                'observacoes'=>$reason,'usuario_id'=>$this->saleActorId(),
+                'criado_em'=>$this->nowLocal(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Adiantamento registrado sem antecipar comissão de venda.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'adiantamento da pendência');}
+    }
+
+    public function estornarAdiantamento(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $originalId=$this->optionalId($data['adiantamento_id']??null);
+        $reason=$this->cleanText($data['justificativa']??null,500,true);
+        if(!$originalId||$reason===false||mb_strlen($reason)<5)
+            return $this->errorResponse(422,'Selecione o adiantamento e justifique o estorno.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op||$op['situacao']!=='PENDENCIA'){
+                $db->transRollback();return $this->errorResponse(409,'Adiantamento só pode ser estornado antes da conversão da negociação.');
+            }
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
+            $old=$db->table('pendencia_adiantamentos')->where('id',$originalId)
+                ->where('operacao_id',(int)$id)->where('tipo','SAIDA')->get()->getRowArray();
+            if(!$old||$db->table('pendencia_adiantamentos')->where('referencia_adiantamento_id',$originalId)->countAllResults()>0){
+                $db->transRollback();return $this->errorResponse(409,'Adiantamento inexistente ou já estornado.');
+            }
+            $db->table('pendencia_adiantamentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'ESTORNO',
+                'referencia_adiantamento_id'=>$originalId,
+                'origem'=>$old['origem'],'beneficiario_pessoa_id'=>$old['beneficiario_pessoa_id'],
+                'valor'=>$old['valor'],'data_movimento'=>substr($this->nowLocal(),0,10),
+                'observacoes'=>$reason,'usuario_id'=>$this->saleActorId(),
+                'criado_em'=>$this->nowLocal(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Adiantamento estornado com histórico preservado.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'estorno de adiantamento');}
     }
 
     public function devolver(int|string $id): ResponseInterface
