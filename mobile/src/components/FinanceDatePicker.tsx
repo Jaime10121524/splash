@@ -34,7 +34,7 @@ export default function FinanceDatePicker({open,value,onClose,onChange,title='Es
       <View style={[s.panel,{backgroundColor:palette.surface,borderColor:palette.line}]}>
         <View style={s.heading}>
           <View style={{flex:1}}>
-            <Text style={[s.eyebrow,{color:palette.brandDark}]}>DATA DO LANÇAMENTO</Text>
+            <Text style={[s.eyebrow,{color:palette.brandDark}]}>CALENDÁRIO</Text>
             <Text style={[s.title,{color:palette.ink}]}>{title}</Text>
           </View>
           <Pressable onPress={onClose} style={[s.close,{backgroundColor:palette.pale}]}>
