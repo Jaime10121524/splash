@@ -20,7 +20,8 @@ final class MobileVendasController extends VendasController
         $u=auth('tokens')->user();
         if (!$u || $u->isBanned()) return $this->errorResponse(401,'Sua sessão expirou.');
         // Operador e vendedor não podem consultar pagamentos ou valores de vendas.
-        if (!$u->inGroup('admin','gerente','corretor'))
+        if (!$u->inGroup('admin','gerente','corretor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$u))
             return $this->errorResponse(403,'Seu perfil não pode consultar ou registrar vendas comerciais.');
         $admin=$u->inGroup('admin');
         $manager=!$admin && \App\Libraries\GestaoEquipe::ehGestor(db_connect(),$u);
