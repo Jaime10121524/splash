@@ -153,19 +153,39 @@ function HomeOperacional(){
   const {palette,isDark}=useTheme();const {user,token}=useAuth();
   const [days,setDays]=useState<Range>(7);
   const [data,setData]=useState<Data|null>(null);
+  const [ownCommission,setOwnCommission]=useState<{
+    total:string;a_receber:string;recebidas:string;participacoes:number;
+  }|null>(null);
   const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false);
   const [error,setError]=useState(''),[forbidden,setForbidden]=useState(false);
   const {uri:photoUri,reload:reloadPhoto}=useProtectedPhoto('mobile/me/foto',token);
   const load=useCallback(async()=>{
     if(!token)return;
     try{
-      const result=await apiRequest<Data>('mobile/dashboard?dias='+days,{token});
-      setData(result);setError('');setForbidden(false);
+      const ending=new Date();
+      const starting=new Date(ending);starting.setDate(ending.getDate()-days+1);
+      const dateValue=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),
+        String(d.getDate()).padStart(2,'0')].join('-');
+      const period=new URLSearchParams({inicio:dateValue(starting),fim:dateValue(ending)});
+      const results=await Promise.all([
+        apiRequest<Data>('mobile/dashboard?dias='+days,{token}),
+        user?.role==='operador'?Promise.resolve(null):
+          apiRequest<{
+            minha_pessoa_id:number|null;
+            contas:{pessoa_id:number;total:string;a_receber:string;recebidas:string;participacoes:number}[];
+          }>('mobile/financeiro?'+period.toString(),{token}),
+      ]);
+      const result=results[0],fin=results[1];
+      setData(result);
+      setOwnCommission(fin?.contas.find(x=>x.pessoa_id===fin.minha_pessoa_id)||{
+        total:'0.00',a_receber:'0.00',recebidas:'0.00',participacoes:0,
+      });
+      setError('');setForbidden(false);
     }catch(e){
       if(e instanceof ApiError&&e.status===403)setForbidden(true);
       else setError(e instanceof Error?e.message:'Não foi possível carregar indicadores.');
     }finally{setLoading(false);setRefreshing(false);}
-  },[token,days]);
+  },[token,days,user?.role]);
   useFocusEffect(useCallback(()=>{
     void load();void reloadPhoto();
   },[load,reloadPhoto]));
@@ -248,16 +268,19 @@ function HomeOperacional(){
            <MiniKpi title="Vendas fechadas" value={String(data.visitas.venda)}
              description="Resultados nas visitas" icon="🤝" tint="#8972FF"
              onPress={()=>go('/(tabs)/atendimentos')}/>
-           {user?.role!=='operador'&&<MiniKpi title="Títulos cadastrados" value={String(data.vendas.total)}
-             description="Vendas lançadas" icon="🏆" tint="#E7A348"
+           {user?.role!=='operador'&&<MiniKpi title="Minha comissão" value={ownCommission?money(ownCommission.total):'—'}
+             description="Direitos apurados no período" icon="💰" tint="#E7A348"
              onPress={()=>go('/vendas')}/>}
            <MiniKpi title="Conversão" value={conversion.toFixed(1).replace('.',',')+'%'}
              description={count+' atendimentos concluídos'} icon="📈" tint="#45BE92"
              onPress={()=>go('/(tabs)/atendimentos')}/>
          </View>
-         {data.vendas.valor!==null&&<View style={s.revenue}>
-           <View><Text style={s.revenueLabel}>VALOR DAS VENDAS DO PERÍODO</Text>
-             <Text style={s.revenueValue}>{money(data.vendas.valor)}</Text></View>
+         {user?.role!=='operador'&&ownCommission&&<View style={s.revenue}>
+           <View><Text style={s.revenueLabel}>MINHA COMISSÃO TOTAL NO PERÍODO</Text>
+             <Text style={s.revenueValue}>{money(ownCommission.total)}</Text>
+             <Text style={{color:'#E5DAFF',fontSize:12,marginTop:7}}>
+               A receber {money(ownCommission.a_receber)} · Recebida {money(ownCommission.recebidas)}
+             </Text></View>
            <Text style={s.revenueIcon}>💎</Text>
          </View>}
          {user?.role!=='operador'&&<View style={s.chartCard}>
