@@ -10,8 +10,8 @@ const iso=(y:number,m:number,d:number)=>y+'-'+pad(m+1)+'-'+pad(d);
 const today=()=>{const d=new Date();return iso(d.getFullYear(),d.getMonth(),d.getDate());};
 const monthFrom=(v:string)=>/^\d{4}-\d{2}/.test(v)?v.slice(0,7):today().slice(0,7);
 
-export default function FinanceDatePicker({open,value,onClose,onChange}:{
-  open:boolean;value:string;onClose:()=>void;onChange:(isoDate:string)=>void;
+export default function FinanceDatePicker({open,value,onClose,onChange,title='Escolha a data'}:{
+  open:boolean;value:string;onClose:()=>void;onChange:(isoDate:string)=>void;title?:string;
 }){
   const {palette}=useTheme();
   const [shown,setShown]=useState(monthFrom(value));
@@ -35,7 +35,7 @@ export default function FinanceDatePicker({open,value,onClose,onChange}:{
         <View style={s.heading}>
           <View style={{flex:1}}>
             <Text style={[s.eyebrow,{color:palette.brandDark}]}>DATA DO LANÇAMENTO</Text>
-            <Text style={[s.title,{color:palette.ink}]}>Escolha o dia</Text>
+            <Text style={[s.title,{color:palette.ink}]}>{title}</Text>
           </View>
           <Pressable onPress={onClose} style={[s.close,{backgroundColor:palette.pale}]}>
             <Text style={{color:palette.ink,fontSize:19}}>✕</Text>
