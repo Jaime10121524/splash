@@ -122,6 +122,11 @@ export default function PendingDetail(){
           Retorno previsto: {displayDate(detail.operacao.retorno_previsto)}
         </Text>}
         {!!detail.operacao.observacoes&&<Text style={s.note}>{detail.operacao.observacoes}</Text>}
+        <Pressable style={s.secondary} onPress={()=>router.push({
+          pathname:'/pendencia/adiantamentos/[id]',params:{id:String(id)}} as never)}>
+          <SymbolView name={{ios:'arrow.left.arrow.right',android:'swap_horiz'}} size={19} tintColor={palette.brandDark}/>
+          <Text style={s.secondaryText}>Custódia e adiantamentos do vendedor / gestor</Text>
+        </Pressable>
         {(detail.movimentos||[]).length>0&&<View style={s.card}>
           <Text style={s.sectionTitle}>Histórico de recebimentos</Text>
           {detail.movimentos?.map(r=><View key={r.id} style={s.receipt}>
