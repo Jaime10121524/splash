@@ -131,6 +131,9 @@ function VendasOperacionais(){
             {v.corretor_nome||'Corretor não informado'}
             {v.segundo_corretor_nome?' + '+v.segundo_corretor_nome:''}
           </Text>
+          {v.responsavel_financeiro_nome&&<Text style={s.brokers} numberOfLines={2}>
+            Repasse e cobrança: {v.responsavel_financeiro_nome}
+          </Text>}
           <Text style={s.client}>{v.cliente_nome}</Text>
           <View style={s.row}><Text style={s.price}>{money(v.valor_cobrado)}</Text>
             <Text style={s.date}>{v.data_venda}</Text></View>
