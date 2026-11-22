@@ -130,7 +130,8 @@ export default function NewVisitScreen() {
     if(!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)||visitDate>todayLocal()){
       setError('Escolha hoje ou uma data anterior para a chegada.');return;
     }
-    const owner = options?.corretores.find(p=>p.id===main)?.dono_corrente_padrao_pessoa_id??main;
+    const owner = options?.pode_escolher_dono_corrente ? (ownerId ?? main)
+      : (options?.corretores.find(p=>p.id===main)?.dono_corrente_padrao_pessoa_id??main);
     setSaving(true);
     setError('');
     Keyboard.dismiss();
@@ -219,7 +220,8 @@ export default function NewVisitScreen() {
   const secondName = options?.corretores.find(p => p.id === second)?.nome;
   const origin = options?.origens.find(o => o.id === originId);
   const effectiveOwner = options?.corretores.find(p=>p.id===main)?.dono_corrente_padrao_pessoa_id??main;
-  const ownerName = options?.corretores.find(p=>p.id===effectiveOwner)?.nome ?? '';
+  const chosenOwner=options?.pode_escolher_dono_corrente ? (ownerId ?? effectiveOwner) : effectiveOwner;
+  const ownerName = options?.corretores.find(p=>p.id===chosenOwner)?.nome ?? '';
   const isNew = clientMode === 'new';
 
   return <SafeAreaView style={styles.root} edges={['top']}>
@@ -353,11 +355,17 @@ export default function NewVisitScreen() {
             </View>}
             {!indicator && <View style={styles.fieldSpace}>
               <Text style={styles.fieldLabel}>Dono da corrente *</Text>
-              <View style={styles.ownerFixed}>
+              <Pressable style={styles.ownerFixed}
+                disabled={!options?.pode_escolher_dono_corrente}
+                accessibilityRole="button" onPress={() => {Keyboard.dismiss();setSheet('owner');}}>
                 <SymbolView name={{ios:'person.crop.circle',android:'account_circle'}}
                   size={19} tintColor={colors.brandDark}/>
-                <Text style={styles.ownerText}>{ownerName || 'Titular configurado no cadastro'}</Text>
-              </View>
+                <Text style={[styles.ownerText,{flex:1}]}>{ownerName || 'Selecionar dono da corrente'}</Text>
+                {options?.pode_escolher_dono_corrente&&<SymbolView
+                  name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={colors.brandDark}/>}
+              </Pressable>
+              {options?.pode_escolher_dono_corrente&&
+                <Text style={styles.bonusHelp}>Titular da corrente é independente de quem administra e recebe os repasses da venda.</Text>}
             </View>}
             <Pressable onPress={() => setExtraFields(!extraFields)} style={styles.moreButton} accessibilityRole="button">
               <SymbolView name={{ ios: extraFields ? 'minus.circle' : 'plus.circle', android: extraFields ? 'remove_circle_outline' : 'add_circle_outline' }}
@@ -422,14 +430,15 @@ export default function NewVisitScreen() {
       choices={sheet === 'origin'
         ? (options?.origens || []).map(o => ({ id: o.id, label: o.nome }))
         : sheet === 'owner'
-          ? (options?.atendentes || []).map(o => ({ id: o.id, label: o.nome }))
+          ? brokers.filter(b=>b.id===main || b.id===second
+            || b.id===effectiveOwner)
           : brokers}
       selected={sheet === 'main' ? main : sheet === 'second' ? second
-        : sheet === 'origin' ? originId : ownerId}
+        : sheet === 'origin' ? originId : chosenOwner}
       allowEmpty={sheet === 'second'}
       onClose={() => setSheet(null)} onChoose={value => {
         if (sheet === 'main') {
-          if (ownerId === null || ownerId === main) setOwnerId(value);
+          if (ownerId === null || ownerId === main || ownerId===effectiveOwner) setOwnerId(value);
           setMain(value);
         }
         if (sheet === 'second') setSecond(value);
