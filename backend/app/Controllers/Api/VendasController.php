@@ -315,6 +315,7 @@ class VendasController extends CommercialBaseController
             $db->table('venda_operacoes')->insert([
                 'cliente_id'=>$clientId,'visita_id'=>$visitId,'plano_versao_id'=>$versionId,
                 'situacao'=>$kind,'historica'=>$historic?1:0,'numero_titulo'=>$number,
+                'renovacao_externa'=>($data['renovacao_externa']??false)===true?1:0,
                 'sigla_plano'=>$plan['codigo'],'prazo_meses'=>(int)$plan['duracao_meses'],
                 'valor_tabela'=>VendaMoney::decimal($table),
                 'desconto_corretor'=>VendaMoney::decimal($discount),
@@ -475,6 +476,7 @@ class VendasController extends CommercialBaseController
                 return $this->errorResponse(422,'Gerente inválido ou sem função gerente.');
             }
             $new=[
+                'renovacao_externa'=>($data['renovacao_externa']??(bool)($op['renovacao_externa']??false))===true?1:0,
                 'gerente_pessoa_id'=>$managerId,
                 'plano_versao_id'=>$versionId,'sigla_plano'=>$plan['codigo'],
                 'prazo_meses'=>(int)$plan['duracao_meses'],
