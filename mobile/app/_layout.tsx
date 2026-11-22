@@ -76,6 +76,7 @@ function AppNavigation(){
         <Stack.Screen name="vendas"/>
         <Stack.Screen name="pendencias"/>
         <Stack.Screen name="pendencia/[id]"/>
+        <Stack.Screen name="pendencia/adiantamentos/[id]"/>
         <Stack.Screen name="financeiro"/>
         <Stack.Screen name="gastos"/>
         <Stack.Screen name="emprestimos"/>
