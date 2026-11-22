@@ -185,7 +185,7 @@ final class MobileVisitasController extends BaseController
         $db = db_connect();
         $user = auth('tokens')->user();
         $people = $db->table('pessoas p')
-            ->select('p.id, p.nome, pp.papel')
+            ->select('p.id, p.nome, pp.papel, p.dono_corrente_padrao_pessoa_id')
             ->join('pessoa_papeis pp', 'pp.pessoa_id=p.id')
             ->where('p.ativo', 1)->whereIn('pp.papel', ['corretor', 'vendedor'])
             ->orderBy('p.nome', 'ASC')->get()->getResultArray();
@@ -194,7 +194,9 @@ final class MobileVisitasController extends BaseController
         $attendants = [];
         foreach ($people as $row) {
             $id = (int) $row['id'];
-            $person = ['id' => $id, 'nome' => (string) $row['nome']];
+            $person = ['id' => $id, 'nome' => (string) $row['nome'],
+                'dono_corrente_padrao_pessoa_id'=>$row['dono_corrente_padrao_pessoa_id']===null
+                    ?null:(int)$row['dono_corrente_padrao_pessoa_id']];
             $attendants[$id] = $person;
             if ($row['papel'] === 'corretor') $brokers[$id] = $person;
         }
@@ -618,10 +620,8 @@ final class MobileVisitasController extends BaseController
                     $db->transRollback();
                     return $this->error(422, $clean['error']);
                 }
-                if (($scope !== null && (int)$clean['dono_corrente_pessoa_id'] !==
-                        \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']))
-                    || ($team!==null&&!in_array((int)$brokers['corretor_pessoa_id'],$team,true)
-                        && !in_array((int)($brokers['segundo_corretor_pessoa_id']??0),$team,true))) {
+                if ($team!==null&&!in_array((int)$brokers['corretor_pessoa_id'],$team,true)
+                        && !in_array((int)($brokers['segundo_corretor_pessoa_id']??0),$team,true)) {
                     $db->transRollback();
                     return $this->error(403, 'Cliente indicado pertence a outra corrente.');
                 }
