@@ -59,12 +59,19 @@ final class MobileVisitasController extends BaseController
 
     private function allowed(array $visit, $user): bool
     {
-        $scope = $this->scope($user);
-        return $scope === null || ($scope > 0 && (
-            (int) ($visit['corretor_pessoa_id'] ?? 0) === $scope
-            || (int) ($visit['segundo_corretor_pessoa_id'] ?? 0) === $scope
-            || (int) ($visit['criado_por_usuario_id'] ?? 0) === (int) $user->id
-        ));
+        if($user->inGroup('admin','operador'))return true;
+        if($user->inGroup('gerente')){
+            $ids=\App\Libraries\GestaoEquipe::ids(db_connect(),$user);
+            return in_array((int)($visit['corretor_pessoa_id']??0),$ids,true)
+                || in_array((int)($visit['segundo_corretor_pessoa_id']??0),$ids,true)
+                || (int)($visit['criado_por_usuario_id']??0)===(int)$user->id;
+        }
+        $scope=$this->scope($user);
+        return $scope!==null && $scope>0 && (
+            (int)($visit['corretor_pessoa_id']??0)===$scope
+            || (int)($visit['segundo_corretor_pessoa_id']??0)===$scope
+            || (int)($visit['criado_por_usuario_id']??0)===(int)$user->id
+        );
     }
 
     private function now(): string
@@ -306,6 +313,7 @@ final class MobileVisitasController extends BaseController
         $admin=$user->inGroup('admin');
         $manager=$user->inGroup('gerente');
         $operator=$user->inGroup('operador') && !$admin && !$manager;
+        $team=$manager&&!$admin?\App\Libraries\GestaoEquipe::ids($db,$user):null;
         $personId=null;
         if($manager&&!$admin){
             $person=$db->table('pessoas')->select('id')
@@ -313,7 +321,8 @@ final class MobileVisitasController extends BaseController
             $personId=(int)($person['id']??0);
         }
         $query=$db->table('visitas v')
-            ->select('v.id,v.cliente_id,v.chegada_em,v.fim_em,v.retorno_previsto,v.observacoes,
+            ->select('v.id,v.cliente_id,v.corretor_pessoa_id,v.segundo_corretor_pessoa_id,
+                v.chegada_em,v.fim_em,v.retorno_previsto,v.observacoes,
                 c.nome AS cliente_nome,c.telefone AS cliente_telefone,
                 cp.nome AS corretor_nome,op.id AS operacao_id,
                 op.situacao AS operacao_situacao,op.gerente_pessoa_id AS operacao_gerente_id,
@@ -327,6 +336,11 @@ final class MobileVisitasController extends BaseController
                 ->orWhere('v.segundo_corretor_pessoa_id',$scope)
                 ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
         }
+        if($team!==null){
+            $query->groupStart()->whereIn('v.corretor_pessoa_id',$team)
+                ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
+                ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
+        }
         $rows=$query->orderBy('v.id','DESC')->limit(151)->get()->getResultArray();
         $limited=count($rows)>150;
         if($limited)$rows=array_slice($rows,0,150);
@@ -336,7 +350,12 @@ final class MobileVisitasController extends BaseController
             $canManage=!$operator && ($admin || $manager && (
                 ($personId>0 && (int)($r['operacao_gerente_id']??0)===$personId) ||
                 ($personId>0 && (int)($r['operacao_criado_por']??0)===(int)$user->id) ||
-                ($personId>0 && $operation===0)
+                ($operation===0 && (
+                    in_array((int)($r['corretor_pessoa_id']??0),$team??[],true) ||
+                    in_array((int)($r['segundo_corretor_pessoa_id']??0),$team??[],true)
+                )) ||
+                in_array((int)($r['corretor_pessoa_id']??0),$team??[],true) ||
+                in_array((int)($r['segundo_corretor_pessoa_id']??0),$team??[],true)
             ) || (!$manager && $scope!==0));
             $items[]=[
                 'id'=>(int)$r['id'],'cliente_nome'=>$r['cliente_nome'],
@@ -421,8 +440,10 @@ final class MobileVisitasController extends BaseController
                 $op=$db->table('venda_operacoes')->select('gerente_pessoa_id,criado_por_usuario_id')
                     ->where('id',(int)$visit['operacao_id'])->get()->getRowArray();
                 $canManage=$op && (
-                    (int)($op['gerente_pessoa_id']??0)===$managerId ||
-                    (int)($op['criado_por_usuario_id']??0)===(int)$actor->id
+                    \App\Libraries\GestaoEquipe::podeGerirOperacao($db,$actor,[
+                        ...$op,'corretor_pessoa_id'=>$visit['corretor_pessoa_id'],
+                        'segundo_corretor_pessoa_id'=>$visit['segundo_corretor_pessoa_id'],
+                    ])
                 );
             }
         }
