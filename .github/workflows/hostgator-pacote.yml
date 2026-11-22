@@ -1,0 +1,63 @@
+name: SPLASH - ZIP HostGator sem terminal
+on:
+  push:
+    branches:
+      - feature/react-native-splash-mobile
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'deploy/hostgator/**'
+      - '.github/workflows/hostgator-pacote.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gerar-zip-hostgator:
+    name: Compilar e empacotar para cPanel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar fonte do projeto
+        uses: actions/checkout@v4
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependências e compilar site
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Gerar pacote PHP privado + frontend público + SQL
+        run: python3 deploy/hostgator/empacotar-sem-terminal.py
+      - name: Verificar se o ZIP contém os arquivos obrigatórios
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          p='deploy/_pacote_hostgator_sem_terminal/SPLASH_HOSTGATOR_SEM_TERMINAL.zip'
+          with zipfile.ZipFile(p) as z:
+              names=set(z.namelist())
+              assert 'SPLASH_PHP_BACKEND.zip' in names
+              assert 'SPLASH_WEB_PUBLICO.zip' in names
+              assert 'LEIA_PRIMEIRO.txt' in names
+              assert 'SQL_PHPMyAdmin/01_ATUALIZAR_ESTRUTURA.sql' in names
+              with zipfile.ZipFile(z.open('SPLASH_PHP_BACKEND.zip')) as php:
+                  assert 'app/Config/Routes.php' in php.namelist()
+                  assert 'app/Controllers/Api/MobileVendasController.php' in php.namelist()
+                  assert not any(p.startswith('vendor/') or p.startswith('writable/') or '/.env' in p for p in php.namelist())
+              with zipfile.ZipFile(z.open('SPLASH_WEB_PUBLICO.zip')) as web:
+                  assert 'index.html' in web.namelist()
+                  assert '.htaccess' in web.namelist()
+                  assert 'api/index.php' in web.namelist()
+              print('VALIDAÇÃO ZIP OK - estrutura privada/pública correta')
+          PY
+      - name: Disponibilizar ZIP para baixar no GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: SPLASH_HOSTGATOR_SEM_TERMINAL
+          path: deploy/_pacote_hostgator_sem_terminal/SPLASH_HOSTGATOR_SEM_TERMINAL.zip
+          retention-days: 30
+          if-no-files-found: error
