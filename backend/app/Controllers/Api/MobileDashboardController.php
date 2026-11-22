@@ -27,8 +27,9 @@ final class MobileDashboardController extends BaseController
             return $this->response->setStatusCode(422)->setJSON(['message'=>'Período inválido.']);
         $days=(int)$range;
         $db=db_connect();
+        $manager=\App\Libraries\GestaoEquipe::ehGestor($db,$user);
         $scope=null;
-        if($user->inGroup('corretor')&&!$user->inGroup('admin','gerente','operador')){
+        if($user->inGroup('corretor')&&!$manager&&!$user->inGroup('admin','operador')){
             $person=$db->table('pessoas')->select('id')->where('user_id',(int)$user->id)
                 ->where('ativo',1)->get()->getRowArray();
             if(!$person)
@@ -38,7 +39,7 @@ final class MobileDashboardController extends BaseController
         }
         // Gerente acompanha vendas sob sua gestão, não o faturamento dos demais.
         $managerScope=null;
-        if($user->inGroup('gerente')&&!$user->inGroup('admin')){
+        if($manager&&!$user->inGroup('admin')){
             $person=$db->table('pessoas')->select('id')
                 ->where('user_id',(int)$user->id)->where('ativo',1)->get()->getRowArray();
             if(!$person)return $this->response->setStatusCode(403)
