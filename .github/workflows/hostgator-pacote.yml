@@ -29,7 +29,9 @@ jobs:
       - name: Instalar dependências e compilar site
         working-directory: frontend
         run: |
-          npm ci
+          # O lockfile do repo pode estar defasado (qrcode e dependências).
+          # npm install reconcilia o lock apenas neste runner efêmero.
+          npm install --no-audit --no-fund
           npm run build
       - name: Gerar pacote PHP privado + frontend público + SQL
         run: python3 deploy/hostgator/empacotar-sem-terminal.py
