@@ -63,8 +63,7 @@ final class MobileClientesController extends BaseController
         $page=max(1,min(10000,(int)($this->request->getGet('page')?:1)));
         $limit=max(1,min(50,(int)($this->request->getGet('limit')?:25)));
         $builder=$this->row(db_connect());
-        if($a['scope']!==null)$builder->where('c.dono_corrente_pessoa_id',$a['scope']);
-        if($a['team']!==null)$builder->whereIn('c.dono_corrente_pessoa_id',$a['team']);
+        \App\Libraries\GestaoEquipe::filtrarClientes(db_connect(),$a['user'],$builder);
         if($q!==''){
             $digits=preg_replace('/\D/','',$q);
             $builder->groupStart()->like('c.nome',$q);
@@ -84,8 +83,7 @@ final class MobileClientesController extends BaseController
         $a=$this->actor();if($a instanceof ResponseInterface)return $a;
         $n=$this->id($id);if(!$n)return $this->error(404,'Cliente não encontrado.');
         $builder=$this->row(db_connect())->where('c.id',$n);
-        if($a['scope']!==null)$builder->where('c.dono_corrente_pessoa_id',$a['scope']);
-        if($a['team']!==null)$builder->whereIn('c.dono_corrente_pessoa_id',$a['team']);
+        \App\Libraries\GestaoEquipe::filtrarClientes(db_connect(),$a['user'],$builder);
         $row=$builder->get()->getRowArray();
         if(!$row)return $this->error(404,'Cliente não encontrado.');
         return $this->response->setJSON(['cliente'=>$this->cast($row)])
@@ -106,8 +104,9 @@ final class MobileClientesController extends BaseController
         try {
             $clean=ClienteRules::validate($db,$input);
             if(isset($clean['error'])){$db->transRollback();return $this->error(422,$clean['error']);}
-            if(($a['scope']!==null&&(int)$clean['dono_corrente_pessoa_id']!==$a['scope'])
-                || ($a['team']!==null&&!in_array((int)$clean['dono_corrente_pessoa_id'],$a['team'],true))){
+            if((int)$clean['dono_corrente_pessoa_id']!==(int)$old['dono_corrente_pessoa_id']
+                && !$a['user']->inGroup('admin')
+                && !in_array((int)$clean['dono_corrente_pessoa_id'], $a['team']??[$a['scope']],true)){
                 $db->transRollback();return $this->error(403,'A indicação pertence a outra corrente.');
             }
             $now=date('Y-m-d H:i:s');
@@ -136,8 +135,7 @@ final class MobileClientesController extends BaseController
         $db=db_connect();$db->transBegin();
         try {
             $old=$db->query('SELECT * FROM clientes WHERE id=? FOR UPDATE',[$n])->getRowArray();
-            if(!$old||($a['scope']!==null&&(int)$old['dono_corrente_pessoa_id']!==$a['scope'])
-                || ($a['team']!==null&&!in_array((int)$old['dono_corrente_pessoa_id'],$a['team'],true))){
+            if(!$old||!\App\Libraries\GestaoEquipe::podeVerCliente($db,$a['user'],$n)){
                 $db->transRollback();return $this->error(404,'Cliente não encontrado.');
             }
             $fields=['nome','telefone','cpf','email','data_nascimento','endereco',
@@ -146,7 +144,7 @@ final class MobileClientesController extends BaseController
             $allowed=[];
             foreach($fields as $key)if(array_key_exists($key,$input))$allowed[$key]=$input[$key];
             $combined=array_replace($old,$allowed);
-            if($a['scope']!==null)$combined['dono_corrente_pessoa_id']=$a['scope'];
+            // Acesso por equipe nao implica transferir a corrente do cliente.
             $combined['ativo']=(bool)$old['ativo'];
             $clean=ClienteRules::validate($db,$combined,$old);
             if(isset($clean['error'])){$db->transRollback();return $this->error(422,$clean['error']);}
