@@ -26,7 +26,7 @@ const filters = [
 
 export default function AtendimentosScreen() {
   const styles=useThemedStyles(lightStyles);
-  const { token,user } = useAuth();
+  const { token } = useAuth();
   const [periodo, setPeriodo] = useState<'hoje' | 'todos' | 'intervalo'>('hoje');
   const [dateRange,setDateRange]=useState({start:'',end:''});
   const [calendarOpen,setCalendarOpen]=useState(false);
@@ -79,25 +79,6 @@ export default function AtendimentosScreen() {
           <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle' }} size={20} tintColor="#FFFFFF" />
           <Text style={styles.newVisitText}>Registrar chegada</Text>
           <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward' }} size={19} tintColor="#FFFFFF" />
-        </Pressable>
-        {!!user?.groups?.some(g=>g==='admin'||g==='gerente')&&
-          <Pressable style={styles.pendingShortcut}
-            onPress={()=>router.push('/atendimento/retroativo' as never)}
-            accessibilityRole="button">
-            <SymbolView name={{ios:'clock.arrow.circlepath',android:'history'}}
-              size={19} tintColor={colors.brandDark}/>
-            <View style={{flex:1}}><Text style={styles.pendingShortcutTitle}>Registrar venda anterior</Text>
-              <Text style={styles.pendingShortcutSub}>Atendimento de data passada, com horários reais</Text>
-            </View>
-          </Pressable>}
-        <Pressable style={styles.pendingShortcut} onPress={()=>router.push('/pendencias' as never)}
-          accessibilityRole="button">
-          <SymbolView name={{ios:'clock.arrow.circlepath',android:'pending_actions'}}
-            size={19} tintColor={colors.brandDark}/>
-          <View style={{flex:1}}><Text style={styles.pendingShortcutTitle}>Pendências</Text>
-            <Text style={styles.pendingShortcutSub}>Negociações de todos os dias · fechar venda</Text>
-          </View>
-          <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} size={18} tintColor={colors.brandDark}/>
         </Pressable>
         <View style={styles.searchRow}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search' }} size={20} tintColor={colors.muted} />
