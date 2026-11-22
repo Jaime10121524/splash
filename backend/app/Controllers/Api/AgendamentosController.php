@@ -43,7 +43,11 @@ final class AgendamentosController extends BaseController
             if (!$person) return $this->deny(403,'Seu usuário não possui corretor ativo vinculado.');
             $personId=(int)$person['id'];
         }
-        return ['user'=>$user,'scope'=>$personId];
+        $team=$user->inGroup('gerente')&&!$user->inGroup('admin')
+            ?\App\Libraries\GestaoEquipe::ids(db_connect(),$user):null;
+        $teamUsers=$team!==null
+            ?\App\Libraries\GestaoEquipe::usuarios(db_connect(),$user):null;
+        return ['user'=>$user,'scope'=>$personId,'team'=>$team,'team_users'=>$teamUsers];
     }
 
     private function parseId($value): ?int
@@ -69,6 +73,11 @@ final class AgendamentosController extends BaseController
 
     private function visible(array $row,array $actor): bool
     {
+        if($actor['team']!==null)return
+            in_array((int)$row['captador_pessoa_id'],$actor['team'],true)
+            || in_array((int)($row['corretor_confirmado_pessoa_id']??0),$actor['team'],true)
+            || in_array((int)($row['segundo_corretor_pessoa_id']??0),$actor['team'],true)
+            || in_array((int)$row['criado_por_usuario_id'],$actor['team_users'],true);
         return $actor['scope']===null || (int)$row['captador_pessoa_id']===$actor['scope']
             || (int)($row['corretor_confirmado_pessoa_id']??0)===$actor['scope']
             || (int)($row['segundo_corretor_pessoa_id']??0)===$actor['scope'];
@@ -142,7 +151,14 @@ final class AgendamentosController extends BaseController
             ->join('visitas v','v.id=a.visita_id','left')
             ->join('venda_operacoes op','op.visita_id=a.visita_id','left');
         foreach ([$builder,$statsBuilder] as $query) {
-            if ($actor['scope']!==null) {
+            if ($actor['team']!==null) {
+                $query->groupStart()
+                    ->whereIn('a.captador_pessoa_id',$actor['team'])
+                    ->orWhereIn('a.corretor_confirmado_pessoa_id',$actor['team'])
+                    ->orWhereIn('a.segundo_corretor_pessoa_id',$actor['team'])
+                    ->orWhereIn('a.criado_por_usuario_id',$actor['team_users'])
+                    ->groupEnd();
+            }elseif ($actor['scope']!==null) {
                 $query->groupStart()
                     ->where('a.captador_pessoa_id',$actor['scope'])
                     ->orWhere('a.corretor_confirmado_pessoa_id',$actor['scope'])
@@ -356,7 +372,7 @@ final class AgendamentosController extends BaseController
                     $clean=ClienteRules::validate($db,[
                         'nome'=>$book['nome_completo'],'telefone'=>$book['telefone'],
                         'origem_id'=>(int)$origin['id'],
-                        'dono_corrente_pessoa_id'=>(int)$book['captador_pessoa_id'],
+                        'dono_corrente_pessoa_id'=>\App\Libraries\GestaoEquipe::donoPadrao($db,(int)$book['captador_pessoa_id']),
                         'ativo'=>true,
                     ]);
                     if (isset($clean['error'])) {
