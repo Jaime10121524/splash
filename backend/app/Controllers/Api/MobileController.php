@@ -151,14 +151,26 @@ final class MobileController extends BaseController
             $scope = (int) $person['id'];
         }
 
-        // Mesma regra de isolamento da API web: corretor só vê visitas suas
-        // ou por ele cadastradas; as contas administrativas têm escopo total.
-        $build = static function () use ($db, $scope, $user, $periodo, $inicio, $fim) {
+        // Gestor consulta apenas os corretores formalmente vinculados,
+        // independentemente de participação na comissão.
+        $team=null;
+        if($user->inGroup('gerente')&&!$user->inGroup('admin')){
+            $team=\App\Libraries\GestaoEquipe::ids($db,$user);
+            if(!$team)return $this->error(403,'Gestor sem equipe/pessoa ativa vinculada.');
+        }
+
+        // Mesma regra de isolamento para todos os perfis.
+        $build = static function () use ($db, $scope, $team, $user, $periodo, $inicio, $fim) {
             $query = $db->table('visitas v');
             if ($scope !== null) {
                 $query->groupStart()->where('v.corretor_pessoa_id', $scope)
                     ->orWhere('v.segundo_corretor_pessoa_id', $scope)
                     ->orWhere('v.criado_por_usuario_id', (int) $user->id)->groupEnd();
+            }
+            if($team!==null){
+                $query->groupStart()->whereIn('v.corretor_pessoa_id',$team)
+                    ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
+                    ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
             }
             if ($periodo === 'hoje') {
                 $query->where('v.chegada_em >=', date('Y-m-d') . ' 00:00:00')
