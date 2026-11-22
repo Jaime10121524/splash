@@ -160,7 +160,8 @@ final class MobileController extends BaseController
         }
 
         // Mesma regra de isolamento para todos os perfis.
-        $build = static function () use ($db, $scope, $team, $user, $periodo, $inicio, $fim) {
+        $teamUsers=$team!==null?\App\Libraries\GestaoEquipe::usuarios($db,$user):null;
+        $build = static function () use ($db, $scope, $team, $teamUsers, $user, $periodo, $inicio, $fim) {
             $query = $db->table('visitas v');
             if ($scope !== null) {
                 $query->groupStart()->where('v.corretor_pessoa_id', $scope)
@@ -170,7 +171,7 @@ final class MobileController extends BaseController
             if($team!==null){
                 $query->groupStart()->whereIn('v.corretor_pessoa_id',$team)
                     ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
-                    ->orWhere('v.criado_por_usuario_id',(int)$user->id)->groupEnd();
+                    ->orWhereIn('v.criado_por_usuario_id',$teamUsers)->groupEnd();
             }
             if ($periodo === 'hoje') {
                 $query->where('v.chegada_em >=', date('Y-m-d') . ' 00:00:00')
