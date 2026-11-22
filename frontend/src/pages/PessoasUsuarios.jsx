@@ -306,8 +306,8 @@ export default function PessoasUsuarios({tab='pessoas'}) {
             Este vínculo é independente do gestor e de quem recebe repasses.</small>
         </label>}
         {personForm.papeis.includes('gerente')&&<label className="pu-switch">
-          <span><strong>Visão geral de todos os agendamentos e atendimentos</strong>
-            <small>Inclui registros antigos sem vínculo com os corretores atuais. Habilite apenas para a gestão geral, como Helena.</small></span>
+          <span><strong>Visão geral de agendamentos, atendimentos e vendas</strong>
+            <small>Inclui vendas e históricos antigos de toda a operação, mesmo sem participação direta. Autorize somente a gestora geral.</small></span>
           <input type="checkbox" checked={!!personForm.gestor_visao_global}
             onChange={e=>setPersonForm(f=>({...f,gestor_visao_global:e.target.checked}))}/>
         </label>}
