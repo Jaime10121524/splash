@@ -98,6 +98,28 @@ final class GestorVendasController extends VendasController
             ->setHeader('Cache-Control', 'private, no-store');
     }
 
+    /**
+     * Gestor pode abrir o histórico integral das vendas sob sua supervisão,
+     * inclusive quando não é um dos corretores; sem liberar outros endpoints.
+     */
+    public function detalhe(int|string $id): ResponseInterface
+    {
+        $actor=$this->manager();
+        if($actor instanceof ResponseInterface)return $actor;
+        $db=db_connect();
+        $op=$db->table('venda_operacoes')->where('id',(int)$id)->get()->getRowArray();
+        $user=auth('session')->user();
+        if(!$op||!\App\Libraries\GestaoEquipe::podeGerirOperacao($db,$user,$op))
+            return $this->errorResponse(404,'Venda fora da gestão.');
+
+        $this->creatingAsManager=true;
+        try {
+            return parent::detalhe($id);
+        } finally {
+            $this->creatingAsManager=false;
+        }
+    }
+
     public function create(): ResponseInterface
     {
         $actor = $this->manager();
