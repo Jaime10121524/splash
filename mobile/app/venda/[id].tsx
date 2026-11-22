@@ -129,6 +129,13 @@ export default function VendaMobile(){
         const v=await apiRequest<VisitDetailsResponse>('mobile/atendimentos/'+visitId,{token});
         if(!active)return;
         setVisit(v.visita);
+        // Ao cadastrar uma venda retroativa, usar a data do atendimento como
+        // padrão. O usuário pode ajustá-la antes de confirmar.
+        const oldDay=String(v.visita.chegada_em||'').slice(0,10);
+        if(/^\d{4}-\d{2}-\d{2}$/.test(oldDay)){
+          const display=oldDay.slice(8,10)+'/'+oldDay.slice(5,7)+'/'+oldDay.slice(0,4);
+          setDate(display);setStartDate(display);
+        }
         if(!['VENDA','PENDENCIA'].includes(v.visita.status))throw Error('Encerre o atendimento como Venda ou Pendência antes de continuar.');
         if(v.visita.operacao_id){
           router.replace({pathname:v.visita.status==='PENDENCIA'?'/pendencia/[id]':'/venda/[id]',params:{id:String(v.visita.operacao_id)}} as never);return;
