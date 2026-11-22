@@ -674,12 +674,9 @@ export default function VendaMobile(){
               <View style={{flex:1}}><Text style={s.lineTitle}>{p.nome}</Text>
                 <Text style={s.helper}>{roles[p.papel]||p.papel}</Text></View>
               <Text style={s.lineTitle}>{money(p.devido)}</Text></View>)}
-            {opts?.pode_corrigir_comissao&&!saleLocked&&Number(detail.saldo)>0&&!editingGross?
-              <Btn text="Corrigir comissão bruta" muted onPress={()=>{setEditingGross(true);setGrossValue(gross||'');setReason('');}}/>:null}
-            {editingGross&&<View style={s.panel}><Input label="Nova comissão bruta (R$)" value={grossValue} onChange={setGrossValue} numeric placeholder="0,00"/>
-              <Input label="Justificativa *" value={reason} onChange={setReason} placeholder="Motivo da correção"/>
-              <Btn text="Salvar ajuste auditado" disabled={busy} onPress={()=>{void adjustGross();}}/>
-              <Btn text="Cancelar" muted onPress={()=>setEditingGross(false)}/></View>}
+            {opts?.pode_corrigir_comissao&&!saleLocked&&Number(detail.saldo)>0?
+              <Btn text="Corrigir comissão bruta" muted onPress={()=>router.push({
+                pathname:'/venda/comissao/[id]',params:{id:String(opId)}} as never)}/>:null}
 
             {opts?.pode_corrigir_comissao&&rateios&&<View style={s.panel}>
               <Text style={s.section}>Participações e rateio</Text>
