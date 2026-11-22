@@ -67,6 +67,7 @@ export type MobileVisitOptions = {
   motivos: { id: number; descricao: string }[];
   origens: { id: number; nome: string; permite_indicador: boolean }[];
   minha_pessoa_id: number | null;
+  pode_escolher_dono_corrente?:boolean;
 };
 export type MobileClient = { id: number; nome: string; telefone: string | null };
 
