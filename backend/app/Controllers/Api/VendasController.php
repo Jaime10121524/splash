@@ -315,9 +315,15 @@ class VendasController extends CommercialBaseController
             $external=\App\Libraries\GestaoEquipe::renovacaoExterna(
                 $db,(int)$clientId,(int)$brokers['corretor_pessoa_id'],$visit,
                 $brokers['segundo_corretor_pessoa_id']??null);
+            // Titularidade da corrente e obrigação de repasse são coisas diferentes:
+            // Marcelino permanece dono da corrente externa; James pode administrar
+            // a venda como segundo corretor e responsável financeiro.
             $currentOwner=$external
                 ?(int)$brokers['corretor_pessoa_id']
-                :\App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']);
+                :(int)($client['dono_corrente_pessoa_id']
+                    ?: \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']));
+            $financialManager=$external && !empty($brokers['segundo_corretor_pessoa_id'])
+                ?(int)$brokers['segundo_corretor_pessoa_id']:null;
             \App\Libraries\GestaoEquipe::atribuirCorrente($db,(int)$clientId,$currentOwner,
                 $this->saleActorId(),'Titularidade da corrente conforme equipe ou renovação externa.');
             $db->table('venda_operacoes')->insert([
@@ -335,6 +341,7 @@ class VendasController extends CommercialBaseController
                 'observacao_comissao'=>$estimate['aviso'],
                 ...$brokers,
                 'dono_corrente_pessoa_id'=>$currentOwner,
+                'responsavel_financeiro_pessoa_id'=>$financialManager,
                 'gerente_pessoa_id'=>$managerId,
                 ...$attendants,
                 'data_negociacao'=>$day,'data_venda'=>$saleDate,'data_inicio'=>$start,
@@ -488,11 +495,15 @@ class VendasController extends CommercialBaseController
                 $db,(int)$op['cliente_id'],(int)$brokers['corretor_pessoa_id'],$visit,
                 $brokers['segundo_corretor_pessoa_id']??null,(int)$id);
             $currentOwner=$external?(int)$brokers['corretor_pessoa_id']:
-                \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']);
+                (int)($op['dono_corrente_pessoa_id']
+                    ?: \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']));
+            $financialManager=$external && !empty($brokers['segundo_corretor_pessoa_id'])
+                ?(int)$brokers['segundo_corretor_pessoa_id']:null;
             \App\Libraries\GestaoEquipe::atribuirCorrente($db,(int)$op['cliente_id'],
                 $currentOwner,$this->saleActorId(),'Ajuste de responsáveis antes do fechamento.');
             $new=[
                 'dono_corrente_pessoa_id'=>$currentOwner,
+                'responsavel_financeiro_pessoa_id'=>$financialManager,
                 'renovacao_externa'=>$external?1:0,
                 'gerente_pessoa_id'=>$managerId,
                 'plano_versao_id'=>$versionId,'sigla_plano'=>$plan['codigo'],
