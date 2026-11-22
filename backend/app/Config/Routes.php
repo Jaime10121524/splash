@@ -71,6 +71,7 @@ $routes->group('api', static function ($routes): void {
             $routes->get('vendas', 'Api\MobileVendasController::index');
             $routes->post('vendas', 'Api\MobileVendasController::create');
             $routes->post('vendas/(:num)/converter', 'Api\MobileVendasController::converter/$1');
+            $routes->post('vendas/(:num)/editar', 'Api\MobileVendasController::editar/$1');
             $routes->get('vendas/(:num)', 'Api\MobileVendasController::detalhe/$1');
             $routes->get('vendas/(:num)/foto', 'Api\MidiasSplashController::vendaMobile/$1');
             $routes->post('vendas/(:num)/foto', 'Api\MidiasSplashController::uploadVendaMobile/$1');
