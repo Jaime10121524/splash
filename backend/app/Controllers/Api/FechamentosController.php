@@ -54,7 +54,7 @@ class FechamentosController extends CommercialBaseController
     private function rows($db,string $start,string $end): array
     {
         $operations=$db->table('venda_operacoes o')
-            ->select('o.id,o.visita_id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_cobrado,o.valor_tabela,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
+            ->select('o.id,o.visita_id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_cobrado,o.valor_tabela,o.observacao_comissao,o.responsavel_financeiro_pessoa_id,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas p','p.id=o.corretor_pessoa_id','left')
             ->where('o.situacao','VENDA')
@@ -216,7 +216,8 @@ class FechamentosController extends CommercialBaseController
             $key=(int)$op['id'];
             $paidOwner=$ownerByOperation[$key]['saldo']??0;
             $sourceLabel='Corretor principal — parte própria';
-            $recebedorOperacional=$responsaveis[$root]??$root;
+            $recebedorOperacional=(int)($op['responsavel_financeiro_pessoa_id']
+                ?:($responsaveis[$root]??$root));
             $recebedorNome=$personName[$recebedorOperacional]??'Responsável financeiro';
             $meta=[
                 'operacao_id'=>$key,
@@ -253,7 +254,11 @@ class FechamentosController extends CommercialBaseController
                         'GERENTE'=>'Gerência',default=>'Participação',
                     },
                     'pagador'=>$admin
-                         ?($personName[$responsaveis[(int)$a['responsavel_pessoa_id']]??(int)$a['responsavel_pessoa_id']]??$a['origem_nome'])
+                         ?($personName[
+                            (int)$a['responsavel_pessoa_id']===$root
+                                ?$recebedorOperacional
+                                :($responsaveis[(int)$a['responsavel_pessoa_id']]??(int)$a['responsavel_pessoa_id'])
+                            ]??$a['origem_nome'])
                          :'Responsável financeiro',
                     'total_centavos'=>$outstanding,'pago_centavos'=>$paid,
                     'abatido_centavos'=>$abated($history[(int)$a['id']]??[]),
@@ -278,7 +283,9 @@ class FechamentosController extends CommercialBaseController
                 }
                 if($includeOutgoing){
                     $titularOperacao=(int)$a['responsavel_pessoa_id'];
-                    $pagadorOperacional=$responsaveis[$titularOperacao]??$titularOperacao;
+                    $pagadorOperacional=$titularOperacao===$root
+                        ?$recebedorOperacional
+                        :($responsaveis[$titularOperacao]??$titularOperacao);
                     if($onlyPersonId===null || $pagadorOperacional===$onlyPersonId){
                         $accounts[$pagadorOperacional]??=[
                             'pessoa_id'=>$pagadorOperacional,
@@ -457,13 +464,38 @@ class FechamentosController extends CommercialBaseController
                         VendaMoney::cents((string)$m['valor'],true);
                 }
             }
+            // Antecipações de uma pendência NÃO são comissões apuradas.
+            // Cada pessoa recebe exclusivamente os movimentos de adiantamento
+            // que efetivamente a beneficiaram (SAIDA menos ESTORNO).
+            $adiantadoPorOperacaoPessoa=[];
+            $beneficiariosPendencia=[];
+            if($pendingRows && $db->tableExists('pendencia_adiantamentos')){
+                foreach($db->table('pendencia_adiantamentos')
+                    ->select('operacao_id,beneficiario_pessoa_id,tipo,valor')
+                    ->whereIn('operacao_id',array_map('intval',array_column($pendingRows,'id')))
+                    ->get()->getResultArray() as $adiantamento){
+                    $key=(int)$adiantamento['operacao_id'];
+                    $beneficiario=(int)$adiantamento['beneficiario_pessoa_id'];
+                    $valor=VendaMoney::cents((string)$adiantamento['valor'],true);
+                    $adiantadoPorOperacaoPessoa[$key][$beneficiario]=
+                        ($adiantadoPorOperacaoPessoa[$key][$beneficiario]??0)
+                        +($adiantamento['tipo']==='SAIDA'?$valor:-$valor);
+                    $beneficiariosPendencia[$key][$beneficiario]=true;
+                }
+            }
             // Inclui pessoas que possuem somente negociações pendentes.
             // Uma conta vazia de comissoes nao deve esconder a pendencia.
             $existingPersons=array_map(static fn($a)=>(int)$a['pessoa_id'],$accounts);
             $pendingPersons=[];
             foreach($pendingRows as $p){
-                foreach(['corretor_pessoa_id','segundo_corretor_pessoa_id','gerente_pessoa_id'] as $field){
-                    $who=(int)($p[$field]??0);
+                $peopleOnThisPending=[
+                    (int)$p['corretor_pessoa_id'],
+                    (int)($p['segundo_corretor_pessoa_id']??0),
+                    (int)($p['gerente_pessoa_id']??0),
+                    ...array_keys($beneficiariosPendencia[(int)$p['id']]??[]),
+                ];
+                foreach(array_unique($peopleOnThisPending) as $who){
+                    $who=(int)$who;
                     if($who<1||in_array($who,$existingPersons,true))continue;
                     if(!$admin && $team!==null && !in_array($who,$team,true))continue;
                     if(!$admin && $team===null && $who!==$personId)continue;
@@ -517,15 +549,19 @@ class FechamentosController extends CommercialBaseController
                     if(!in_array($id,[
                         (int)$pending['corretor_pessoa_id'],
                         (int)($pending['segundo_corretor_pessoa_id']??0),
-                        (int)($pending['gerente_pessoa_id']??0)],true))continue;
+                        (int)($pending['gerente_pessoa_id']??0),
+                        ...array_map('intval',array_keys($beneficiariosPendencia[(int)$pending['id']]??[])),
+                    ],true))continue;
                     $pendingCount++;
+                    $receivedPending=max(0,$adiantadoPorOperacaoPessoa[(int)$pending['id']][$id]??0);
                     if(count($detail)>=30)continue;
                     $detail[]=[
                         'operacao_id'=>(int)$pending['id'],
                         'titulo'=>'Negociação #'.$pending['id'].' · '.$pending['sigla_plano'],
                         'data_venda'=>$pending['data_negociacao'],
-                        'descricao'=>'PENDÊNCIA · '.$pending['cliente_nome'],
-                        'tipo'=>'NEGOCIACAO','valor_negociado'=>$pending['valor_cobrado'],
+                        'descricao'=>$admin?'PENDÊNCIA · '.$pending['cliente_nome']:'PENDÊNCIA · aguardando conversão',
+                        'tipo'=>'NEGOCIACAO',
+                        'adiantado'=>VendaMoney::decimal($receivedPending),
                         'total'=>'0.00','recebidas'=>'0.00','abatidas'=>'0.00','a_receber'=>'0.00',
                     ];
                 }
