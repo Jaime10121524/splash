@@ -12,7 +12,7 @@ import FeedbackPopup from '../../../src/components/FeedbackPopup';
 import {colors} from '../../../src/theme';
 
 type Person={id:number;nome:string;papeis:string[]};
-type Plan={id:number;nome:string;valor:string};
+type Plan={id:number;nome:string;valor:string;ativo:boolean};
 type Options={planos:Plan[];pessoas:Person[];gerentes:{id:number;nome:string}[]};
 type Operation={
   id:number;situacao:'VENDA'|'PENDENCIA';plano_versao_id:number;
@@ -82,7 +82,7 @@ export default function EditSale(){
   },[token,saleId]);
   const set=<K extends keyof Form>(key:K,value:Form[K])=>setForm(old=>({...old,[key]:value}));
   const choices:Choice[]=choice==='plano_versao_id'
-    ?(options?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)}))
+    ?(options?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)+(p.ativo?'':' · histórico')}))
     :choice==='gerente_pessoa_id'?(options?.gerentes||[]).map(p=>({id:p.id,label:p.nome}))
     :(options?.pessoas||[]).filter(p=>choice==='corretor_pessoa_id'||choice==='segundo_corretor_pessoa_id'
       ?p.papeis.includes('corretor'):p.papeis.some(r=>r==='corretor'||r==='vendedor'))
@@ -96,7 +96,7 @@ export default function EditSale(){
       :name(id);
     return <Pressable style={[s.field,{borderColor:palette.line,backgroundColor:palette.surface}]} onPress={()=>setChoice(field)}>
       <Text style={[s.label,{color:palette.muted}]}>{label}</Text>
-      <Text style={[s.value,{color:palette.ink}]}>{txt}  ⌄</Text>
+      <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10}}><Text style={[s.value,{color:palette.ink,flex:1}]}>{txt}</Text><SymbolView name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={palette.muted}/></View>
     </Pressable>;
   };
   const date=(field:'data_negociacao'|'data_venda'|'data_inicio'|'retorno_previsto',label:string)=>
