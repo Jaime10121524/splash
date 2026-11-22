@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ClientFinder, SurfaceModal } from '../components/ComercialForms.jsx'
 import { FormControl } from '../components/UiFields.jsx'
-import { comercialGet, comercialPost, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
+import { comercialGet, comercialPost, comercialUpload, dateBR, localDateISO, personOptions } from '../lib/comercialApi.js'
 import { formatPhone } from '../components/PhoneInput.jsx'
 import WhatsAppLink from '../components/WhatsAppLink.jsx'
 import RateiosVenda from './RateiosVenda.jsx'
+import PendenciaCustodia from './PendenciaCustodia.jsx'
+import {apiUrl} from '../lib/nativeApi.js'
 import './ComercialPages.css'
 import './Vendas.css'
 
@@ -44,6 +46,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [saleForm,setSaleForm]=useState(blank)
   const [useDiscount,setUseDiscount]=useState(false)
   const [moveForm,setMoveForm]=useState(blankMovement)
+  const [correctForm,setCorrectForm]=useState({...blankMovement(),justificativa:''})
   const [detail,setDetail]=useState(null)
   const [formError,setFormError]=useState('')
   const [setting,setSetting]=useState('regras')
@@ -51,6 +54,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   const [applying,setApplying]=useState({codigo:'',regra_comissao_id:''})
   const [adjustment,setAdjustment]=useState({valor:'',justificativa:''})
   const [showRateios,setShowRateios]=useState(false)
+  const [salePhotoRevision,setSalePhotoRevision]=useState(0)
+  const [salePhotoFailed,setSalePhotoFailed]=useState(false)
+  const [salePhotoBusy,setSalePhotoBusy]=useState(false)
+  const salePhotoRef=useRef(null)
 
   async function loadOptions() {
     const [opt,catalogs,visitsResponse]=await Promise.all([
@@ -157,6 +164,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
   }
   async function openDetail(op,type='details'){
     setShowRateios(false)
+    setSalePhotoFailed(false)
     setBusy(true);setFormError('')
     try{
       const data=await comercialGet('/api/vendas/'+op.id)
@@ -165,6 +173,26 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       setDialog({type,op})
     }catch(e){setError(e.message)}
     finally{setBusy(false)}
+  }
+  async function uploadSalePhoto(event){
+    const photo=event.target.files?.[0]
+    if(!photo||!detail?.operacao?.id)return
+    if(detail.fechamento){
+      setFormError('Foto bloqueada: esta venda pertence ao fechamento nº '+detail.fechamento.id+'.')
+      event.target.value='';return
+    }
+    setFormError('');setNotice('')
+    if(!['image/jpeg','image/png','image/webp'].includes(photo.type)||photo.size>5*1024*1024){
+      setFormError('Use uma foto JPG, PNG ou WebP de até 5 MB.')
+      event.target.value='';return
+    }
+    setSalePhotoBusy(true)
+    try{
+      await comercialUpload('/api/vendas/'+detail.operacao.id+'/foto',photo)
+      setSalePhotoRevision(v=>v+1);setSalePhotoFailed(false)
+      setNotice('Foto da venda atualizada com sucesso.')
+    }catch(error){setFormError(error.message)}
+    finally{setSalePhotoBusy(false);event.target.value=''}
   }
   async function refresh(){
     await loadList()
@@ -255,6 +283,32 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       await refresh()
       const data=await comercialGet('/api/vendas/'+dialog.op.id)
       setDetail(data)
+      setDialog({type:'details',op:dialog.op})
+    }catch(e){setFormError(e.message)}
+    finally{setBusy(false)}
+  }
+
+  async function saveCorrection(e){
+    e.preventDefault()
+    const value=moneyInput(correctForm.valor)
+    if(!correctForm.entrada_id||!correctForm.forma_id||!value||Number(value)<=0
+      ||correctForm.justificativa.trim().length<5){
+      setFormError('Selecione o recebimento e informe os novos dados e o motivo da correção.')
+      return
+    }
+    setBusy(true);setFormError('')
+    try{
+      const result=await comercialPost('/api/vendas/'+dialog.op.id+'/corrigir-recebimento',{
+        entrada_id:Number(correctForm.entrada_id),
+        forma_id:Number(correctForm.forma_id),
+        valor:value,
+        data_movimento:correctForm.data_movimento,
+        detentor:correctForm.detentor,
+        justificativa:correctForm.justificativa.trim(),
+      })
+      setNotice(result.message)
+      const next=await comercialGet('/api/vendas/'+dialog.op.id)
+      setDetail(next);await refresh()
       setDialog({type:'details',op:dialog.op})
     }catch(e){setFormError(e.message)}
     finally{setBusy(false)}
@@ -368,7 +422,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
             {op.fechamento_id&&<span className="com-pill good">Fechamento #{op.fechamento_id} · {op.fechamento_status==='CONCLUIDO'?'Concluído':'Em andamento'}</span>}
           </div>
           <small>{formatPhone(op.cliente_telefone)} · {op.numero_titulo?op.numero_titulo+' ':''}{op.sigla_plano}
-            {' · '}Corretor: {op.corretor_nome}{op.segundo_corretor_nome?' + '+op.segundo_corretor_nome:''}</small>
+</small>
+          <small>Corretores: {op.corretor_nome||'Não informado'}{op.segundo_corretor_nome?' + '+op.segundo_corretor_nome:''}</small>
           <small>Corrente: {op.dono_corrente_nome} · {dateBR(op.data_venda||op.data_negociacao)}</small>
           {op.observacao_comissao&&<span className="vd-soft-note">{op.observacao_comissao}</span>}
         </div>
@@ -387,10 +442,11 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
     {dialog&&<SurfaceModal
       title={dialog.type==='new'?(saleForm.situacao==='PENDENCIA'?'Nova pendência':'Nova venda'):
         dialog.type==='convert'?'Fechar pendência em venda':
+        dialog.type==='custodia'?'Custódia e adiantamentos':dialog.type==='correct'?'Corrigir recebimento':
         dialog.type==='receipt'?'Registrar recebimento':dialog.type==='refund'?'Devolver dinheiro':
         dialog.type==='reversal'?'Estornar lançamento':dialog.type==='edit'?'Corrigir cadastro':
         dialog.type==='details'?'Extrato da operação':dialog.type==='adjust'?'Ajustar comissão':dialog.type==='setting'?'Cadastro financeiro':dialog.type==='application'?'Regra automática':'Configurações de vendas'}
-      subtitle={['details','receipt','refund','reversal','edit'].includes(dialog.type)?dialog.op?.cliente_nome:''}
+      subtitle={['details','receipt','refund','reversal','edit','custodia','correct'].includes(dialog.type)?dialog.op?.cliente_nome:''}
       busy={busy} onClose={()=>setDialog(null)}>
 
       {['new','edit'].includes(dialog.type)&&<form className="cm-form vd-form" onSubmit={saveSale}>
@@ -525,6 +581,26 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
       </form>}
 
       {dialog.type==='details'&&detail&&<div className="cm-form">
+        <div className="vd-sale-photo">
+          <div className="vd-sale-photo-preview">
+            {!salePhotoFailed&&<img key={detail.operacao.id+'-'+salePhotoRevision}
+              src={apiUrl('/api/vendas/'+detail.operacao.id+'/foto')+'?rev='+salePhotoRevision}
+              alt={'Foto da venda '+detail.operacao.numero_titulo}
+              onError={()=>setSalePhotoFailed(true)}/>}
+            {salePhotoFailed&&<span role="img" aria-label="Foto não cadastrada">📷</span>}
+          </div>
+          <div className="vd-sale-photo-content">
+            <strong>Foto da venda</strong>
+            <p>Registre o momento da conquista. A imagem fica protegida no servidor, fora do banco de dados.</p>
+            {detail.fechamento
+              ?<small>Foto protegida pelo fechamento nº {detail.fechamento.id}. Apenas consulta.</small>
+              :<><button type="button" className="vd-outline" onClick={()=>salePhotoRef.current?.click()}
+                disabled={salePhotoBusy}>{salePhotoBusy?'Enviando...':'Adicionar / trocar foto'}</button>
+                <small>JPG, PNG ou WebP, até 5 MB.</small></>}
+            <input ref={salePhotoRef} type="file" accept="image/jpeg,image/png,image/webp"
+              onChange={uploadSalePhoto} style={{display:'none'}} aria-label="Selecionar foto da venda"/>
+          </div>
+        </div>
         <div className="vd-overview"><div><span>Preço cobrado pelo título</span><strong>{currency(detail.operacao.valor_cobrado)}</strong></div>
           <div><span>Cliente já pagou</span><strong>{currency(detail.recebido)}</strong></div>
           <div><span>Falta o cliente pagar</span><strong>{currency(detail.saldo)}</strong></div></div>
@@ -545,6 +621,10 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         {detail.fechamento&&<div className="com-alert success" role="status">
           <strong>Venda protegida · Fechamento #{detail.fechamento.id} ({detail.fechamento.status==='CONCLUIDO'?'Concluído':'Em andamento'})</strong>
           <p>Cadastro, recebimentos do cliente e distribuição de comissões bloqueados. Consulte os lançamentos do fechamento correspondente.</p>
+        </div>}
+        {detail.operacao.situacao==='PENDENCIA'&&<div className="com-inform">
+          Durante a negociação, o dinheiro pode ficar com o clube ou o corretor. Registre
+          os adiantamentos feitos ao vendedor e ao gestor separadamente das comissões.
         </div>}
         <div className="vd-detail-title"><strong>Movimentos registrados</strong><small>Estorno corrige erro; devolução registra dinheiro realmente devolvido</small></div>
         {(detail.movimentos||[]).length ? <div className="vd-ledger">{detail.movimentos.map(m=><div key={m.id} className="vd-ledger-entry">
@@ -622,12 +702,71 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
         <div className="cm-form-actions vd-wrap">
           <button type="button" className="cm-button" onClick={()=>setDialog(null)}>Fechar</button>
           <button type="button" className="cm-button" disabled={!detail.editavel} onClick={openEdit}>Editar cadastro</button>
+          {detail.operacao.situacao==='PENDENCIA'&&<button type="button" className="cm-button"
+            onClick={()=>{setFormError('');setDialog({type:'custodia',op:dialog.op})}}>
+            Custódia e adiantamentos
+          </button>}
+          <button type="button" className="cm-button"
+            disabled={!detail.editavel||!(detail.movimentos||[]).some(m=>m.tipo==='ENTRADA'&&Number(m.saldo_estornavel)===Number(m.valor))}
+            onClick={()=>{
+              setCorrectForm({...blankMovement(),justificativa:''})
+              setFormError('');setDialog({type:'correct',op:dialog.op})
+            }}>Corrigir forma / valor</button>
           <button type="button" className="cm-button" disabled={!!detail.fechamento} onClick={openAdjustment}>Ajustar comissão</button>
           <button type="button" className="cm-button" disabled={!!detail.fechamento||!!detail.titulo_posterior||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'reversal',op:dialog.op})}}>Estornar lançamento</button>
           <button type="button" className="cm-button" disabled={!!detail.fechamento||!!detail.titulo_posterior||!entryRecords.length} onClick={()=>{setMoveForm(blankMovement());setFormError('');setDialog({type:'refund',op:dialog.op})}}>Devolver dinheiro</button>
           <button type="button" className="cm-button primary" disabled={!!detail.fechamento||!!detail.titulo_posterior||Number(detail.saldo)<=0} onClick={()=>{setMoveForm({...blankMovement(),valor:suggestedAmount(detail.saldo)});setFormError('');setDialog({type:'receipt',op:dialog.op})}}>Registrar recebimento</button>
         </div>
       </div>}
+
+      {dialog.type==='custodia'&&<PendenciaCustodia operacaoId={dialog.op.id}/>}
+      {dialog.type==='correct'&&<form className="cm-form" onSubmit={saveCorrection}>
+        <div className="com-inform">A correção cria um estorno técnico e registra a nova
+          forma, valor e detentor do dinheiro. O histórico anterior permanece disponível.</div>
+        <label>Recebimento original
+          <FormControl type="select" value={correctForm.entrada_id}
+            onChange={v=>{
+              const original=(detail.movimentos||[]).find(m=>String(m.id)===v)
+              setCorrectForm({...blankMovement(),
+                justificativa:'',entrada_id:v,
+                forma_id:String(original?.forma_id||''),
+                valor:original?.valor||'',
+                detentor:original?.detentor||'CORRETOR',
+                data_movimento:original?.data_movimento||localDateISO()})
+            }}
+            options={(detail.movimentos||[]).filter(m=>m.tipo==='ENTRADA'&&Number(m.saldo_estornavel)===Number(m.valor))
+              .map(m=>({value:String(m.id),label:m.forma_nome+' · '+currency(m.valor)+' · '+dateBR(m.data_movimento)}))}
+            placeholder="Selecione o recebimento"/>
+        </label>
+        <label>Forma de pagamento
+          <FormControl type="select" value={correctForm.forma_id}
+            onChange={v=>setCorrectForm(f=>({...f,forma_id:v}))}
+            options={options.formas.filter(m=>m.ativo).map(m=>({value:String(m.id),label:m.nome}))}
+            placeholder="Selecionar nova forma"/>
+        </label>
+        {(!options.formas.find(m=>String(m.id)===String(correctForm.forma_id))?.credito)&&
+          <label>Onde o dinheiro ficou
+            <FormControl type="select" value={correctForm.detentor}
+              onChange={v=>setCorrectForm(f=>({...f,detentor:v}))}
+              options={[{value:'CORRETOR',label:'Com o corretor'},{value:'EMPRESA',label:'Com o clube'}]}/>
+          </label>}
+        <div className="cm-form-grid">
+          <label>Valor corrigido *<input required inputMode="decimal" value={correctForm.valor}
+            onChange={e=>setCorrectForm(f=>({...f,valor:e.target.value}))}/></label>
+          <label>Data do recebimento *<FormControl type="date" value={correctForm.data_movimento}
+            onChange={v=>setCorrectForm(f=>({...f,data_movimento:v}))}/></label>
+        </div>
+        <label>Justificativa *<textarea required minLength={5} maxLength={500}
+          value={correctForm.justificativa}
+          onChange={e=>setCorrectForm(f=>({...f,justificativa:e.target.value}))} rows={2}/></label>
+        {formError&&<p className="cm-error" role="alert">{formError}</p>}
+        <div className="cm-form-actions">
+          <button type="button" className="cm-button"
+            onClick={()=>setDialog({type:'details',op:dialog.op})}>Voltar</button>
+          <button type="submit" className="cm-button primary" disabled={busy}>
+            {busy?'Salvando...':'Corrigir e recalcular'}</button>
+        </div>
+      </form>}
 
       {dialog.type==='adjust'&&<form className="cm-form" onSubmit={saveAdjustment}>
         <div className="com-inform">O clube pode arredondar a comissão. O ajuste será registrado com justificativa e não realiza repasse financeiro.</div>
@@ -648,7 +787,7 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
           ? 'ESTORNO é apenas uma correção de lançamento incorreto. Nenhum dinheiro é devolvido ao cliente. O sistema anula o saldo registrado dessa entrada e preserva o histórico. Depois, registre o recebimento certo.'
           : dialog.type==='refund'
           ? 'DEVOLUÇÃO significa dinheiro de fato devolvido ao cliente e mantém o responsável por esse dinheiro. Não utilize para corrigir erro de digitação.'
-          : 'Informe quanto o CLIENTE realmente pagou pelo título. Isso não significa comissão recebida. Pix fica com o corretor responsável pela arrecadação; crédito fica com a empresa.'}</div>
+          : 'Informe quanto o CLIENTE realmente pagou. O dinheiro pode ficar com o corretor ou com o clube, inclusive por Pix. Crédito fica com a empresa.'}</div>
         {['refund','reversal'].includes(dialog.type)?<label>Recebimento original
           <FormControl type="select" value={moveForm.entrada_id}
             onChange={v=>setMoveForm(f=>({...f,entrada_id:v}))}
@@ -661,8 +800,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
               options={options.formas.filter(x=>x.ativo).map(x=>({value:String(x.id),label:x.nome}))}
               placeholder="Selecione a forma"/></label>}
         {dialog.type==='receipt' && <label>Onde o dinheiro ficou
-          {currentMethod?.codigo==='PIX'||currentMethod?.credito
-            ? <div className="vd-readonly">{currentMethod.codigo==='PIX'?'Com você (Pix)':'Com a empresa (crédito)'}</div>
+          {currentMethod?.credito
+            ? <div className="vd-readonly">{'Com a empresa (crédito)'}</div>
             : <FormControl type="select" value={moveForm.detentor}
                 onChange={v=>setMoveForm(f=>({...f,detentor:v}))}
                 options={[{value:'CORRETOR',label:'Com você'},{value:'EMPRESA',label:'Com a empresa'}]}/>}

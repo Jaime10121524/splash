@@ -1,0 +1,13 @@
+.splash-toast{position:relative;display:flex;flex-direction:column;max-width:720px;background:#fff;
+  border-radius:16px;box-shadow:0 15px 45px rgba(33,23,73,.13);border:1px solid #e5def7;overflow:hidden}
+.splash-toast-content{display:flex;gap:12px;align-items:center;padding:13px 15px}
+.splash-toast-icon{display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;
+  border-radius:10px;background:#f2edff;color:#624cde;font-weight:900}
+.splash-toast p{flex:1;margin:0;font-size:13px;line-height:1.45;color:#292144;font-weight:650}
+.splash-toast button{border:0;background:transparent;color:#817899;font-size:22px;cursor:pointer;padding:2px 7px}
+.splash-toast-track{height:4px;width:100%;background:#f4f0ff}
+.splash-toast-progress{height:100%;width:100%;background:linear-gradient(90deg,#cdbfff,#917cfb,#624cde);
+  transform-origin:left;animation:splash-toast-shrink linear forwards}
+.splash-toast.error .splash-toast-icon{background:#ffebe6;color:#b65a45}
+@keyframes splash-toast-shrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@media(prefers-reduced-motion:reduce){.splash-toast-progress{animation:none}}

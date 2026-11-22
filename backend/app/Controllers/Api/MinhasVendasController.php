@@ -16,7 +16,11 @@ final class MinhasVendasController extends CommercialBaseController
 {
     private function pessoa(): int|ResponseInterface
     {
-        $user=auth('session')->user();
+        // A mesma consulta individual atende web (sessão) e app (token Shield).
+        // O vínculo é sempre resolvido no servidor, nunca por pessoa_id enviado.
+        $path='/'.ltrim((string)$this->request->getUri()->getPath(),'/');
+        $mobile=str_contains($path,'/api/mobile/');
+        $user=auth($mobile?'tokens':'session')->user();
         if(!$user || $user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
         // Permissão definida na configuração atual do código. O Shield pode
         // conservar no banco uma matriz anterior, sem 'sales.own' para corretor.

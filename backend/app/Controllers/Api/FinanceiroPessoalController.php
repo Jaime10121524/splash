@@ -11,12 +11,20 @@ use Throwable;
 
 class FinanceiroPessoalController extends CommercialBaseController
 {
+    private function mobile(): bool
+    {
+        return str_contains('/'.ltrim((string)$this->request->getUri()->getPath(),'/'),'/api/mobile/');
+    }
+
     private function actor(): array|ResponseInterface
     {
-        $user=auth('session')->user();
+        $mobile=$this->mobile();
+        $user=auth($mobile?'tokens':'session')->user();
         if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
-        $admin=$user->inGroup('admin')&&$user->can('visits.manage');
-        $allowed=ExtratoPermissoes::financeiroPessoal($admin,$user->inGroup('corretor') && $user->can('finance.own'));
+        $admin=$user->inGroup('admin')&&($mobile||$user->can('visits.manage'));
+        $corretor=$user->inGroup('corretor')&&$user->can('finance.own');
+        $otherRead=$mobile&&$user->inGroup('vendedor','gerente');
+        $allowed=ExtratoPermissoes::financeiroPessoal($admin,$corretor)||$otherRead;
         if(!$allowed)return $this->errorResponse(403,'Acesso ao financeiro pessoal não autorizado.');
         $own=null;
         if(!$admin){
@@ -25,7 +33,31 @@ class FinanceiroPessoalController extends CommercialBaseController
             if(!$person)return $this->errorResponse(403,'Usuário sem pessoa ativa vinculada.');
             $own=(int)$person['id'];
         }
-        return ['admin'=>$admin,'own'=>$own,'user_id'=>(int)$user->id];
+        // Somente admin cadastra empréstimos. Corretor pode registrar seus
+        // próprios gastos apenas se tiver expenses.own; demais perfis só leem.
+        return [
+            'admin'=>$admin,'own'=>$own,'user_id'=>(int)$user->id,
+            'pode_gasto'=>$admin||($user->inGroup('corretor')&&$user->can('expenses.own')),
+            'pode_emprestimo'=>$admin,
+        ];
+    }
+
+    private function authorizeFinancialAdmin(): ?ResponseInterface
+    {
+        $actor=$this->actor();
+        if($actor instanceof ResponseInterface)return $actor;
+        return $actor['admin']?null:$this->errorResponse(403,'Acesso restrito ao administrador.');
+    }
+
+    public function mobilePessoas(): ResponseInterface
+    {
+        $actor=$this->actor();
+        if($actor instanceof ResponseInterface)return $actor;
+        if(!$actor['admin'])return $this->errorResponse(403,'Consulta restrita ao administrador.');
+        $rows=db_connect()->table('pessoas')->select('id,nome')
+            ->where('ativo',1)->orderBy('nome','ASC')->get()->getResultArray();
+        return $this->response->setJSON(['pessoas'=>$rows])
+            ->setHeader('Cache-Control','private, no-store');
     }
 
     private function target(array $actor,mixed $requested): int|false
@@ -61,7 +93,9 @@ class FinanceiroPessoalController extends CommercialBaseController
         }
         $db=db_connect();
         $categories=$db->table('financeiro_categorias_despesa')->where('ativo',1);
-        if($id){
+        // No mobile do administrador, a lista de pessoas pode ser filtrada
+        // sem ocultar categorias de outra conta que ele escolha ao cadastrar.
+        if($id && (!$actor['admin'] || !$this->mobile())){
             $categories->groupStart()->where('pessoa_id',null)
                 ->orWhere('pessoa_id',$id)->groupEnd();
         }
@@ -112,6 +146,11 @@ class FinanceiroPessoalController extends CommercialBaseController
                     static fn($loan)=>VendaMoney::cents((string)$loan['saldo'],true),$loans)))],
             'inicio'=>$start,'fim'=>$end,
             'limite_resultados'=>500,
+            'permissoes'=>[
+                'admin'=>$actor['admin'],
+                'cadastrar_gasto'=>$actor['pode_gasto'],
+                'cadastrar_emprestimo'=>$actor['pode_emprestimo'],
+            ],
         ])->setHeader('Cache-Control','no-store');
     }
 
@@ -119,6 +158,7 @@ class FinanceiroPessoalController extends CommercialBaseController
     {
         $actor=$this->actor();
         if($actor instanceof ResponseInterface)return $actor;
+        if(!$actor['pode_gasto'])return $this->errorResponse(403,'Você não pode cadastrar categorias.');
         $input=$this->jsonPayload();
         $name=$this->cleanText($input['nome']??null,90,true);
         $person=$this->target($actor,$input['pessoa_id']??null);
@@ -137,6 +177,7 @@ class FinanceiroPessoalController extends CommercialBaseController
     {
         $actor=$this->actor();
         if($actor instanceof ResponseInterface)return $actor;
+        if(!$actor['pode_gasto'])return $this->errorResponse(403,'Você não pode alterar despesas.');
         $input=$this->jsonPayload();
         $person=$this->target($actor,$input['pessoa_id']??null);
         $category=$this->optionalId($input['categoria_id']??null);
@@ -170,6 +211,7 @@ class FinanceiroPessoalController extends CommercialBaseController
     {
         $actor=$this->actor();
         if($actor instanceof ResponseInterface)return $actor;
+        if(!$actor['pode_gasto'])return $this->errorResponse(403,'Você não pode alterar despesas.');
         $input=$this->jsonPayload();
         $category=$this->optionalId($input['categoria_id']??null);
         $date=(string)($input['data_despesa']??'');
@@ -205,6 +247,7 @@ class FinanceiroPessoalController extends CommercialBaseController
     {
         $actor=$this->actor();
         if($actor instanceof ResponseInterface)return $actor;
+        if(!$actor['pode_gasto'])return $this->errorResponse(403,'Você não pode alterar despesas.');
         $reason=$this->cleanText($this->jsonPayload()['justificativa']??null,500,true);
         if($reason===false||mb_strlen((string)$reason)<5){
             return $this->errorResponse(422,'Informe o motivo do cancelamento (mínimo cinco caracteres).');
@@ -232,7 +275,7 @@ class FinanceiroPessoalController extends CommercialBaseController
 
     public function editarEmprestimo(int|string $id): ResponseInterface
     {
-        if($denied=$this->authorizeAdmin())return $denied;
+        if($denied=$this->authorizeFinancialAdmin())return $denied;
         $data=$this->jsonPayload();
         $date=(string)($data['data_emprestimo']??'');
         $amount=$this->amount($data['valor']??null);
@@ -260,7 +303,7 @@ class FinanceiroPessoalController extends CommercialBaseController
 
     public function cancelarEmprestimo(int|string $id): ResponseInterface
     {
-        if($denied=$this->authorizeAdmin())return $denied;
+        if($denied=$this->authorizeFinancialAdmin())return $denied;
         $reason=$this->cleanText($this->jsonPayload()['justificativa']??null,500,true);
         if($reason===false||mb_strlen((string)$reason)<5){
             return $this->errorResponse(422,'Informe o motivo do cancelamento (mínimo cinco caracteres).');
@@ -279,7 +322,7 @@ class FinanceiroPessoalController extends CommercialBaseController
             }
             $db->table('financeiro_emprestimos')->where('id',(int)$id)->update([
                 'situacao'=>'CANCELADO','justificativa_cancelamento'=>$reason,
-                'cancelado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'cancelado_por_usuario_id'=>(int)auth($this->mobile()?'tokens':'session')->user()->id,
                 'cancelado_em'=>date('Y-m-d H:i:s'),
             ]);
             $this->commitOrFail($db);
@@ -291,7 +334,7 @@ class FinanceiroPessoalController extends CommercialBaseController
 
     public function cadastrarEmprestimo(): ResponseInterface
     {
-        if($denied=$this->authorizeAdmin())return $denied;
+        if($denied=$this->authorizeFinancialAdmin())return $denied;
         $input=$this->jsonPayload();
         $person=$this->optionalId($input['pessoa_id']??null);
         $date=(string)($input['data_emprestimo']??'');
@@ -307,7 +350,7 @@ class FinanceiroPessoalController extends CommercialBaseController
         $db->table('financeiro_emprestimos')->insert([
             'pessoa_id'=>$person,'data_emprestimo'=>$date,
             'valor'=>VendaMoney::decimal($amount),'descricao'=>$description,
-            'situacao'=>'ATIVO','criado_por_usuario_id'=>(int)auth('session')->user()->id,
+            'situacao'=>'ATIVO','criado_por_usuario_id'=>(int)auth($this->mobile()?'tokens':'session')->user()->id,
             'criado_em'=>date('Y-m-d H:i:s'),
         ]);
         return $this->responseOK('Empréstimo registrado para esta pessoa. O abatimento será negociado no fechamento.');

@@ -17,9 +17,18 @@ use Throwable;
  */
 class VendasController extends CommercialBaseController
 {
-    private function guard(): ?ResponseInterface
+    protected function guard(): ?ResponseInterface
     {
         return $this->authorizeAdmin();
+    }
+
+    /** Usuário autenticado da sessão web ou do token Shield mobile validado pela rota. */
+    protected function saleActorId(): int
+    {
+        $mobile = str_contains((string) $this->request->getUri()->getPath(), '/api/mobile/');
+        $user = auth($mobile ? 'tokens' : 'session')->user();
+        if (!$user || $user->isBanned()) throw new \RuntimeException('Usuário não autenticado.');
+        return (int) $user->id;
     }
 
     private function impedeVendaFechada($db,int $id): ?ResponseInterface
@@ -165,14 +174,15 @@ class VendasController extends CommercialBaseController
         $periodo=ProtecaoVendaFechada::fechamento($db,(int)$id);
         $tituloAnterior=$db->table('titulo_vinculos')->where('operacao_nova_id',(int)$id)->get()->getRowArray();
         $tituloPosterior=$db->table('titulo_vinculos')->where('operacao_origem_id',(int)$id)->get()->getRowArray();
-        $editavel=$periodo===null && !$tituloAnterior && !$tituloPosterior && $op['comissao_ajustada']===null;
-        if($this->temRateio($db,(int)$id)||$this->temPagamentoTitular($db,(int)$id))$editavel=false;
-        foreach($movements as $mov){
-            if($mov['tipo']==='DEVOLUCAO') $editavel=false;
-        }
-        // Só pode alterar condições com todos os lançamentos estornados
-        // (ou quando não houve entrada). Devolução real NÃO libera edição.
-        if($received!==0) $editavel=false;
+        // Recebimentos de CLIENTE não impedem ajuste. Rateios automaticos
+        // sem repasse podem ser recalculados, preservando o historico.
+        $editavel=$periodo===null && !$tituloAnterior && !$tituloPosterior
+            && !$this->temPagamentoTitular($db,(int)$id);
+        foreach($movements as $mov)if($mov['tipo']==='DEVOLUCAO')$editavel=false;
+        $rateIds=array_column($db->table('comissao_rateios')->select('id')
+            ->where('operacao_id',(int)$id)->get()->getResultArray(),'id');
+        if($rateIds&&$db->table('comissao_repasses')->whereIn('rateio_id',$rateIds)
+            ->countAllResults()>0)$editavel=false;
         $comissaoStatus=$this->comissoesNoDetalhe($db,$op);
         $recClube=null;
         if($periodo){
@@ -249,7 +259,11 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Gerente inválido ou sem função de gerente no cadastro Pessoas.');
             }
-            $brokers=$this->participants($db,$data,$visit);
+            // Um atendimento pode ter captador diferente do corretor que
+            // realmente recebe pela venda (ex.: renovacao de terceiro).
+            // O vinculo da visita permanece intacto, com auditoria propria.
+            $override=($data['corretores_venda_diferentes_visita']??false)===true;
+            $brokers=$this->participants($db,$data,$override?null:$visit);
             if(isset($brokers['error'])){
                 $db->transRollback();
                 return $this->errorResponse(422,$brokers['error']);
@@ -298,9 +312,24 @@ class VendasController extends CommercialBaseController
                 }
             }
             $now=$this->nowLocal();
+            $external=\App\Libraries\GestaoEquipe::renovacaoExterna(
+                $db,(int)$clientId,(int)$brokers['corretor_pessoa_id'],$visit,
+                $brokers['segundo_corretor_pessoa_id']??null);
+            // Titularidade da corrente e obrigação de repasse são coisas diferentes:
+            // Marcelino permanece dono da corrente externa; James pode administrar
+            // a venda como segundo corretor e responsável financeiro.
+            $currentOwner=$external
+                ?(int)$brokers['corretor_pessoa_id']
+                :(int)($client['dono_corrente_pessoa_id']
+                    ?: \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']));
+            $financialManager=$external && !empty($brokers['segundo_corretor_pessoa_id'])
+                ?(int)$brokers['segundo_corretor_pessoa_id']:null;
+            \App\Libraries\GestaoEquipe::atribuirCorrente($db,(int)$clientId,$currentOwner,
+                $this->saleActorId(),'Titularidade da corrente conforme equipe ou renovação externa.');
             $db->table('venda_operacoes')->insert([
                 'cliente_id'=>$clientId,'visita_id'=>$visitId,'plano_versao_id'=>$versionId,
                 'situacao'=>$kind,'historica'=>$historic?1:0,'numero_titulo'=>$number,
+                'renovacao_externa'=>$external?1:0,
                 'sigla_plano'=>$plan['codigo'],'prazo_meses'=>(int)$plan['duracao_meses'],
                 'valor_tabela'=>VendaMoney::decimal($table),
                 'desconto_corretor'=>VendaMoney::decimal($discount),
@@ -311,12 +340,13 @@ class VendasController extends CommercialBaseController
                 'comissao_prevista'=>$estimate['valor'],
                 'observacao_comissao'=>$estimate['aviso'],
                 ...$brokers,
-                'dono_corrente_pessoa_id'=>(int)$client['dono_corrente_pessoa_id'],
+                'dono_corrente_pessoa_id'=>$currentOwner,
+                'responsavel_financeiro_pessoa_id'=>$financialManager,
                 'gerente_pessoa_id'=>$managerId,
                 ...$attendants,
                 'data_negociacao'=>$day,'data_venda'=>$saleDate,'data_inicio'=>$start,
                 'data_vencimento'=>$expiry,'retorno_previsto'=>$kind==='PENDENCIA'?$returnDay:null,
-                'observacoes'=>$notes,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'observacoes'=>$notes,'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$now,
             ]);
             $id=(int)$db->insertID();
@@ -370,9 +400,16 @@ class VendasController extends CommercialBaseController
                 $net += $move['tipo']==='ENTRADA' ? $cent : -$cent;
                 if($move['tipo']==='DEVOLUCAO')$hasRealRefund=true;
             }
-            if($net!==0 || $hasRealRefund || $op['comissao_ajustada']!==null || ($this->temRateio($db,(int)$id) || $this->temPagamentoTitular($db,(int)$id))){
+            // Recebimentos do cliente permanecem; recalculamos as comissoes
+            // na mesma transacao. Repasses efetivos exigem compensacao auditada.
+            $rateIds=array_column($db->table('comissao_rateios')->select('id')
+                ->where('operacao_id',(int)$id)->get()->getResultArray(),'id');
+            $hasRepasses=$rateIds && $db->table('comissao_repasses')
+                ->whereIn('rateio_id',$rateIds)->countAllResults()>0;
+            if($hasRealRefund || $hasRepasses || $this->temPagamentoTitular($db,(int)$id)){
                 $db->transRollback();
-                return $this->errorResponse(409,'Cadastro protegido: existem pagamentos não estornados, devoluções reais ou comissão já ajustada. Apenas operações sem movimentação financeira válida podem ser corrigidas.');
+                return $this->errorResponse(409,
+                    'Há devoluções ou repasses efetivos de comissão. É necessário um ajuste compensatório auditado antes de alterar responsáveis.');
             }
             $versionId=$this->optionalId($data['plano_versao_id']??null);
             if(!$versionId){
@@ -391,6 +428,10 @@ class VendasController extends CommercialBaseController
             if($discount===null || $discount>=$table){
                 $db->transRollback();
                 return $this->errorResponse(422,'Desconto inválido ou superior ao valor de tabela.');
+            }
+            if($net>$table-$discount){
+                $db->transRollback();
+                return $this->errorResponse(422,'O novo valor não pode ser menor que o total já recebido do cliente.');
             }
             $estimate=['valor'=>null,'aviso'=>'Aguardando pagamento do cliente para calcular a comissão automaticamente.'];
             $day=(string)($data['data_negociacao']??'');
@@ -432,13 +473,13 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Observações com mais de 4000 caracteres.');
             }
-            $visit=$op['visita_id'] ? $db->table('visitas')->where('id',$op['visita_id'])->get()->getRowArray():null;
-            $brokers=$this->participants($db,$data,$visit);
+            // Captador da visita e titular financeiro podem ser diferentes.
+            $brokers=$this->participants($db,$data,null);
             if(isset($brokers['error'])){
                 $db->transRollback();
                 return $this->errorResponse(422,$brokers['error']);
             }
-            $attendants=$this->attendants($db,$data,$visit);
+            $attendants=$this->attendants($db,$data,null);
             if(isset($attendants['error'])){
                 $db->transRollback();
                 return $this->errorResponse(422,$attendants['error']);
@@ -449,7 +490,21 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Gerente inválido ou sem função gerente.');
             }
+            $visit=$op['visita_id']?$db->table('visitas')->where('id',(int)$op['visita_id'])->get()->getRowArray():null;
+            $external=\App\Libraries\GestaoEquipe::renovacaoExterna(
+                $db,(int)$op['cliente_id'],(int)$brokers['corretor_pessoa_id'],$visit,
+                $brokers['segundo_corretor_pessoa_id']??null,(int)$id);
+            $currentOwner=$external?(int)$brokers['corretor_pessoa_id']:
+                (int)($op['dono_corrente_pessoa_id']
+                    ?: \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']));
+            $financialManager=$external && !empty($brokers['segundo_corretor_pessoa_id'])
+                ?(int)$brokers['segundo_corretor_pessoa_id']:null;
+            \App\Libraries\GestaoEquipe::atribuirCorrente($db,(int)$op['cliente_id'],
+                $currentOwner,$this->saleActorId(),'Ajuste de responsáveis antes do fechamento.');
             $new=[
+                'dono_corrente_pessoa_id'=>$currentOwner,
+                'responsavel_financeiro_pessoa_id'=>$financialManager,
+                'renovacao_externa'=>$external?1:0,
                 'gerente_pessoa_id'=>$managerId,
                 'plano_versao_id'=>$versionId,'sigla_plano'=>$plan['codigo'],
                 'prazo_meses'=>(int)$plan['duracao_meses'],
@@ -467,18 +522,24 @@ class VendasController extends CommercialBaseController
                 'retorno_previsto'=>$returnDay,'observacoes'=>$notes,
             ];
             $before=array_intersect_key($op,$new);
+            // Nunca apagar movimentos de recebimento, somente invalidar
+            // a apuracao de direitos sem repasse e refazer o rateio.
+            if($rateIds)$db->table('comissao_rateios')->where('operacao_id',(int)$id)->delete();
+            $db->table('comissao_auto_apuracoes')->where('operacao_id',(int)$id)->delete();
             $db->table('venda_operacoes')->where('id',(int)$id)
                 ->update([...$new,'atualizado_em'=>$this->nowLocal()]);
+            $this->updateEstimate($db,(int)$id,[...$op,...$new]);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $db->table('venda_operacoes_auditoria')->insert([
                 'operacao_id'=>(int)$id,'acao'=>'EDITAR_DADOS',
                 'dados_antes'=>json_encode($before,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'dados_depois'=>json_encode($new,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'justificativa'=>$reason,
-                'usuario_id'=>(int)auth('session')->user()->id,
+                'usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->commitOrFail($db);
-            return $this->responseOK('Cadastro corrigido. O histórico anterior foi preservado.');
+            return $this->responseOK('Venda corrigida. Recebimentos preservados e comissões recalculadas com auditoria.');
         }catch(Throwable $e){
             $db->transRollback();
             return $this->unexpected($e,'edição de venda');
@@ -532,12 +593,12 @@ class VendasController extends CommercialBaseController
                         'visita_id'=>(int)$visit['id'],
                         'status_anterior'=>'PENDENCIA',
                         'status_novo'=>'VENDA',
-                        'usuario_id'=>(int)auth('session')->user()->id,
+                        'usuario_id'=>$this->saleActorId(),
                         'criado_em'=>$this->nowLocal(),
                     ]);
                 }
             }
-            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $this->commitOrFail($db);
             \App\Libraries\AvisosSplash::venda((int)$id);
             \App\Libraries\AvisosSplash::venda((int)$id,true);
@@ -586,8 +647,7 @@ class VendasController extends CommercialBaseController
                 return $this->errorResponse(422,'O recebimento não pode ultrapassar o saldo a receber.');
             }
             $holder=(string)($data['detentor']??'');
-            if($method['codigo']==='PIX')$holder='CORRETOR';
-            elseif((bool)$method['credito'])$holder='EMPRESA';
+            if((bool)$method['credito'])$holder='EMPRESA';
             elseif(!in_array($holder,['CORRETOR','EMPRESA'],true)){
                 $db->transRollback();
                 return $this->errorResponse(422,'Informe com quem o valor recebido ficou.');
@@ -601,11 +661,11 @@ class VendasController extends CommercialBaseController
                 'operacao_id'=>(int)$id,'tipo'=>'ENTRADA','referencia_entrada_id'=>null,
                 'forma_id'=>$methodId,'detentor'=>$holder,'valor'=>VendaMoney::decimal($money),
                 'data_movimento'=>$date,'observacoes'=>$note,
-                'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->updateEstimate($db,(int)$id,$op);
-            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $this->commitOrFail($db);
             \App\Libraries\AvisosSplash::venda((int)$id,true);
             \App\Libraries\AvisosSplash::vendaPaga((int)$id);
@@ -615,6 +675,245 @@ class VendasController extends CommercialBaseController
             $db->transRollback();
             return $this->unexpected($e,'receber venda');
         }
+    }
+
+    /**
+     * Corrige um recebimento sem apagar ou reescrever o extrato.
+     * Um estorno técnico e uma nova entrada são gravados na mesma transação.
+     * As comissões automáticas não pagas são reapuradas e auditadas.
+     */
+    public function corrigirRecebimento(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $entryId=$this->optionalId($data['entrada_id']??null);
+        $formId=$this->optionalId($data['forma_id']??null);
+        $amount=VendaMoney::cents($data['valor']??null);
+        $day=(string)($data['data_movimento']??'');
+        $reason=$this->cleanText($data['justificativa']??null,500,true);
+        if(!$entryId||!$formId||$amount===null||!$this->validateDate($day,false)
+            ||$reason===false||mb_strlen($reason)<5)
+            return $this->errorResponse(422,'Informe recebimento, forma, valor, data e motivo (mínimo 5 caracteres).');
+        $db=db_connect();$db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op){$db->transRollback();return $this->errorResponse(404,'Venda não encontrada.');}
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
+            if($this->temPagamentoTitular($db,(int)$id)){
+                $db->transRollback();return $this->errorResponse(409,'Comissão já movimentada: corrija pelo fechamento.');
+            }
+            $rateIds=array_column($db->table('comissao_rateios')->select('id')
+                ->where('operacao_id',(int)$id)->get()->getResultArray(),'id');
+            if($rateIds && $db->table('comissao_repasses')->whereIn('rateio_id',$rateIds)->countAllResults()>0){
+                $db->transRollback();return $this->errorResponse(409,'Existem repasses de comissão. Estorne primeiro os repasses.');
+            }
+            $audit=$db->table('comissao_auto_apuracoes')->where('operacao_id',(int)$id)->get()->getRowArray();
+            if($audit && $audit['status']==='MANUAL'){
+                $db->transRollback();return $this->errorResponse(409,'Esta venda possui rateio manual. Reavalie as participações antes de corrigir o recebimento.');
+            }
+            if($rateIds && !$audit){
+                $db->transRollback();return $this->errorResponse(409,'Existem participações sem apuração automática. Confira a auditoria antes de corrigir.');
+            }
+            $original=$db->table('venda_recebimentos')->where('id',$entryId)
+                ->where('operacao_id',(int)$id)->where('tipo','ENTRADA')->get()->getRowArray();
+            if(!$original){
+                $db->transRollback();return $this->errorResponse(404,'Recebimento original não encontrado.');
+            }
+            $reversed=$db->table('venda_recebimentos')->selectSum('valor')
+                ->where('referencia_entrada_id',$entryId)
+                ->whereIn('tipo',['ESTORNO','DEVOLUCAO'])->get()->getRowArray();
+            if(VendaMoney::cents((string)($reversed['valor']??'0'),true)>0){
+                $db->transRollback();return $this->errorResponse(409,'Recebimento já estornado ou devolvido parcialmente. Faça ajuste separado.');
+            }
+            $method=$db->table('venda_formas_pagamento')->where('id',$formId)->where('ativo',1)->get()->getRowArray();
+            if(!$method||$method['codigo']==='ABATIMENTO_EMP'){
+                $db->transRollback();return $this->errorResponse(422,'Forma de pagamento inválida.');
+            }
+            if($day<$op['data_negociacao']){
+                $db->transRollback();return $this->errorResponse(422,'Data do recebimento anterior à negociação.');
+            }
+            $oldValue=VendaMoney::cents((string)$original['valor']);
+            if($amount>$this->balance($db,(int)$id,$op)+$oldValue){
+                $db->transRollback();return $this->errorResponse(422,'Novo valor excede o saldo disponível.');
+            }
+            $holder=(bool)$method['credito']?'EMPRESA':(string)($data['detentor']??'');
+            if(!in_array($holder,['CORRETOR','EMPRESA'],true)){
+                $db->transRollback();return $this->errorResponse(422,'Selecione se o valor ficou com o clube ou corretor.');
+            }
+            if($op['situacao']==='PENDENCIA' && $db->tableExists('pendencia_adiantamentos')){
+                $custodia=$this->saldosCustodia($db,(int)$id);
+                $custodia[(string)$original['detentor']]-=$oldValue;
+                $custodia[$holder]+=$amount;
+                if($custodia['CORRETOR']<0||$custodia['EMPRESA']<0){
+                    $db->transRollback();return $this->errorResponse(409,'Há adiantamentos usando este dinheiro. Estorne os adiantamentos antes de mudar o recebimento.');
+                }
+            }
+            $now=$this->nowLocal();
+            if($audit){
+                $oldRates=$db->table('comissao_rateios')->where('operacao_id',(int)$id)->get()->getResultArray();
+                $db->table('comissao_rateios_auditoria')->insert([
+                    'operacao_id'=>(int)$id,
+                    'dados_antes'=>json_encode($oldRates,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                    'dados_depois'=>'[]',
+                    'justificativa'=>'Reabertura de apuração automática por correção de recebimento: '.$reason,
+                    'usuario_id'=>$this->saleActorId(),'criado_em'=>$now,
+                ]);
+                $db->table('comissao_rateios')->where('operacao_id',(int)$id)->delete();
+                $db->table('comissao_auto_apuracoes')->where('operacao_id',(int)$id)->delete();
+            }
+            $db->table('venda_recebimentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'ESTORNO','referencia_entrada_id'=>$entryId,
+                'forma_id'=>$original['forma_id'],'detentor'=>$original['detentor'],
+                'valor'=>$original['valor'],
+                'data_movimento'=>max(substr($now,0,10),(string)$original['data_movimento']),
+                'observacoes'=>'Correção: '.$reason,
+                'criado_por_usuario_id'=>$this->saleActorId(),'criado_em'=>$now,
+            ]);
+            $db->table('venda_recebimentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'ENTRADA','referencia_entrada_id'=>null,
+                'forma_id'=>$formId,'detentor'=>$holder,
+                'valor'=>VendaMoney::decimal($amount),'data_movimento'=>$day,
+                'observacoes'=>'Substitui entrada #'.$entryId.'. '.$reason,
+                'criado_por_usuario_id'=>$this->saleActorId(),'criado_em'=>$now,
+            ]);
+            $this->updateEstimate($db,(int)$id,$op);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
+            $this->commitOrFail($db);
+            return $this->responseOK('Recebimento corrigido com estorno técnico, nova entrada e auditoria das comissões.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'correção de recebimento');
+        }
+    }
+
+    /** Saldo por detentor, considerando recebimentos e adiantamentos registrados. */
+    private function saldosCustodia($db,int $id): array
+    {
+        $saldos=['CORRETOR'=>0,'EMPRESA'=>0];
+        foreach($db->table('venda_recebimentos')->select('tipo,detentor,valor')
+            ->where('operacao_id',$id)->get()->getResultArray() as $r){
+            $source=(string)$r['detentor'];
+            if(!array_key_exists($source,$saldos))continue;
+            $value=VendaMoney::cents((string)$r['valor'],true)??0;
+            $saldos[$source]+=($r['tipo']==='ENTRADA'?1:-1)*$value;
+        }
+        if($db->tableExists('pendencia_adiantamentos')){
+            foreach($db->table('pendencia_adiantamentos')->select('tipo,origem,valor')
+                ->where('operacao_id',$id)->get()->getResultArray() as $r){
+                $source=(string)$r['origem'];
+                if(!array_key_exists($source,$saldos))continue;
+                $value=VendaMoney::cents((string)$r['valor'],true)??0;
+                $saldos[$source]+=($r['tipo']==='ESTORNO'?1:-1)*$value;
+            }
+        }
+        return $saldos;
+    }
+
+    public function custodiaPendencia(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $db=db_connect();
+        if(!$db->tableExists('pendencia_adiantamentos'))
+            return $this->errorResponse(503,'Execute as migrations de custódia das pendências.');
+        $op=$db->table('venda_operacoes')->where('id',(int)$id)->get()->getRowArray();
+        if(!$op)return $this->errorResponse(404,'Negociação não encontrada.');
+        $moves=$db->table('pendencia_adiantamentos a')
+            ->select('a.*,p.nome AS beneficiario_nome')
+            ->join('pessoas p','p.id=a.beneficiario_pessoa_id')
+            ->where('a.operacao_id',(int)$id)->orderBy('a.id','DESC')->get()->getResultArray();
+        $sal=$this->saldosCustodia($db,(int)$id);
+        return $this->response->setJSON([
+            'operacao_id'=>(int)$id,'situacao'=>$op['situacao'],
+            'saldos'=>['CORRETOR'=>VendaMoney::decimal($sal['CORRETOR']),
+                'EMPRESA'=>VendaMoney::decimal($sal['EMPRESA'])],
+            'movimentos'=>$moves,
+            'aviso'=>'Adiantamentos movimentam custódia, não quitam comissões. Conciliar manualmente ao fechar a venda.',
+        ])->setHeader('Cache-Control','no-store');
+    }
+
+    public function registrarAdiantamento(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $person=$this->optionalId($data['beneficiario_pessoa_id']??null);
+        $value=VendaMoney::cents($data['valor']??null);
+        $origem=(string)($data['origem']??'');
+        $day=(string)($data['data_movimento']??'');
+        $reason=$this->cleanText($data['observacoes']??null,500,true);
+        if(!$person||$value===null||!in_array($origem,['CORRETOR','EMPRESA'],true)
+            ||!$this->validateDate($day,false)||$reason===false)
+            return $this->errorResponse(422,'Informe origem do valor, vendedor/gestor, valor, data e justificativa.');
+        $db=db_connect();$db->transBegin();
+        try{
+            if(!$db->tableExists('pendencia_adiantamentos')){
+                $db->transRollback();return $this->errorResponse(503,'Execute as migrations de custódia.');
+            }
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op||$op['situacao']!=='PENDENCIA'){
+                $db->transRollback();return $this->errorResponse(409,'Adiantamentos devem ser registrados enquanto a negociação está pendente.');
+            }
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
+            if($day<$op['data_negociacao']){
+                $db->transRollback();return $this->errorResponse(422,'Data anterior à negociação.');
+            }
+            $valid=$db->table('pessoas p')->join('pessoa_papeis r','r.pessoa_id=p.id')
+                ->where('p.id',$person)->where('p.ativo',1)
+                ->whereIn('r.papel',['vendedor','gerente'])->countAllResults()>0;
+            if(!$valid){
+                $db->transRollback();return $this->errorResponse(422,'Destinatário precisa ser vendedor ou gestor ativo.');
+            }
+            $sal=$this->saldosCustodia($db,(int)$id);
+            if($value>$sal[$origem]){
+                $db->transRollback();return $this->errorResponse(422,'Adiantamento supera o saldo que está com o clube ou corretor.');
+            }
+            $db->table('pendencia_adiantamentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'SAIDA','referencia_adiantamento_id'=>null,
+                'origem'=>$origem,'beneficiario_pessoa_id'=>$person,
+                'valor'=>VendaMoney::decimal($value),'data_movimento'=>$day,
+                'observacoes'=>$reason,'usuario_id'=>$this->saleActorId(),
+                'criado_em'=>$this->nowLocal(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Adiantamento registrado sem antecipar comissão de venda.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'adiantamento da pendência');}
+    }
+
+    public function estornarAdiantamento(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $originalId=$this->optionalId($data['adiantamento_id']??null);
+        $reason=$this->cleanText($data['justificativa']??null,500,true);
+        if(!$originalId||$reason===false||mb_strlen($reason)<5)
+            return $this->errorResponse(422,'Selecione o adiantamento e justifique o estorno.');
+        $db=db_connect();$db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op||$op['situacao']!=='PENDENCIA'){
+                $db->transRollback();return $this->errorResponse(409,'Adiantamento só pode ser estornado antes da conversão da negociação.');
+            }
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
+            $old=$db->table('pendencia_adiantamentos')->where('id',$originalId)
+                ->where('operacao_id',(int)$id)->where('tipo','SAIDA')->get()->getRowArray();
+            if(!$old||$db->table('pendencia_adiantamentos')->where('referencia_adiantamento_id',$originalId)->countAllResults()>0){
+                $db->transRollback();return $this->errorResponse(409,'Adiantamento inexistente ou já estornado.');
+            }
+            $db->table('pendencia_adiantamentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'ESTORNO',
+                'referencia_adiantamento_id'=>$originalId,
+                'origem'=>$old['origem'],'beneficiario_pessoa_id'=>$old['beneficiario_pessoa_id'],
+                'valor'=>$old['valor'],'data_movimento'=>substr($this->nowLocal(),0,10),
+                'observacoes'=>$reason,'usuario_id'=>$this->saleActorId(),
+                'criado_em'=>$this->nowLocal(),
+            ]);
+            $this->commitOrFail($db);
+            return $this->responseOK('Adiantamento estornado com histórico preservado.');
+        }catch(Throwable $e){$db->transRollback();return $this->unexpected($e,'estorno de adiantamento');}
     }
 
     public function devolver(int|string $id): ResponseInterface
@@ -661,7 +960,7 @@ class VendasController extends CommercialBaseController
                 'operacao_id'=>(int)$id,'tipo'=>'DEVOLUCAO','referencia_entrada_id'=>$reference,
                 'forma_id'=>$original['forma_id'],'detentor'=>$original['detentor'],
                 'valor'=>VendaMoney::decimal($amount),'data_movimento'=>$date,
-                'observacoes'=>$note,'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'observacoes'=>$note,'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->updateEstimate($db,(int)$id,$op);
@@ -721,7 +1020,7 @@ class VendasController extends CommercialBaseController
                 'forma_id'=>$original['forma_id'],'detentor'=>$original['detentor'],
                 'valor'=>VendaMoney::decimal($remaining),
                 'data_movimento'=>$date,'observacoes'=>$reason,
-                'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                'criado_por_usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
             $this->updateEstimate($db,(int)$id,$op);
@@ -768,10 +1067,10 @@ class VendasController extends CommercialBaseController
             ]);
             $db->table('venda_comissao_ajustes')->insert([
                 'operacao_id'=>(int)$id,'valor_anterior'=>$before,'valor_novo'=>$adjusted,
-                'justificativa'=>$reason,'usuario_id'=>(int)auth('session')->user()->id,
+                'justificativa'=>$reason,'usuario_id'=>$this->saleActorId(),
                 'criado_em'=>$this->nowLocal(),
             ]);
-            RateioAutomatico::sync($db,(int)$id,(int)auth('session')->user()->id);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
             $this->commitOrFail($db);
             return $this->responseOK('Comissão ajustada e registrada no histórico. Nenhum repasse foi realizado.');
         }catch(Throwable $e){

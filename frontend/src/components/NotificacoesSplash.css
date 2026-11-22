@@ -35,3 +35,22 @@
 .sn-test-button:hover:not(:disabled){border-color:var(--brand);color:var(--brand)}
 .sn-test-button:disabled{opacity:.5;cursor:wait}
 .sn-push-state{font-size:10px;color:var(--muted-dark)}
+
+
+/* Vendas e quitações em destaque, mantendo o painel contido na largura da tela. */
+.sn-item{display:flex;align-items:flex-start;gap:10px;padding:13px;border-radius:15px}
+.sn-item-icon{width:39px;height:39px;flex:0 0 39px;display:grid;place-items:center;
+  border-radius:12px;background:#EDE7FF;font-size:20px}
+.sn-item-body{display:grid;flex:1;min-width:0;gap:5px}
+.sn-item-body strong{color:var(--text);font-size:12px;line-height:1.4}
+.sn-item-body>span{font-size:11px;line-height:1.55;color:var(--muted-dark)}
+.sn-tag{font-size:9px!important;letter-spacing:.65px;font-weight:900;color:var(--brand)!important}
+.sn-item.sale{border-color:#DCD0FF;background:var(--surface)}
+.sn-item.paid{border-color:#BBEAD0;background:linear-gradient(125deg,#EAFBF1,#FFFFFF 70%)}
+.sn-item.paid .sn-item-icon{background:#D7F6E3}
+.sn-item.unread{border-left:4px solid var(--brand)}
+.sn-item.paid.unread{border-left-color:#1BA166}
+.sn-item .sn-value{font-size:11px;font-weight:900;color:#16734A;
+  background:#DFF7E9;padding:6px 9px;border-radius:8px;justify-self:start;max-width:100%}
+.sn-new-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);margin-top:4px;flex:0 0 8px}
+.sn-list{gap:8px}

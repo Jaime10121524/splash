@@ -173,13 +173,9 @@ final class RateioAutomatico
         $planVersion=$db->table('plano_versoes')
             ->select('duracao_meses')->where('id',(int)$op['plano_versao_id'])->get()->getRowArray();
         $op['duracao_meses']=(int)($planVersion['duracao_meses']??0);
-        $renewalOther=false;
-        if($op['segundo_corretor_pessoa_id']){
-            $cliente=$db->table('clientes c')->select('o.nome AS origem_nome')
-                ->join('lead_origens o','o.id=c.origem_id','left')
-                ->where('c.id',$op['cliente_id'])->get()->getRowArray();
-            $renewalOther=mb_stripos((string)($cliente['origem_nome']??''),'renova')!==false;
-        }
+        $renewalOther=(bool)($op['renovacao_externa']??false);
+        // Origem de lead nao basta: apenas renovacao com titular externo
+        // (sinalizada pela regra da equipe) usa o rateio de terceiro.
         try{
             $plan=self::propose($op,$policy,$holiday,$renewalOther);
         }catch(\InvalidArgumentException $e){

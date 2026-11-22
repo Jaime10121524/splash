@@ -40,3 +40,15 @@
 .ui-native-select-wrap{display:block;position:relative;width:100%;min-width:0}
 .ui-native-select{display:block;appearance:none;-webkit-appearance:none;width:100%;padding-right:42px;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .ui-native-select-arrow{pointer-events:none;display:flex;align-items:center;justify-content:center;position:absolute;top:0;bottom:0;right:12px;color:var(--muted-dark,#717b92)}
+
+/* Selector de pesquisa: lista curta, dentro da tela e alinhada ao campo. */
+.ui-search-menu{display:flex;flex-direction:column;gap:5px;min-width:210px;padding:7px;
+  overflow:hidden;box-shadow:0 20px 48px rgba(11,15,35,.26)}
+.ui-search-head{display:grid;gap:6px;border-bottom:1px solid var(--border);padding:5px 5px 9px}
+.ui-search-head .ui-input{min-height:41px;font-size:12px;background:var(--surface-alt)}
+.ui-search-head>span{font-size:10px;color:var(--muted-dark);padding-left:5px}
+.ui-search-results{overflow-y:auto;min-height:0;max-height:220px;overscroll-behavior:contain}
+.ui-search-results .ui-choice{min-height:38px;font-size:12px}
+.ui-search-empty{text-align:center;color:var(--muted-dark);font-size:12px;padding:18px 10px;margin:0}
+.ui-calendar .ui-day:disabled{opacity:.28;cursor:not-allowed;background:transparent;color:var(--muted)}
+.ui-calendar .ui-day.picked{color:white}

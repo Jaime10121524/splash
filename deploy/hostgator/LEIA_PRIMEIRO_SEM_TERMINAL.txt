@@ -1,0 +1,73 @@
+SPLASH — ATUALIZAÇÃO HOSTGATOR SEM TERMINAL
+===============================================
+Pacote para branch feature/react-native-splash-mobile.
+ATUALIZAÇÃO DE UM SPLASH JÁ INSTALADO, NÃO É INSTALAÇÃO INICIAL.
+
+ESTRUTURA DO ZIP MESTRE
+- SPLASH_PHP_BACKEND.zip: PHP completo de backend/app e backend/public, spark e composer.
+- SPLASH_WEB_PUBLICO.zip: frontend compilado, .htaccess e api/index.php.
+- SQL_PHPMyAdmin/: arquivos SQL em ordem de execução.
+- MANIFESTO_SHA256.txt: integridade dos arquivos.
+
+IMPORTANTE — SÃO DUAS PASTAS DIFERENTES NO CPANEL
+1. PHP PRIVADO: /home/USUARIO/splash-backend, FORA de public_html.
+   Envie SPLASH_PHP_BACKEND.zip para essa pasta e clique em Extract.
+   O ZIP tem app/, public/, spark e composer; não contém vendor ou .env.
+2. SITE PÚBLICO: DOCUMENT ROOT do domínio do SPLASH,
+   p.ex. /home/USUARIO/public_html ou /home/USUARIO/splash_publico.
+   Envie SPLASH_WEB_PUBLICO.zip para essa pasta e clique em Extract.
+   Confirme index.html, assets/, .htaccess e api/index.php na pasta correta.
+
+BACKUP ANTES DE PUBLICAR
+- Coloque o sistema em manutenção; suspenda novos registros enquanto atualiza.
+- Exporte o banco DO SPLASH pelo phpMyAdmin em formato SQL.
+- Salve cópia das pastas pública e privada pelo Gerenciador de Arquivos.
+- Confirme que o backup pode ser restaurado e que selecionou o banco certo.
+
+BANCO DE DADOS — PHPMYADMIN SEM SHELL
+1. Escolha no phpMyAdmin o BANCO DO SPLASH, não outro banco.
+2. Execute SQL_PHPMyAdmin/00_CONFERIR_ANTES.sql (só leitura).
+3. Verifique que as migrations originais ATÉ 2026-11-03-000003
+   já existem na tabela migrations. Se não, PARE: o pacote não
+   inclui a criação de todas as tabelas históricas.
+4. Execute SQL_PHPMyAdmin/01_ATUALIZAR_ESTRUTURA.sql; pare se houver erro.
+5. Execute SQL_PHPMyAdmin/02_REGISTRAR_MIGRACOES.sql.
+6. Execute SQL_PHPMyAdmin/03_CONFERIR_DEPOIS.sql: os itens devem ser OK.
+Os SQL acima equivalem às migrations recentes 2026-11-21-000001
+e 2026-11-22-000001 até 2026-11-22-000004. A etapa 02
+atualiza a tabela migrations do CodeIgniter, impedindo reaplicação.
+
+NÃO APAGAR NEM SOBRESCREVER
+- splash-backend/.env
+- splash-backend/vendor/
+- splash-backend/writable/, inclusive fotos, uploads e backups
+- customizações de servidor e arquivos de outros sites.
+NUNCA copie backend, vendor, .env ou backups para public_html.
+
+PORTA DE ENTRADA PHP
+O adaptador web/api/index.php assume que o diretório público é
+filho direto de /home/USUARIO e que backend está em
+/home/USUARIO/splash-backend. Se o domínio aponta para uma
+subpasta de public_html, compare o adaptador antigo e ajuste
+o caminho $backend ANTES de publicar. Não sobrescreva às cegas.
+
+VALIDAÇÃO
+- Verificar PHP >= 8.2, HTTPS, login, /api/mobile/ping.
+- Conferir vendedores, corretor 1 + 2, renovação, finance,
+  adiantamentos e o acesso da Helena aos históricos.
+- Em Pessoas > Helena, conferir papel GERENTE e opção Visão geral.
+- Não executar migrate:refresh, reset nem SQL de correção em massa.
+- Este pacote NÃO inclui vendor/; se faltar biblioteca PHP,
+  é preciso instalar/atualizar dependências por outro meio.
+
+APK ANDROID — COMANDO NO SEU PC, NÃO NO SERVIDOR
+cd D:\Ahritech\Sistemas\Web\splash\mobile
+npx.cmd eas-cli build --platform android --profile production-apk
+
+OBRIGATÓRIO antes de compilar APK de produção:
+Criar/configurar a variável EAS environment production
+EXPO_PUBLIC_SPLASH_API_URL=https://SEU-DOMINIO-REAL
+O perfil production-apk gera APK; production padrão gera AAB.
+Não publicar APK que aponte para localhost, LAN HTTP ou domínio de exemplo.
+
+O pacote é montado de forma automática no GitHub; veja o commit no manifesto.

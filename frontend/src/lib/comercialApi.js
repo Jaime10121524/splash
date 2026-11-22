@@ -63,3 +63,20 @@ export function personOptions(pessoas, roles = []) {
     .filter(p => p.ativo && (!roles.length || roles.some(role => p.papeis.includes(role))))
     .map(p => ({ value: String(p.id), label: p.nome }))
 }
+
+/** Envia o arquivo real via multipart, sem convertê-lo em base64 ou JSON. */
+export async function comercialUpload(url,file) {
+  if(!(file instanceof File)) throw new Error('Selecione uma foto.')
+  const session=await comercialGet('/api/session')
+  if(!session.authenticated||!session.csrf)throw new Error('Sua sessão expirou. Entre novamente.')
+  const data=new FormData()
+  data.append('foto',file,file.name)
+  const response=await fetch(apiUrl(url),{
+    method:'POST',credentials:apiCredentials,
+    headers:{Accept:'application/json',[session.csrf.header]:session.csrf.hash},
+    body:data,
+  })
+  const output=await response.json().catch(()=>({}))
+  if(!response.ok)throw new Error(output.message||'Falha no upload (HTTP '+response.status+').')
+  return output
+}

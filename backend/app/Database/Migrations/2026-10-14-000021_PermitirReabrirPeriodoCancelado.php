@@ -17,15 +17,21 @@ class PermitirReabrirPeriodoCancelado extends Migration
     {
         // O deploy usa MariaDB/MySQL. Evita alterar índices de SQLite nos testes.
         if ($this->db->DBDriver !== 'MySQLi') return;
-        $existing = $this->db->query("SHOW INDEX FROM fechamento_periodos WHERE Key_name = 'uq_fe_periodo'")
-            ->getResultArray();
-        if ($existing) {
-            $this->db->query('ALTER TABLE fechamento_periodos DROP INDEX uq_fe_periodo');
-        }
+        // A chave estrangeira fk_fe_owner (responsavel_pessoa_id -> pessoas.id)
+        // pode estar sustentada pelo índice UNIQUE original. MySQL/MariaDB
+        // recusam DROP INDEX enquanto não existir outro índice compatível.
+        // Cria PRIMEIRO o índice não exclusivo com o mesmo prefixo.
+        // Operação idempotente caso uma tentativa anterior tenha parado no meio.
         $index = $this->db->query("SHOW INDEX FROM fechamento_periodos WHERE Key_name = 'ix_fe_periodo'")
             ->getResultArray();
         if (!$index) {
             $this->db->query('CREATE INDEX ix_fe_periodo ON fechamento_periodos (responsavel_pessoa_id, inicio, fim)');
+        }
+
+        $existing = $this->db->query("SHOW INDEX FROM fechamento_periodos WHERE Key_name = 'uq_fe_periodo'")
+            ->getResultArray();
+        if ($existing) {
+            $this->db->query('ALTER TABLE fechamento_periodos DROP INDEX uq_fe_periodo');
         }
     }
 

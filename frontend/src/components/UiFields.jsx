@@ -157,6 +157,66 @@ export function SelectInput({value, onChange, options, placeholder='Selecione', 
   </>
 }
 
+
+/** Combo pesquisável com popup limitado ao campo, sem o select nativo gigante. */
+export function SearchSelectInput({value='',onChange,options=[],placeholder='Pesquisar e selecionar',disabled=false,ariaLabel='Selecionar'}) {
+  const anchor=useRef(null),popup=useRef(null),input=useRef(null)
+  const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[active,setActive]=useState(0)
+  const position=usePopup(open,anchor,popup)
+  const values=options.map(o=>typeof o==='object'?o:{value:o,label:String(o)})
+  const selected=values.find(o=>String(o.value)===String(value))
+  const filtered=values.filter(o=>String(o.label).toLocaleLowerCase('pt-BR')
+    .includes(query.toLocaleLowerCase('pt-BR').trim()))
+  useEffect(()=>{if(open){setQuery('');setActive(0);requestAnimationFrame(()=>input.current?.focus())}},[open])
+  useEffect(()=>{
+    if(!open)return
+    const handler=()=>setOpen(false),el=popup.current
+    el?.addEventListener('splash-dismiss',handler)
+    return()=>el?.removeEventListener('splash-dismiss',handler)
+  },[open])
+  function choose(option){
+    if(!option||option.disabled)return
+    onChange(option.value);setOpen(false);anchor.current?.focus()
+  }
+  function keys(e){
+    if(e.key==='Escape'){e.preventDefault();setOpen(false);anchor.current?.focus()}
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      e.preventDefault();setActive(i=>Math.max(0,Math.min(filtered.length-1,i+(e.key==='ArrowDown'?1:-1))))
+    }
+    if(e.key==='Enter'){e.preventDefault();choose(filtered[active])}
+  }
+  return <>
+    <button type="button" ref={anchor} className={'ui-input ui-select-trigger'+(open?' open':'')}
+      aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open}
+      disabled={disabled} onClick={()=>setOpen(x=>!x)}
+      onKeyDown={e=>{if(e.key==='Enter'||e.key===' '||e.altKey&&e.key==='ArrowDown'){
+        e.preventDefault();setOpen(x=>!x)
+      }}}>
+      <span className={!selected?'ui-placeholder':''}>{selected?.label||placeholder}</span><Chevron/>
+    </button>
+    {open&&createPortal(<div className="ui-floating ui-search-menu" ref={popup}
+      role="listbox" aria-label={ariaLabel}
+      style={{top:position.top,left:position.left,width:position.width,
+        maxHeight:Math.min(320,position.maxHeight),
+        transform:position.above?'translateY(-100%)':undefined}}>
+      <div className="ui-search-head"><input ref={input} type="search" className="ui-input"
+        placeholder="Digite para encontrar..." aria-label="Pesquisar opções"
+        value={query} onChange={e=>{setQuery(e.target.value);setActive(0)}} onKeyDown={keys}/>
+        <span>{filtered.length} opções</span></div>
+      <div className="ui-search-results">
+        {filtered.length?filtered.map((option,i)=><button type="button" key={String(option.value)}
+          className={'ui-choice'+(i===active?' hovered':'')+
+            (String(option.value)===String(value)?' selected':'')}
+          onMouseEnter={()=>setActive(i)}
+          role="option" aria-selected={String(option.value)===String(value)}
+          disabled={option.disabled} onClick={()=>choose(option)}>
+          <span>{option.label}</span>{String(option.value)===String(value)?'✓':null}
+        </button>):<p className="ui-search-empty">Nenhuma opção encontrada.</p>}
+      </div>
+    </div>,document.body)}
+  </>
+}
+
 function pad(value) {return String(value).padStart(2,'0')}
 function toISO(value) {
   const result = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim())
@@ -175,7 +235,7 @@ function toBR(value) {
 const weekday = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-export function DateInput({value='',onChange,placeholder='dd/mm/aaaa',disabled=false,ariaLabel='Data'}) {
+export function DateInput({value='',onChange,placeholder='dd/mm/aaaa',disabled=false,ariaLabel='Data',minDate=''}) {
   const anchor=useRef(null)
   const popup=useRef(null)
   const [open,setOpen]=useState(false)
@@ -196,7 +256,7 @@ export function DateInput({value='',onChange,placeholder='dd/mm/aaaa',disabled=f
   function commit() {
     if(text.trim()==='') { onChange('');return }
     const parsed=toISO(text)
-    if(parsed) onChange(parsed)
+    if(parsed && (!minDate || parsed>=minDate)) onChange(parsed)
     else setText(toBR(value))
   }
   function openCalendar() {
@@ -237,7 +297,7 @@ export function DateInput({value='',onChange,placeholder='dd/mm/aaaa',disabled=f
         {cells.map((n,i)=>{
           const iso=n?month.getFullYear()+'-'+pad(month.getMonth()+1)+'-'+pad(n):''
           const isToday=n&&today.getDate()===n&&today.getMonth()===month.getMonth()&&today.getFullYear()===month.getFullYear()
-          return n?<button type="button" className={'ui-day'+(iso===value?' picked':'')+(isToday?' today':'')}
+          return n?<button type="button" disabled={!!minDate&&iso<minDate} className={'ui-day'+(iso===value?' picked':'')+(isToday?' today':'')}
             key={i} onClick={()=>{onChange(iso);setText(toBR(iso));setOpen(false)}} aria-label={toBR(iso)}>{n}</button>
             :<span key={i} className="ui-day-empty"/>
         })}

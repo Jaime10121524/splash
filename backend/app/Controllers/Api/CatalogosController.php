@@ -19,14 +19,15 @@ class CatalogosController extends CommercialBaseController
 
         // Retornamos somente os campos operacionais necessários, nunca credenciais.
         $people=$db->table('pessoas p')
-            ->select('p.id,p.nome,p.ativo,pp.papel')
+            ->select('p.id,p.nome,p.ativo,p.usa_sistema,pp.papel')
             ->join('pessoa_papeis pp','pp.pessoa_id=p.id','inner')
             ->orderBy('p.nome','ASC')->get()->getResultArray();
         $pessoas=[];
         foreach($people as $row) {
             $id=(int)$row['id'];
             if(!isset($pessoas[$id])) $pessoas[$id]=[
-                'id'=>$id,'nome'=>$row['nome'],'ativo'=>(bool)$row['ativo'],'papeis'=>[],
+                'id'=>$id,'nome'=>$row['nome'],'ativo'=>(bool)$row['ativo'],
+                'usa_sistema'=>(bool)$row['usa_sistema'],'papeis'=>[],
             ];
             $pessoas[$id]['papeis'][]=$row['papel'];
         }
@@ -41,6 +42,7 @@ class CatalogosController extends CommercialBaseController
         return $this->response->setJSON([
             'origens'=>$origens, 'motivos'=>$motivos,'pessoas'=>array_values($pessoas),
             'pessoa_logada'=>$this->visitorScopeId(),
+            'pode_confirmar_bonificacao'=>auth('session')->user()?->inGroup('admin')??false,
         ])->setHeader('Cache-Control','no-store');
     }
 

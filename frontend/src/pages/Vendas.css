@@ -165,3 +165,18 @@
   .vd-commission-person-values{grid-template-columns:1fr 1fr}
   .vd-commission-person-values>div:last-child{grid-column:1/-1}
 }
+
+
+/* Foto da venda: painel editorial responsivo e sem ocupar espaço excessivo. */
+.vd-sale-photo { display:flex;align-items:center;gap:20px;background:#F7F5FF;
+  border:1px solid #E6DFFF;border-radius:20px;padding:16px;flex-wrap:wrap }
+.vd-sale-photo-preview { width:148px;height:118px;flex-shrink:0;background:#EAE2FF;
+  border-radius:15px;overflow:hidden;display:grid;place-items:center }
+.vd-sale-photo-preview img { width:100%;height:100%;object-fit:cover }
+.vd-sale-photo-preview span { font-size:40px;opacity:.65 }
+.vd-sale-photo-content { display:grid;gap:8px;flex:1;min-width:190px }
+.vd-sale-photo-content strong { font-size:16px;color:#29203E }
+.vd-sale-photo-content p {margin:0;font-size:12px;color:#6A6580;line-height:1.5 }
+.vd-sale-photo-content small { color:#8A839A;font-size:11px }
+.vd-sale-photo-content .vd-outline { justify-self:start }
+@media(max-width:480px){.vd-sale-photo-preview{width:100%;height:170px}}

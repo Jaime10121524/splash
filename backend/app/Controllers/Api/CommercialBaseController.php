@@ -31,7 +31,8 @@ abstract class CommercialBaseController extends BaseController
         if ($user === null || $user->isBanned()) return $this->errorResponse(401, 'Faça login novamente.');
         // O menu permite estes grupos; não dependa de uma matriz Shield antiga
         // salva no banco. O corretor continua limitado à própria pessoa/visitas.
-        if (!$user->inGroup('admin', 'operador', 'gerente', 'corretor')) {
+        if (!$user->inGroup('admin', 'operador', 'gerente', 'corretor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)) {
             return $this->errorResponse(403, 'Seu perfil não possui permissão para atendimentos.');
         }
         if ($this->visitorScopeId() === 0) return $this->errorResponse(403,'Conta sem pessoa ativa vinculada.');
@@ -43,7 +44,8 @@ abstract class CommercialBaseController extends BaseController
     {
         $user=auth('session')->user();
         if (!$user || !$user->inGroup('corretor') || $user->inGroup('admin')
-            || $user->inGroup('operador') || $user->inGroup('gerente')) return null;
+            || $user->inGroup('operador') || $user->inGroup('gerente')
+            || \App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)) return null;
         $person=db_connect()->table('pessoas')->select('id')->where('user_id',(int)$user->id)
             ->where('ativo',1)->get()->getRowArray();
         return $person?(int)$person['id']:0;

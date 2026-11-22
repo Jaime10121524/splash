@@ -54,7 +54,7 @@ class FechamentosController extends CommercialBaseController
     private function rows($db,string $start,string $end): array
     {
         $operations=$db->table('venda_operacoes o')
-            ->select('o.id,o.visita_id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_cobrado,o.valor_tabela,o.observacao_comissao,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
+            ->select('o.id,o.visita_id,o.numero_titulo,o.sigla_plano,o.data_venda,o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.atendente_pessoa_id,o.atendente_adicional_pessoa_id,o.comissao_prevista,o.comissao_ajustada,o.valor_cobrado,o.valor_tabela,o.observacao_comissao,o.responsavel_financeiro_pessoa_id,c.nome AS cliente_nome,p.nome AS corretor_nome',false)
             ->join('clientes c','c.id=o.cliente_id')
             ->join('pessoas p','p.id=o.corretor_pessoa_id','left')
             ->where('o.situacao','VENDA')
@@ -216,7 +216,8 @@ class FechamentosController extends CommercialBaseController
             $key=(int)$op['id'];
             $paidOwner=$ownerByOperation[$key]['saldo']??0;
             $sourceLabel='Corretor principal — parte própria';
-            $recebedorOperacional=$responsaveis[$root]??$root;
+            $recebedorOperacional=(int)($op['responsavel_financeiro_pessoa_id']
+                ?:($responsaveis[$root]??$root));
             $recebedorNome=$personName[$recebedorOperacional]??'Responsável financeiro';
             $meta=[
                 'operacao_id'=>$key,
@@ -253,7 +254,11 @@ class FechamentosController extends CommercialBaseController
                         'GERENTE'=>'Gerência',default=>'Participação',
                     },
                     'pagador'=>$admin
-                         ?($personName[$responsaveis[(int)$a['responsavel_pessoa_id']]??(int)$a['responsavel_pessoa_id']]??$a['origem_nome'])
+                         ?($personName[
+                            (int)$a['responsavel_pessoa_id']===$root
+                                ?$recebedorOperacional
+                                :($responsaveis[(int)$a['responsavel_pessoa_id']]??(int)$a['responsavel_pessoa_id'])
+                            ]??$a['origem_nome'])
                          :'Responsável financeiro',
                     'total_centavos'=>$outstanding,'pago_centavos'=>$paid,
                     'abatido_centavos'=>$abated($history[(int)$a['id']]??[]),
@@ -278,7 +283,9 @@ class FechamentosController extends CommercialBaseController
                 }
                 if($includeOutgoing){
                     $titularOperacao=(int)$a['responsavel_pessoa_id'];
-                    $pagadorOperacional=$responsaveis[$titularOperacao]??$titularOperacao;
+                    $pagadorOperacional=$titularOperacao===$root
+                        ?$recebedorOperacional
+                        :($responsaveis[$titularOperacao]??$titularOperacao);
                     if($onlyPersonId===null || $pagadorOperacional===$onlyPersonId){
                         $accounts[$pagadorOperacional]??=[
                             'pessoa_id'=>$pagadorOperacional,
@@ -345,9 +352,29 @@ class FechamentosController extends CommercialBaseController
 
     public function contas(): ResponseInterface
     {
-        $user=auth('session')->user();
+        return $this->contasCore(false);
+    }
+
+    /**
+     * Extrato financeiro do aplicativo, derivado da MESMA apuracao web.
+     * Admin consulta o conjunto da equipe; demais perfis somente a pessoa
+     * associada ao token Shield. Esta rota nao permite mutacoes nem recebe
+     * pessoa_id de usuarios nao administradores.
+     */
+    public function mobileContas(): ResponseInterface
+    {
+        return $this->contasCore(true);
+    }
+
+    private function contasCore(bool $mobile): ResponseInterface
+    {
+        $user=auth($mobile?'tokens':'session')->user();
         if(!$user||$user->isBanned())return $this->errorResponse(401,'Faça login novamente.');
-        $admin=$user->inGroup('admin')&&$user->can('visits.manage');
+        $admin=$user->inGroup('admin')&&($mobile||$user->can('visits.manage'));
+        if($mobile&&!$user->inGroup('admin','gerente','corretor','vendedor')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)){
+            return $this->errorResponse(403,'Seu perfil nao possui acesso ao financeiro.');
+        }
         $period=$this->period();
         if($period instanceof ResponseInterface)return $period;
         [$start,$end]=$period;
@@ -368,16 +395,207 @@ class FechamentosController extends CommercialBaseController
         }
         $canSeeOutgoing=$admin;
         if(!$admin){
-            if(!$user->can('finance.own') || (! $user->inGroup('corretor') && ! $user->inGroup('vendedor') && ! $user->inGroup('gerente'))){
+            if((!$mobile&&!$user->can('finance.own')) || (! $user->inGroup('corretor') && ! $user->inGroup('vendedor') && ! $user->inGroup('gerente'))){
                 return $this->errorResponse(403,'Acesso ao financeiro não autorizado.');
             }
             // Delegados consultam apenas a conta pessoal: jamais recebem o extrato dos terceiros.
             $delegado=$db->table('fechamento_responsabilidades')
                 ->where('corretor_pessoa_id',$personId)->countAllResults()>0;
-            $canSeeOutgoing=ExtratoPermissoes::repasses(false,$user->inGroup('corretor'),$delegado);
+            $canSeeOutgoing=$mobile ? false : ExtratoPermissoes::repasses(false,$user->inGroup('corretor'),$delegado);
         }
         $operations=$this->rows($db,$start,$end);
-        $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId,$canSeeOutgoing);
+        $team=$mobile&&!$admin&&\App\Libraries\GestaoEquipe::ehGestor($db,$user)
+            ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
+        if($team!==null){
+            $accounts=[];
+            foreach($team as $member){
+                foreach($this->contasPorPessoa($db,$operations,false,$member,false) as $record)
+                    $accounts[]=$record;
+            }
+        }else{
+            $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId,$canSeeOutgoing);
+        }
+        if($mobile){
+            // O servidor retorna SOMENTE valores e identificadores autorizados:
+            // nao enviar linhas SQL, dados do cliente nem rateios de terceiros.
+            $ownId=$personId;
+            if($admin){
+                $ownRecord=$db->table('pessoas')->select('id')
+                    ->where('user_id',(int)$user->id)->where('ativo',1)
+                    ->get()->getRowArray();
+                $ownId=$ownRecord?(int)$ownRecord['id']:null;
+            }
+            // O gerente pode visualizar o resumo de sua equipe, sem receber nem
+            // liquidar comissões de terceiros.
+            $teamNames=[];
+            if($team!==null){
+                foreach($db->table('pessoas')->select('id,nome')->whereIn('id',$team)
+                    ->get()->getResultArray() as $p)$teamNames[(int)$p['id']]=$p['nome'];
+            }
+            // Pendência é negociação financeira, NÃO comissão apurada.
+            $pendingQuery=$db->table('venda_operacoes o')
+                ->select('o.id,o.valor_cobrado,o.data_negociacao,o.sigla_plano,
+                    o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.gerente_pessoa_id,
+                    o.criado_por_usuario_id,c.nome AS cliente_nome')
+                ->join('clientes c','c.id=o.cliente_id')
+                ->where('o.situacao','PENDENCIA')
+                ->where('o.data_negociacao >=',$start)->where('o.data_negociacao <=',$end);
+            if(!$admin){
+                if($team!==null)$pendingQuery->groupStart()
+                    ->whereIn('o.corretor_pessoa_id',$team)
+                    ->orWhereIn('o.segundo_corretor_pessoa_id',$team)
+                    ->orWhereIn('o.gerente_pessoa_id',$team)
+                    ->orWhereIn('o.criado_por_usuario_id',
+                        \App\Libraries\GestaoEquipe::usuarios($db,$user))->groupEnd();
+                else $pendingQuery->groupStart()->where('o.corretor_pessoa_id',$personId)
+                    ->orWhere('o.segundo_corretor_pessoa_id',$personId)
+                    ->orWhere('o.gerente_pessoa_id',$personId)->groupEnd();
+            }
+            $pendingRows=$pendingQuery->orderBy('o.id','DESC')->limit(500)
+                ->get()->getResultArray();
+            $pendingTotal=0;$pendingReceived=0;
+            foreach($pendingRows as $p)$pendingTotal+=VendaMoney::cents((string)$p['valor_cobrado'],true);
+            if($pendingRows){
+                $pendingIds=array_map(static fn($p)=>(int)$p['id'],$pendingRows);
+                foreach($db->table('venda_recebimentos')
+                    ->select('tipo,valor')->whereIn('operacao_id',$pendingIds)
+                    ->get()->getResultArray() as $m){
+                    $pendingReceived+=($m['tipo']==='ENTRADA'?1:-1)*
+                        VendaMoney::cents((string)$m['valor'],true);
+                }
+            }
+            // Antecipações de uma pendência NÃO são comissões apuradas.
+            // Cada pessoa recebe exclusivamente os movimentos de adiantamento
+            // que efetivamente a beneficiaram (SAIDA menos ESTORNO).
+            $adiantadoPorOperacaoPessoa=[];
+            $beneficiariosPendencia=[];
+            if($pendingRows && $db->tableExists('pendencia_adiantamentos')){
+                foreach($db->table('pendencia_adiantamentos')
+                    ->select('operacao_id,beneficiario_pessoa_id,tipo,valor')
+                    ->whereIn('operacao_id',array_map('intval',array_column($pendingRows,'id')))
+                    ->get()->getResultArray() as $adiantamento){
+                    $key=(int)$adiantamento['operacao_id'];
+                    $beneficiario=(int)$adiantamento['beneficiario_pessoa_id'];
+                    $valor=VendaMoney::cents((string)$adiantamento['valor'],true);
+                    $adiantadoPorOperacaoPessoa[$key][$beneficiario]=
+                        ($adiantadoPorOperacaoPessoa[$key][$beneficiario]??0)
+                        +($adiantamento['tipo']==='SAIDA'?$valor:-$valor);
+                    $beneficiariosPendencia[$key][$beneficiario]=true;
+                }
+            }
+            // Inclui pessoas que possuem somente negociações pendentes.
+            // Uma conta vazia de comissoes nao deve esconder a pendencia.
+            $existingPersons=array_map(static fn($a)=>(int)$a['pessoa_id'],$accounts);
+            $pendingPersons=[];
+            foreach($pendingRows as $p){
+                $peopleOnThisPending=[
+                    (int)$p['corretor_pessoa_id'],
+                    (int)($p['segundo_corretor_pessoa_id']??0),
+                    (int)($p['gerente_pessoa_id']??0),
+                    ...array_keys($beneficiariosPendencia[(int)$p['id']]??[]),
+                ];
+                foreach(array_unique($peopleOnThisPending) as $who){
+                    $who=(int)$who;
+                    if($who<1||in_array($who,$existingPersons,true))continue;
+                    if(!$admin && $team!==null && !in_array($who,$team,true))continue;
+                    if(!$admin && $team===null && $who!==$personId)continue;
+                    $pendingPersons[$who]=$who;
+                }
+            }
+            if($pendingPersons){
+                $pendingNames=[];
+                foreach($db->table('pessoas')->select('id,nome')->whereIn('id',array_values($pendingPersons))
+                    ->get()->getResultArray() as $p)$pendingNames[(int)$p['id']]=$p['nome'];
+                foreach($pendingPersons as $who){
+                    $accounts[]=[
+                        'pessoa_id'=>$who,'nome'=>$pendingNames[$who]??'Pessoa #'.$who,
+                        'resumo'=>[
+                            'total'=>'0.00','pendente'=>'0.00','recebido'=>'0.00',
+                            'abatido'=>'0.00','pago'=>'0.00',
+                        ],
+                        'itens'=>[],
+                    ];
+                }
+            }
+            $items=[];$ownOpen=0;$ownReceived=0;$teamPayable=0;$teamPaid=0;
+            foreach($accounts as $account){
+                $id=(int)$account['pessoa_id'];
+                $x=$account['resumo'];
+                $open=VendaMoney::cents((string)$x['pendente'],true);
+                $received=VendaMoney::cents((string)$x['recebido'],true);
+                $paid=VendaMoney::cents((string)$x['pago'],true);
+                $isOwn=$ownId!==null&&$id===$ownId;
+                if($isOwn){$ownOpen+=$open;$ownReceived+=$received;}
+                if($admin&&!$isOwn){$teamPayable+=$open;$teamPaid+=$paid;}
+                // Detalhes limitados, sem dados de associado nem informações
+                // financeiras de outra pessoa para o usuário não-admin.
+                $detail=[];
+                foreach(array_slice($account['itens'],0,30) as $line){
+                    $detail[]=[
+                        'operacao_id'=>(int)$line['operacao_id'],
+                        'titulo'=>$line['titulo'],
+                        'data_venda'=>$line['data_venda'],
+                        'descricao'=>$line['descricao'],
+                        'total'=>$line['total'],
+                        'recebidas'=>$line['recebido'],
+                        'abatidas'=>$line['abatido'],
+                        'a_receber'=>$line['pendente'],
+                    ];
+                }
+                // Negociacoes abertas aparecem por pessoa/titulo, mas nao somam
+                // comissao antecipadamente. Direitos so existem apos apuracao.
+                $pendingCount=0;
+                foreach($pendingRows as $pending){
+                    if(!in_array($id,[
+                        (int)$pending['corretor_pessoa_id'],
+                        (int)($pending['segundo_corretor_pessoa_id']??0),
+                        (int)($pending['gerente_pessoa_id']??0),
+                        ...array_map('intval',array_keys($beneficiariosPendencia[(int)$pending['id']]??[])),
+                    ],true))continue;
+                    $pendingCount++;
+                    $receivedPending=max(0,$adiantadoPorOperacaoPessoa[(int)$pending['id']][$id]??0);
+                    if(count($detail)>=30)continue;
+                    $detail[]=[
+                        'operacao_id'=>(int)$pending['id'],
+                        'titulo'=>'Negociação #'.$pending['id'].' · '.$pending['sigla_plano'],
+                        'data_venda'=>$pending['data_negociacao'],
+                        'descricao'=>$admin?'PENDÊNCIA · '.$pending['cliente_nome']:'PENDÊNCIA · aguardando conversão',
+                        'tipo'=>'NEGOCIACAO',
+                        'adiantado'=>VendaMoney::decimal($receivedPending),
+                        'total'=>'0.00','recebidas'=>'0.00','abatidas'=>'0.00','a_receber'=>'0.00',
+                    ];
+                }
+                $items[]=[
+                    'pessoa_id'=>$id,'nome'=>$teamNames[$id]??$account['nome'],
+                    'total'=>$x['total'],'a_receber'=>$x['pendente'],
+                    'recebidas'=>$x['recebido'],'abatidas'=>$x['abatido'],
+                    'liquidadas'=>$x['pago'],'participacoes'=>count($account['itens'])+$pendingCount,
+                    'detalhes'=>$detail,
+                    'detalhes_limitados'=>count($account['itens'])+$pendingCount>30,
+                ];
+            }
+            return $this->response->setJSON([
+                'inicio'=>$start,'fim'=>$end,'admin'=>$admin,
+                'minha_pessoa_id'=>$ownId,
+                'resumo'=>[
+                    'a_pagar'=>$admin?VendaMoney::decimal($teamPayable):null,
+                    'a_receber'=>VendaMoney::decimal($ownOpen),
+                    'recebidas'=>VendaMoney::decimal($ownReceived),
+                    'pagas'=>$admin?VendaMoney::decimal($teamPaid):null,
+                ],
+                'contas'=>$items,
+                'pendencias'=>[
+                    'quantidade'=>count($pendingRows),
+                    'valor_negociado'=>VendaMoney::decimal($pendingTotal),
+                    'valor_recebido'=>VendaMoney::decimal($pendingReceived),
+                    'saldo'=>VendaMoney::decimal(max(0,$pendingTotal-$pendingReceived)),
+                    'limitado'=>count($pendingRows)===500,
+                ],
+                'visao_equipe'=>$team!==null,
+                'possivel_truncamento'=>count($operations)===500,
+                'aviso'=>'Período pela data da venda. Os valores liquidados incluem os pagamentos confirmados dessas vendas, mesmo realizados em outra data. Abatimentos são discriminados separadamente. A pagar exclui a própria conta do administrador.',
+            ])->setHeader('Cache-Control','private, no-store');
+        }
         $lots=[];
         if($admin){
             $query=$db->table('comissao_lotes_pagamento l')
@@ -955,6 +1173,14 @@ class FechamentosController extends CommercialBaseController
      * Não gera pagamento e só libera edição antes de qualquer movimentação
      * financeira da comissão.
      */
+    protected function rateioActorId(): int
+    {
+        $mobile=str_contains((string)$this->request->getUri()->getPath(),'/api/mobile/');
+        $user=auth($mobile?'tokens':'session')->user();
+        if(!$user || $user->isBanned())throw new \RuntimeException('Sessão inválida.');
+        return (int)$user->id;
+    }
+
     public function rateiosVenda(int|string $id): ResponseInterface
     {
         if($denied=$this->authorizeAdmin())return $denied;
@@ -1082,7 +1308,7 @@ class FechamentosController extends CommercialBaseController
             foreach($clean as $item){
                 $db->table('comissao_rateios')->insert([
                     'operacao_id'=>(int)$id,...$item,
-                    'criado_por_usuario_id'=>(int)auth('session')->user()->id,
+                    'criado_por_usuario_id'=>$this->rateioActorId(),
                     'criado_em'=>$now,
                 ]);
             }
@@ -1092,7 +1318,7 @@ class FechamentosController extends CommercialBaseController
                 'operacao_id'=>(int)$id,
                 'dados_antes'=>json_encode($old,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                 'dados_depois'=>json_encode($clean,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
-                'justificativa'=>$reason,'usuario_id'=>(int)auth('session')->user()->id,
+                'justificativa'=>$reason,'usuario_id'=>$this->rateioActorId(),
                 'criado_em'=>$now,
             ]);
             $this->commitOrFail($db);
