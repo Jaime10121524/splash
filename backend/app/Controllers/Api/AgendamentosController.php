@@ -198,8 +198,9 @@ final class AgendamentosController extends BaseController
             return $this->deny(422,'Informe nome, telefone com DDD, data futura ou de hoje, 1 a 100 pessoas e corretor.');
         }
         $db=db_connect();
-        if (!$this->personRole($db,$captor,['corretor'])) {
-            return $this->deny(422,'O corretor do agendamento precisa estar ativo.');
+        if (!$this->personRole($db,$captor,['corretor']) ||
+            !$db->table('pessoas')->where('id',$captor)->where('usa_sistema',1)->countAllResults()) {
+            return $this->deny(422,'Selecione um corretor ativo habilitado para agendamentos.');
         }
         $token=bin2hex(random_bytes(32));
         $now=date('Y-m-d H:i:s');
