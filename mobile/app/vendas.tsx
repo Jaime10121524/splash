@@ -117,6 +117,12 @@ function VendasOperacionais(){
             <SymbolView name={{ios:'chevron.right',android:'chevron_right'}} size={21} tintColor={colors.brandDark}/>
           </View>
           <Text style={s.client}>{v.cliente_nome}</Text>
+          {!!v.movimento_titulo&&<View style={{alignSelf:'flex-start',backgroundColor:colors.pale,
+            borderRadius:9,paddingVertical:6,paddingHorizontal:10}}>
+            <Text style={{fontSize:11,fontWeight:'900',color:colors.brandDark}}>
+              {v.movimento_titulo==='RENOVACAO'?'🔄 RENOVAÇÃO':'⬆️ UPGRADE'}
+            </Text>
+          </View>}
           <View style={s.row}><Text style={s.price}>{money(v.valor_cobrado)}</Text>
             <Text style={s.date}>{v.data_venda}</Text></View>
         </Pressable>):<View style={s.empty}><Text style={s.emptyEmoji}>🛍️</Text>
