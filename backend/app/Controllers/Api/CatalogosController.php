@@ -26,7 +26,8 @@ class CatalogosController extends CommercialBaseController
         foreach($people as $row) {
             $id=(int)$row['id'];
             if(!isset($pessoas[$id])) $pessoas[$id]=[
-                'id'=>$id,'nome'=>$row['nome'],'ativo'=>(bool)$row['ativo'],'papeis'=>[],
+                'id'=>$id,'nome'=>$row['nome'],'ativo'=>(bool)$row['ativo'],
+                'usa_sistema'=>(bool)$row['usa_sistema'],'papeis'=>[],
             ];
             $pessoas[$id]['papeis'][]=$row['papel'];
         }
