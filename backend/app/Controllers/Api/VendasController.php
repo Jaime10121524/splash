@@ -259,7 +259,11 @@ class VendasController extends CommercialBaseController
                 $db->transRollback();
                 return $this->errorResponse(422,'Gerente inválido ou sem função de gerente no cadastro Pessoas.');
             }
-            $brokers=$this->participants($db,$data,$visit);
+            // Um atendimento pode ter captador diferente do corretor que
+            // realmente recebe pela venda (ex.: renovacao de terceiro).
+            // O vinculo da visita permanece intacto, com auditoria propria.
+            $override=($data['corretores_venda_diferentes_visita']??false)===true;
+            $brokers=$this->participants($db,$data,$override?null:$visit);
             if(isset($brokers['error'])){
                 $db->transRollback();
                 return $this->errorResponse(422,$brokers['error']);
