@@ -411,14 +411,29 @@ export default function VendaMobile(){
 
   const rowIndex=choice?.index||0;
   const chosenRole=rateioRows[rowIndex]?.papel;
-  const choices:Choice[]=choice?.field==='plan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
+  const editingField=choice?.field?.startsWith('edit')||false;
+  const editingPeople=choice?.field==='editBroker'||choice?.field==='editSecond'
+    ?salePeople.filter(p=>p.papeis.includes('corretor'))
+    :choice?.field==='editAttendant'||choice?.field==='editAdditional'
+      ?salePeople.filter(p=>p.papeis.includes('corretor')||p.papeis.includes('vendedor'))
+      :choice?.field==='editManager'
+        ?salePeople.filter(p=>p.papeis.includes('gerente')):[];
+  const choices:Choice[]=choice?.field==='editPlan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
+    editingField?editingPeople.map(p=>({id:p.id,label:p.nome})):
+    choice?.field==='plan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
     choice?.field==='method'?(opts?.formas||[]).map(m=>({id:m.id,label:m.nome})):
     choice?.field==='manager'?(opts?.gerentes||[]).map(m=>({id:m.id,label:m.nome})):
     choice?.field==='source'?(opts?.pessoas||[]).map(p=>({id:p.id,label:p.nome})):
     choice?.field==='person'?(opts?.pessoas||[]).filter(p=>p.papeis.some(role=>
       chosenRole==='GERENTE'?role==='gerente':chosenRole==='CORRETOR'?role==='corretor':
       role==='vendedor'||role==='corretor')).map(p=>({id:p.id,label:p.nome})):[];
-  const selected=choice?.field==='plan'?planId:choice?.field==='method'?methodId:
+  const selected=choice?.field==='editPlan'?editSale.plano_versao_id:
+    choice?.field==='editBroker'?editSale.corretor_pessoa_id:
+    choice?.field==='editSecond'?editSale.segundo_corretor_pessoa_id:
+    choice?.field==='editAttendant'?editSale.atendente_pessoa_id:
+    choice?.field==='editAdditional'?editSale.atendente_adicional_pessoa_id:
+    choice?.field==='editManager'?editSale.gerente_pessoa_id:
+    choice?.field==='plan'?planId:choice?.field==='method'?methodId:
     choice?.field==='manager'?managerId:choice?.field==='person'?rateioRows[rowIndex]?.beneficiario_pessoa_id:
     choice?.field==='source'?rateioRows[rowIndex]?.responsavel_pessoa_id:null;
   function changeRow(i:number,patch:Partial<Allocation>){setRateioRows(old=>old.map((r,index)=>index===i?{...r,...patch}:r));}
@@ -523,6 +538,53 @@ export default function VendaMobile(){
               Apenas consulta: recebimentos, foto e comissões não podem ser alterados nesta venda.
             </Text>
           </View>}
+          {step==='titulo'&&detail.editavel!==false&&<View style={s.card}>
+            <Text style={s.section}>Corrigir cadastro e responsáveis</Text>
+            <Text style={s.helper}>Até o fechamento: mudanças registradas em auditoria,
+              recebimentos do cliente preservados e direitos recalculados.</Text>
+            {!editingSale?<Btn text="Editar dados e comissão da venda" muted onPress={()=>setEditingSale(true)}/>:
+              <>
+                <Select label="Plano" value={editPlan?.nome||'Selecionar'}
+                  onPress={()=>setChoice({field:'editPlan'})}/>
+                <Select label="Corretor principal" value={editPerson(editSale.corretor_pessoa_id)}
+                  onPress={()=>setChoice({field:'editBroker'})}/>
+                <Select label="Segundo corretor (opcional)" value={editPerson(editSale.segundo_corretor_pessoa_id)}
+                  onPress={()=>setChoice({field:'editSecond'})}/>
+                <Text style={s.helper}>Renovação externa: o corretor que recebe fica como principal;
+                  o corretor que convidou fica como segundo, mantendo o captador original na visita.</Text>
+                <Select label="Atendente" value={editPerson(editSale.atendente_pessoa_id)}
+                  onPress={()=>setChoice({field:'editAttendant'})}/>
+                <Select label="Segundo atendente" value={editPerson(editSale.atendente_adicional_pessoa_id)}
+                  onPress={()=>setChoice({field:'editAdditional'})}/>
+                <Select label="Gerente" value={editPerson(editSale.gerente_pessoa_id)}
+                  onPress={()=>setChoice({field:'editManager'})}/>
+                <Input label="Desconto (R$)" value={editSale.desconto_corretor} numeric
+                  placeholder="0,00" onChange={v=>setEditSale(o=>({...o,desconto_corretor:v}))}/>
+                {detail.operacao.situacao==='VENDA'&&
+                  <Input label="Número do título" value={editSale.numero_titulo} numeric
+                    placeholder="4 dígitos" onChange={v=>setEditSale(o=>({...o,numero_titulo:v.replace(/\D/g,'').slice(0,4)}))}/>}
+                <Input label="Data da negociação (DD/MM/AAAA)" value={editSale.data_negociacao} numeric
+                  placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,data_negociacao:v}))}/>
+                {detail.operacao.situacao==='VENDA'?<>
+                  <Input label="Data da venda (DD/MM/AAAA)" value={editSale.data_venda} numeric
+                    placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,data_venda:v}))}/>
+                  <Input label="Início da vigência" value={editSale.data_inicio} numeric
+                    placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,data_inicio:v}))}/>
+                </>:<Input label="Retorno previsto (opcional)" value={editSale.retorno_previsto} numeric
+                  placeholder="DD/MM/AAAA" onChange={v=>setEditSale(o=>({...o,retorno_previsto:v}))}/>}
+                <Input label="Observações" value={editSale.observacoes} placeholder="Observações da operação"
+                  onChange={v=>setEditSale(o=>({...o,observacoes:v}))}/>
+                <Input label="Motivo da correção *" value={editSale.justificativa}
+                  placeholder="Explique a alteração" onChange={v=>setEditSale(o=>({...o,justificativa:v}))}/>
+                <Btn text={busy?'Salvando...':'Salvar correção e recalcular'} disabled={busy}
+                  onPress={()=>{void saveSaleChanges();}}/>
+                <Btn text="Cancelar edição" muted onPress={()=>setEditingSale(false)}/>
+              </>}
+          </View>}
+          {step==='titulo'&&detail.editavel===false&&<Text style={s.helper}>
+            Dados protegidos por fechamento, renovação vinculada ou repasse já realizado.
+            Corrija via ajuste compensatório auditado.
+          </Text>}
           {step==='titulo'&&<View style={s.card}>
             <Text style={s.section}>{isPendingOperation?'📸 Foto da negociação':'📸 Foto da venda'}</Text>
             <Text style={s.helper}>{opId
@@ -587,6 +649,8 @@ export default function VendaMobile(){
               </View>}
             <Text style={s.client}>{money(detail.operacao.valor_cobrado)}</Text>
             <Text style={s.helper}>Operação nº {opId} · {detail.operacao.data_venda||detail.operacao.data_negociacao}</Text>
+            {detail.editavel!==false&&<Btn text="Editar responsáveis e dados da venda" muted
+              onPress={()=>{setStep('titulo');setEditingSale(true);}}/>}
             <View style={s.two}><View><Text style={s.label}>Recebido do cliente</Text>
               <Text style={s.lineTitle}>{money(detail.recebido)}</Text></View>
               <View><Text style={s.label}>Saldo do cliente</Text>
@@ -677,10 +741,21 @@ export default function VendaMobile(){
       </ScrollView>
     </KeyboardAvoidingView>
     <ChoiceSheet open={choice!==null}
-      title={choice?.field==='plan'?'Escolher plano':choice?.field==='method'?'Forma de pagamento':
+      title={editingField?'Corrigir dados da venda':choice?.field==='plan'?'Escolher plano':
+        choice?.field==='method'?'Forma de pagamento':
         choice?.field==='manager'?'Gerente':choice?.field==='person'?'Beneficiário':'Quem distribui'}
-      choices={choices} selected={selected??null} allowEmpty={choice?.field==='manager'}
+      choices={choices} selected={selected??null}
+      allowEmpty={['manager','editSecond','editAttendant','editAdditional','editManager'].includes(choice?.field||'')}
       onClose={()=>setChoice(null)} onChoose={value=>{
+        if(choice?.field==='editPlan')setEditSale(o=>({...o,plano_versao_id:value}));
+        if(choice?.field==='editBroker')setEditSale(o=>({
+          ...o,corretor_pessoa_id:value,
+          segundo_corretor_pessoa_id:value===o.segundo_corretor_pessoa_id?null:o.segundo_corretor_pessoa_id,
+        }));
+        if(choice?.field==='editSecond')setEditSale(o=>({...o,segundo_corretor_pessoa_id:value}));
+        if(choice?.field==='editAttendant')setEditSale(o=>({...o,atendente_pessoa_id:value}));
+        if(choice?.field==='editAdditional')setEditSale(o=>({...o,atendente_adicional_pessoa_id:value}));
+        if(choice?.field==='editManager')setEditSale(o=>({...o,gerente_pessoa_id:value}));
         if(choice?.field==='plan'){setPlanId(value);}
         if(choice?.field==='method'){setMethodId(value);}
         if(choice?.field==='manager'){setManagerId(value);}
