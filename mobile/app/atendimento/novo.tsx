@@ -130,7 +130,7 @@ export default function NewVisitScreen() {
     if(!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)||visitDate>todayLocal()){
       setError('Escolha hoje ou uma data anterior para a chegada.');return;
     }
-    const owner = options?.minha_pessoa_id ?? ownerId ?? main;
+    const owner = options?.corretores.find(p=>p.id===main)?.dono_corrente_padrao_pessoa_id??main;
     setSaving(true);
     setError('');
     Keyboard.dismiss();
@@ -218,8 +218,8 @@ export default function NewVisitScreen() {
   const mainName = options?.corretores.find(p => p.id === main)?.nome;
   const secondName = options?.corretores.find(p => p.id === second)?.nome;
   const origin = options?.origens.find(o => o.id === originId);
-  const effectiveOwner = options?.minha_pessoa_id ?? ownerId ?? main;
-  const ownerName = options?.atendentes.find(p => p.id === effectiveOwner)?.nome ?? '';
+  const effectiveOwner = options?.corretores.find(p=>p.id===main)?.dono_corrente_padrao_pessoa_id??main;
+  const ownerName = options?.corretores.find(p=>p.id===effectiveOwner)?.nome ?? '';
   const isNew = clientMode === 'new';
 
   return <SafeAreaView style={styles.root} edges={['top']}>
