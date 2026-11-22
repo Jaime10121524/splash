@@ -98,8 +98,13 @@ final class MobileVendasController extends VendasController
             return $this->errorResponse(422,'A data inicial não pode superar a final.');
         $query=$db->table('venda_operacoes o')
             ->select("o.id,o.visita_id,o.situacao,o.numero_titulo,o.sigla_plano,o.plano_versao_id,o.data_venda,o.valor_cobrado,
-                CASE WHEN o.renovacao_externa=1 THEN 'RENOVACAO_EXTERNA' ELSE mov.tipo END AS movimento_titulo,c.nome AS cliente_nome",false)
+                CASE WHEN o.renovacao_externa=1 THEN 'RENOVACAO_EXTERNA' ELSE mov.tipo END AS movimento_titulo,
+                c.nome AS cliente_nome,p1.nome AS corretor_nome,p2.nome AS segundo_corretor_nome,
+                rf.nome AS responsavel_financeiro_nome",false)
             ->join('clientes c','c.id=o.cliente_id')
+            ->join('pessoas p1','p1.id=o.corretor_pessoa_id','left')
+            ->join('pessoas p2','p2.id=o.segundo_corretor_pessoa_id','left')
+            ->join('pessoas rf','rf.id=o.responsavel_financeiro_pessoa_id','left')
             ->join('plano_versoes pv','pv.id=o.plano_versao_id')
             ->join('visitas v','v.id=o.visita_id','left')
             ->join('titulo_vinculos mov','mov.operacao_nova_id=o.id','left')
@@ -110,10 +115,14 @@ final class MobileVendasController extends VendasController
                     ->orWhereIn('o.criado_por_usuario_id',$a['team_users'])
                     ->orWhereIn('o.corretor_pessoa_id',$a['team'])
                     ->orWhereIn('o.segundo_corretor_pessoa_id',$a['team'])
+                    ->orWhereIn('o.responsavel_financeiro_pessoa_id',$a['team'])
+                    ->orWhereIn('v.corretor_pessoa_id',$a['team'])
+                    ->orWhereIn('v.segundo_corretor_pessoa_id',$a['team'])
                     ->orWhereIn('v.criado_por_usuario_id',$a['team_users'])->groupEnd();
             }else{
                 $query->groupStart()->where('o.corretor_pessoa_id',$a['scope'])
                     ->orWhere('o.segundo_corretor_pessoa_id',$a['scope'])
+                    ->orWhere('o.responsavel_financeiro_pessoa_id',$a['scope'])
                     ->orWhere('v.criado_por_usuario_id',(int)$a['user']->id)->groupEnd();
             }
         }
@@ -279,6 +288,7 @@ final class MobileVendasController extends VendasController
                 'atendente_pessoa_id'=>$op['atendente_pessoa_id']===null?null:(int)$op['atendente_pessoa_id'],
                 'atendente_adicional_pessoa_id'=>$op['atendente_adicional_pessoa_id']===null?null:(int)$op['atendente_adicional_pessoa_id'],
                 'gerente_pessoa_id'=>$op['gerente_pessoa_id']===null?null:(int)$op['gerente_pessoa_id'],
+                'responsavel_financeiro_pessoa_id'=>$op['responsavel_financeiro_pessoa_id']===null?null:(int)$op['responsavel_financeiro_pessoa_id'],
                 'desconto_corretor'=>$op['desconto_corretor'],
                 'data_inicio'=>$op['data_inicio'],
                 'observacao_comissao'=>$op['observacao_comissao'],
