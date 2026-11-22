@@ -396,7 +396,17 @@ class FechamentosController extends CommercialBaseController
             $canSeeOutgoing=$mobile ? false : ExtratoPermissoes::repasses(false,$user->inGroup('corretor'),$delegado);
         }
         $operations=$this->rows($db,$start,$end);
-        $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId,$canSeeOutgoing);
+        $team=$mobile&&!$admin&&$user->inGroup('gerente')
+            ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
+        if($team!==null){
+            $accounts=[];
+            foreach($team as $member){
+                foreach($this->contasPorPessoa($db,$operations,false,$member,false) as $record)
+                    $accounts[]=$record;
+            }
+        }else{
+            $accounts=$this->contasPorPessoa($db,$operations,$admin,$personId,$canSeeOutgoing);
+        }
         if($mobile){
             // O servidor retorna SOMENTE valores e identificadores autorizados:
             // nao enviar linhas SQL, dados do cliente nem rateios de terceiros.
@@ -406,6 +416,39 @@ class FechamentosController extends CommercialBaseController
                     ->where('user_id',(int)$user->id)->where('ativo',1)
                     ->get()->getRowArray();
                 $ownId=$ownRecord?(int)$ownRecord['id']:null;
+            }
+            // O gerente pode visualizar o resumo de sua equipe, sem receber nem
+            // liquidar comissões de terceiros.
+            $teamNames=[];
+            if($team!==null){
+                foreach($db->table('pessoas')->select('id,nome')->whereIn('id',$team)
+                    ->get()->getResultArray() as $p)$teamNames[(int)$p['id']]=$p['nome'];
+            }
+            // Pendência é negociação financeira, NÃO comissão apurada.
+            $pendingQuery=$db->table('venda_operacoes o')
+                ->select('o.id,o.valor_cobrado')
+                ->where('o.situacao','PENDENCIA')
+                ->where('o.data_negociacao >=',$start)->where('o.data_negociacao <=',$end);
+            if(!$admin){
+                if($team!==null)$pendingQuery->groupStart()
+                    ->whereIn('o.corretor_pessoa_id',$team)
+                    ->orWhereIn('o.segundo_corretor_pessoa_id',$team)->groupEnd();
+                else $pendingQuery->groupStart()->where('o.corretor_pessoa_id',$personId)
+                    ->orWhere('o.segundo_corretor_pessoa_id',$personId)
+                    ->orWhere('o.gerente_pessoa_id',$personId)->groupEnd();
+            }
+            $pendingRows=$pendingQuery->orderBy('o.id','DESC')->limit(500)
+                ->get()->getResultArray();
+            $pendingTotal=0;$pendingReceived=0;
+            foreach($pendingRows as $p)$pendingTotal+=VendaMoney::cents((string)$p['valor_cobrado'],true);
+            if($pendingRows){
+                $pendingIds=array_map(static fn($p)=>(int)$p['id'],$pendingRows);
+                foreach($db->table('venda_recebimentos')
+                    ->select('tipo,valor')->whereIn('operacao_id',$pendingIds)
+                    ->get()->getResultArray() as $m){
+                    $pendingReceived+=($m['tipo']==='ENTRADA'?1:-1)*
+                        VendaMoney::cents((string)$m['valor'],true);
+                }
             }
             $items=[];$ownOpen=0;$ownReceived=0;$teamPayable=0;$teamPaid=0;
             foreach($accounts as $account){
@@ -433,7 +476,7 @@ class FechamentosController extends CommercialBaseController
                     ];
                 }
                 $items[]=[
-                    'pessoa_id'=>$id,'nome'=>$account['nome'],
+                    'pessoa_id'=>$id,'nome'=>$teamNames[$id]??$account['nome'],
                     'total'=>$x['total'],'a_receber'=>$x['pendente'],
                     'recebidas'=>$x['recebido'],'abatidas'=>$x['abatido'],
                     'liquidadas'=>$x['pago'],'participacoes'=>count($account['itens']),
@@ -450,6 +493,14 @@ class FechamentosController extends CommercialBaseController
                     'pagas'=>$admin?VendaMoney::decimal($teamPaid):null,
                 ],
                 'contas'=>$items,
+                'pendencias'=>[
+                    'quantidade'=>count($pendingRows),
+                    'valor_negociado'=>VendaMoney::decimal($pendingTotal),
+                    'valor_recebido'=>VendaMoney::decimal($pendingReceived),
+                    'saldo'=>VendaMoney::decimal(max(0,$pendingTotal-$pendingReceived)),
+                    'limitado'=>count($pendingRows)===500,
+                ],
+                'visao_equipe'=>$team!==null,
                 'possivel_truncamento'=>count($operations)===500,
                 'aviso'=>'Período pela data da venda. Os valores liquidados incluem os pagamentos confirmados dessas vendas, mesmo realizados em outra data. Abatimentos são discriminados separadamente. A pagar exclui a própria conta do administrador.',
             ])->setHeader('Cache-Control','private, no-store');
