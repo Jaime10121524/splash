@@ -62,6 +62,7 @@ export type VisitDetailsResponse = {
 export type MobilePersonOption = { id: number; nome: string };
 export type MobileVisitOptions = {
   corretores: MobilePersonOption[];
+  corretores_agendamento?: MobilePersonOption[];
   atendentes: MobilePersonOption[];
   motivos: { id: number; descricao: string }[];
   origens: { id: number; nome: string; permite_indicador: boolean }[];
