@@ -116,6 +116,7 @@ final class GestaoEquipe
         if(in_array((int)($op['corretor_pessoa_id']??0),$ids,true)
             || in_array((int)($op['segundo_corretor_pessoa_id']??0),$ids,true)
             || in_array((int)($op['gerente_pessoa_id']??0),$ids,true)
+            || in_array((int)($op['responsavel_financeiro_pessoa_id']??0),$ids,true)
             || in_array((int)($op['criado_por_usuario_id']??0),$users,true))return true;
         $visitId=(int)($op['visita_id']??0);
         if($visitId<1)return false;
