@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import {ApiError,Visit,apiRequest} from '../../src/api';
 import {useAuth} from '../../src/AuthContext';
 import VisitCard from '../../src/components/VisitCard';
+import CommissionChart from '../../src/components/CommissionChart';
 import {colors,shadows} from '../../src/theme';
 
 type Range=1|7|30;
@@ -283,6 +284,9 @@ function HomeOperacional(){
              </Text></View>
            <Text style={s.revenueIcon}>💎</Text>
          </View>}
+         {user?.role!=='operador'&&ownCommission&&
+           <CommissionChart total={ownCommission.total}
+             received={ownCommission.recebidas} pending={ownCommission.a_receber}/>}
          {user?.role!=='operador'&&<View style={s.chartCard}>
            <View style={s.sectionRow}><View><Text style={s.chartTitle}>Evolução de vendas</Text>
              <Text style={s.chartSubtitle}>Títulos cadastrados por dia{days===30?' (grupos de 3 dias)':''}</Text></View>
