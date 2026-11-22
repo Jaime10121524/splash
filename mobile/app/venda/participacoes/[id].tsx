@@ -8,6 +8,7 @@ import {useAuth} from '../../../src/AuthContext';
 import {useTheme} from '../../../src/ThemeContext';
 import ChoiceSheet,{type Choice} from '../../../src/components/ChoiceSheet';
 import FeedbackPopup from '../../../src/components/FeedbackPopup';
+import {maskBRL,decimalToBRL,brlToCents} from '../../../src/moneyMask';
 
 type Person={id:number;nome:string;papeis:string[]};
 type Rateio={responsavel_pessoa_id:number;beneficiario_pessoa_id:number;papel:string;valor:string;observacoes:string};
@@ -15,7 +16,7 @@ type Rates={corretor_pessoa_id:number;comissao_bruta:string|null;editavel:boolea
   rateios:(Rateio&{id:number;beneficiario_nome:string})[]};
 const roles:Record<string,string>={ATENDENTE:'Atendente',GERENTE:'Gestor',CORRETOR:'Segundo corretor'};
 const money=(v:string|null|undefined)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)||0);
-const cents=(v:string)=>{const raw=v.trim().replace(/\s|R\$/g,'');const n=raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw;return /^\d+(?:\.\d{1,2})?$/.test(n)?Math.round(Number(n)*100):null;};
+const cents=brlToCents;
 export default function Participacoes(){
   const {id}=useLocalSearchParams<{id:string}>();
   const saleId=Number(id);
@@ -40,7 +41,7 @@ export default function Participacoes(){
       setRows(r.rateios.map(p=>({
         responsavel_pessoa_id:Number(p.responsavel_pessoa_id),
         beneficiario_pessoa_id:Number(p.beneficiario_pessoa_id),
-        papel:p.papel,valor:p.valor,observacoes:p.observacoes||'',
+        papel:p.papel,valor:decimalToBRL(p.valor),observacoes:p.observacoes||'',
       })));
     }).catch(e=>{if(active)setError(e instanceof Error?e.message:'Não foi possível carregar participações.');})
       .finally(()=>{if(active)setLoaded(true);});
@@ -106,8 +107,8 @@ export default function Participacoes(){
             <Pressable style={[s.select,{borderColor:palette.line}]} onPress={()=>setChoice({index:i,field:'responsavel_pessoa_id'})}>
               <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text style={{color:palette.ink,flex:1}}>Distribuído por: {names(r.responsavel_pessoa_id)}</Text><SymbolView name={{ios:'chevron.down',android:'expand_more'}} size={16} tintColor={palette.muted}/></View></Pressable>
             <TextInput style={[s.select,{color:palette.ink,borderColor:palette.line}]} value={r.valor}
-              onChangeText={v=>change(i,{valor:v})} keyboardType="decimal-pad"
-              placeholder="Valor da participação (R$)"/>
+              onChangeText={v=>change(i,{valor:maskBRL(v)})} keyboardType="number-pad"
+              placeholder="R$ 0,00" placeholderTextColor={palette.muted}/>
             <Pressable onPress={()=>setRows(old=>old.filter((_,j)=>j!==i))}>
               <Text style={s.remove}>Remover esta participação</Text></Pressable>
           </>}
