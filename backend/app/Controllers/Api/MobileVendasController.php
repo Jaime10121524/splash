@@ -31,7 +31,8 @@ final class MobileVendasController extends VendasController
             if (!$p) return $this->errorResponse(403,'Conta sem pessoa ativa vinculada.');
             $scope=(int)$p['id'];
         }
-        return ['user'=>$u,'admin'=>$admin,'manager'=>$manager,'scope'=>$scope];
+        return ['user'=>$u,'admin'=>$admin,'manager'=>$manager,'scope'=>$scope,
+            'team'=>$manager?\App\Libraries\GestaoEquipe::ids(db_connect(),$u):[]];
     }
 
     protected function guard(): ?ResponseInterface
@@ -45,6 +46,10 @@ final class MobileVendasController extends VendasController
         $visit=db_connect()->table('visitas')->where('id',$id)->get()->getRowArray();
         if (!$visit || !in_array($visit['status'],['VENDA','PENDENCIA'],true))
             return $this->errorResponse(404,'Atendimento com negociação não encontrado.');
+        if ($a['manager'] && !in_array((int)$visit['corretor_pessoa_id'],$a['team'],true)
+            && !in_array((int)($visit['segundo_corretor_pessoa_id']??0),$a['team'],true)
+            && (int)$visit['criado_por_usuario_id']!==(int)$a['user']->id)
+            return $this->errorResponse(404,'Atendimento fora da sua equipe.');
         if ($a['scope']!==null && !$a['manager'] && !in_array($a['scope'],[(int)$visit['corretor_pessoa_id'],(int)($visit['segundo_corretor_pessoa_id']??0)],true)
             && (int)$visit['criado_por_usuario_id']!==(int)$a['user']->id)
             return $this->errorResponse(404,'Visita não encontrada.');
@@ -57,8 +62,8 @@ final class MobileVendasController extends VendasController
         if (!$op) return $this->errorResponse(404,'Venda não encontrada.');
         if ($a['admin']) return $op;
         if ($a['manager']) {
-            if ((int)($op['gerente_pessoa_id']??0)===$a['scope']
-                || (int)($op['criado_por_usuario_id']??0)===(int)$a['user']->id) return $op;
+            if (\App\Libraries\GestaoEquipe::podeGerirOperacao(db_connect(),$a['user'],$op))
+                return $op;
             return $this->errorResponse(404,'Venda não encontrada entre as vendas da sua gestão.');
         }
         $visitId=(int)($op['visita_id']??0);
@@ -93,7 +98,9 @@ final class MobileVendasController extends VendasController
         if($a['scope']!==null){
             if($a['manager']){
                 $query->groupStart()->where('o.gerente_pessoa_id',$a['scope'])
-                    ->orWhere('o.criado_por_usuario_id',(int)$a['user']->id)->groupEnd();
+                    ->orWhere('o.criado_por_usuario_id',(int)$a['user']->id)
+                    ->orWhereIn('o.corretor_pessoa_id',$a['team'])
+                    ->orWhereIn('o.segundo_corretor_pessoa_id',$a['team'])->groupEnd();
             }else{
                 $query->groupStart()->where('o.corretor_pessoa_id',$a['scope'])
                     ->orWhere('o.segundo_corretor_pessoa_id',$a['scope'])
