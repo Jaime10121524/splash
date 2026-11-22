@@ -21,7 +21,11 @@ type Plan={id:number;nome:string;codigo:string;valor:string;duracao_meses:number
 type Method={id:number;nome:string;codigo:string;credito:boolean};
 type Person={id:number;nome:string;papeis:string[]};
 type Options={planos:Plan[];formas:Method[];gerentes:{id:number;nome:string}[];pessoas:Person[];pode_corrigir_comissao:boolean};
-type Detail={operacao:{id:number;visita_id:number|null;movimento_titulo?:string|null;situacao:'VENDA'|'PENDENCIA';data_negociacao?:string;numero_titulo:string|null;sigla_plano:string;valor_cobrado:string;data_venda:string|null;comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};titulo_anterior?:{tipo:string}|null;fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
+type Detail={editavel?:boolean;operacao:{id:number;visita_id:number|null;movimento_titulo?:string|null;situacao:'VENDA'|'PENDENCIA';data_negociacao?:string;numero_titulo:string|null;sigla_plano:string;valor_cobrado:string;data_venda:string|null;
+  plano_versao_id?:number;historica?:boolean;corretor_pessoa_id?:number;segundo_corretor_pessoa_id?:number|null;
+  atendente_pessoa_id?:number|null;atendente_adicional_pessoa_id?:number|null;gerente_pessoa_id?:number|null;
+  desconto_corretor?:string;data_inicio?:string|null;retorno_previsto?:string|null;observacoes?:string|null;
+  comissao_ajustada?:string|null;comissao_prevista?:string|null;observacao_comissao?:string|null};titulo_anterior?:{tipo:string}|null;fechamento?:{id:number;status:string}|null;saldo:string;recebido:string;comissoes:{bruta:string|null;propria?:string|null;participantes:{nome:string;papel:string;devido:string}[];status:string};movimentos?:{id:number;tipo:string;forma_nome:string;valor:string;data_movimento:string}[]};
 type Allocation={responsavel_pessoa_id:number;beneficiario_pessoa_id:number;papel:string;valor:string;observacoes:string};
 type Rateios={corretor_pessoa_id:number;comissao_bruta:string|null;editavel:boolean;quitada:boolean;aviso:string;rateios:(Allocation & {id:number;beneficiario_nome:string})[]};
 
@@ -34,6 +38,8 @@ function cents(input:string):number|null {
   return Number(p[0])*100+Number((p[1]||'').padEnd(2,'0'));
 }
 const decimal=(n:number)=>String(Math.floor(n/100))+'.'+String(n%100).padStart(2,'0');
+const displayISO=(value:string|null|undefined)=>value&&/^\d{4}-\d{2}-\d{2}$/.test(value)
+  ?value.slice(8,10)+'/'+value.slice(5,7)+'/'+value.slice(0,4):'';
 const nowBR=()=>{const d=new Date();return [d.getDate(),d.getMonth()+1,d.getFullYear()].map((n,i)=>i<2?String(n).padStart(2,'0'):String(n)).join('/');};
 function iso(s:string):string|null{
   const p=s.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!p)return null;
@@ -91,6 +97,18 @@ export default function VendaMobile(){
   const [grossValue,setGrossValue]=useState(''),[reason,setReason]=useState('');
   const [confirm,setConfirm]=useState(false);
   const [celebrating,setCelebrating]=useState(false);
+  const [editingSale,setEditingSale]=useState(false);
+  const [editSale,setEditSale]=useState({
+    plano_versao_id:null as number|null,
+    corretor_pessoa_id:null as number|null,
+    segundo_corretor_pessoa_id:null as number|null,
+    atendente_pessoa_id:null as number|null,
+    atendente_adicional_pessoa_id:null as number|null,
+    gerente_pessoa_id:null as number|null,
+    desconto_corretor:'0,00',numero_titulo:'',data_negociacao:'',
+    data_venda:'',data_inicio:'',retorno_previsto:'',observacoes:'',
+    justificativa:'',
+  });
   const {uri:photoUri,error:photoError,reload:reloadPhoto,setUri:setPhotoUri}=
     useProtectedPhoto(opId?'mobile/vendas/'+opId+'/foto':null,token);
   const [photoBusy,setPhotoBusy]=useState(false);
@@ -103,10 +121,29 @@ export default function VendaMobile(){
   const isPendingOperation=detail?.operacao.situacao==='PENDENCIA';
   const price=plan?cents(plan.valor):null,discountValue=cents(discount);
   const total=price!==null&&discountValue!==null?price-discountValue:null;
+  const editPlan=opts?.planos.find(p=>p.id===editSale.plano_versao_id);
+  const salePeople=opts?.pessoas||[];
+  const editPerson=(id:number|null)=>salePeople.find(p=>p.id===id)?.nome||'Nenhum';
 
   const refresh=useCallback(async(id:number,admin:boolean)=>{
     if(!token)return;
     const d=await apiRequest<Detail>('mobile/vendas/'+id,{token});setDetail(d);
+    const o=d.operacao;
+    setEditSale({
+      plano_versao_id:o.plano_versao_id??null,
+      corretor_pessoa_id:o.corretor_pessoa_id??null,
+      segundo_corretor_pessoa_id:o.segundo_corretor_pessoa_id??null,
+      atendente_pessoa_id:o.atendente_pessoa_id??null,
+      atendente_adicional_pessoa_id:o.atendente_adicional_pessoa_id??null,
+      gerente_pessoa_id:o.gerente_pessoa_id??null,
+      desconto_corretor:o.desconto_corretor??'0.00',
+      numero_titulo:o.numero_titulo??'',
+      data_negociacao:displayISO(o.data_negociacao),
+      data_venda:displayISO(o.data_venda),
+      data_inicio:displayISO(o.data_inicio),
+      retorno_previsto:displayISO(o.retorno_previsto),
+      observacoes:o.observacoes??'',justificativa:'',
+    });
     if(admin&&d.operacao.situacao==='VENDA'){
       const r=await apiRequest<Rateios>('mobile/vendas/'+id+'/rateios',{token});
       setRateios(r);
@@ -212,6 +249,47 @@ export default function VendaMobile(){
         setNotice('Venda cadastrada. Agora registre os pagamentos.');
         setCelebrating(true);
       }
+    });
+  }
+
+  async function saveSaleChanges(){
+    if(!opId||!detail||busy||detail.editavel===false)return;
+    const p=editSale;
+    const discountCents=cents(p.desconto_corretor);
+    const value=editPlan?cents(editPlan.valor):null;
+    if(!p.plano_versao_id||!p.corretor_pessoa_id||discountCents===null
+      ||value===null||discountCents>=value||p.corretor_pessoa_id===p.segundo_corretor_pessoa_id){
+      setError('Corrija plano, corretores e desconto.');return;
+    }
+    if(p.atendente_pessoa_id!==null&&p.atendente_pessoa_id===p.atendente_adicional_pessoa_id){
+      setError('Os atendentes devem ser diferentes.');return;
+    }
+    if(!iso(p.data_negociacao)||(detail.operacao.situacao==='VENDA'&&
+      (!/^\d{4}$/.test(p.numero_titulo)||!iso(p.data_venda)||!iso(p.data_inicio)))){
+      setError('Confira número do título e datas no formato DD/MM/AAAA.');return;
+    }
+    if(p.justificativa.trim().length<5){setError('Explique a correção em pelo menos cinco caracteres.');return;}
+    await action(async()=>{
+      await apiRequest('mobile/vendas/'+opId+'/editar',{
+        method:'POST',token,body:{
+          ...p,plano_versao_id:p.plano_versao_id,
+          corretor_pessoa_id:p.corretor_pessoa_id,
+          segundo_corretor_pessoa_id:p.segundo_corretor_pessoa_id,
+          atendente_pessoa_id:p.atendente_pessoa_id,
+          atendente_adicional_pessoa_id:p.atendente_adicional_pessoa_id,
+          gerente_pessoa_id:p.gerente_pessoa_id,
+          desconto_corretor:decimal(discountCents),
+          data_negociacao:iso(p.data_negociacao),
+          data_venda:detail.operacao.situacao==='VENDA'?iso(p.data_venda):null,
+          data_inicio:detail.operacao.situacao==='VENDA'?iso(p.data_inicio):null,
+          numero_titulo:detail.operacao.situacao==='VENDA'?p.numero_titulo:null,
+          retorno_previsto:p.retorno_previsto?iso(p.retorno_previsto):null,
+          justificativa:p.justificativa.trim(),
+        },
+      });
+      await refresh(opId,!!opts?.pode_corrigir_comissao);
+      setEditingSale(false);
+      setNotice('Venda atualizada. Rateios refeitos e recebimentos preservados.');
     });
   }
 
