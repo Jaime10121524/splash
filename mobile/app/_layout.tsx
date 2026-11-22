@@ -66,6 +66,7 @@ function AppNavigation(){
         <Stack.Screen name="(tabs)"/>
         <Stack.Screen name="atendimento/[id]"/>
         <Stack.Screen name="atendimento/novo"/>
+        <Stack.Screen name="atendimento/retroativo"/>
         <Stack.Screen name="cliente/[id]"/>
         <Stack.Screen name="venda/[id]"/>
         <Stack.Screen name="vendas"/>
