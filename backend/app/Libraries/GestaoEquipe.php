@@ -102,4 +102,53 @@ final class GestaoEquipe
             || in_array((int)($v['segundo_corretor_pessoa_id']??0),$ids,true)
             || in_array((int)$v['criado_por_usuario_id'],$users,true));
     }
+
+    /** Titular configuravel por corretor; sem configuracao, o proprio captador. */
+    public static function donoPadrao($db,int $corretor): int
+    {
+        $p=$db->table('pessoas')->select('id,dono_corrente_padrao_pessoa_id')
+            ->where('id',$corretor)->where('ativo',1)->get()->getRowArray();
+        return $p ? (int)($p['dono_corrente_padrao_pessoa_id']?:$p['id']) : $corretor;
+    }
+
+    /**
+     * Renovacao externa depende de origem RENOVACAO e de corretor principal
+     * pertencente a outra corrente padrao, nao de um checkbox no aplicativo.
+     */
+    public static function renovacaoExterna($db,int $cliente,int $titular,?array $visita=null): bool
+    {
+        $r=$db->table('clientes c')->select('o.nome AS origem_nome,c.dono_corrente_pessoa_id')
+            ->join('lead_origens o','o.id=c.origem_id','left')
+            ->where('c.id',$cliente)->get()->getRowArray();
+        if(!$r||mb_stripos((string)($r['origem_nome']??''),'renova')===false)return false;
+        $origin=(int)($visita['corretor_pessoa_id']??0);
+        if($visita && (int)($visita['criado_por_usuario_id']??0)>0){
+            $u=$db->table('pessoas')->select('id')
+                ->where('user_id',(int)$visita['criado_por_usuario_id'])->where('ativo',1)
+                ->get()->getRowArray();
+            if($u)$origin=(int)$u['id'];
+        }
+        if($origin<1)$origin=(int)$r['dono_corrente_pessoa_id'];
+        $owner=self::donoPadrao($db,$origin);
+        return self::donoPadrao($db,$titular)!==$owner;
+    }
+
+    /** Troca de corrente auditable, sem alterar equipe, rateios ou captacao. */
+    public static function atribuirCorrente($db,int $cliente,int $dono,int $usuario,string $motivo): void
+    {
+        $old=$db->table('clientes')->select('dono_corrente_pessoa_id')->where('id',$cliente)
+            ->get()->getRowArray();
+        if(!$old)throw new \RuntimeException('Cliente nao encontrado na transferencia de corrente.');
+        $before=(int)$old['dono_corrente_pessoa_id'];
+        if($before===$dono)return;
+        $now=date('Y-m-d H:i:s');
+        $db->table('clientes')->where('id',$cliente)->update([
+            'dono_corrente_pessoa_id'=>$dono,'atualizado_em'=>$now,
+        ]);
+        $db->table('cliente_corrente_historico')->insert([
+            'cliente_id'=>$cliente,'dono_anterior_pessoa_id'=>$before,
+            'dono_novo_pessoa_id'=>$dono,'origem'=>'AJUSTE_MANUAL',
+            'justificativa'=>$motivo,'usuario_id'=>$usuario,'criado_em'=>$now,
+        ]);
+    }
 }
