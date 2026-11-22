@@ -59,7 +59,7 @@ export type VisitDetailsResponse = {
   trocas_atendente?: AttendantChangeEvent[];
 };
 
-export type MobilePersonOption = { id: number; nome: string };
+export type MobilePersonOption = { id: number; nome: string; dono_corrente_padrao_pessoa_id?:number|null };
 export type MobileVisitOptions = {
   corretores: MobilePersonOption[];
   corretores_agendamento?: MobilePersonOption[];
