@@ -135,36 +135,37 @@ final class GestaoEquipe
     }
 
     /**
-     * Renovacao externa depende de origem RENOVACAO e de corretor principal
-     * pertencente a outra corrente padrao, nao de um checkbox no aplicativo.
+     * A marca de renovação de outra corrente não pode usar o dono PADRÃO
+     * do corretor como prova de quem realizou a venda. Um corretor externo
+     * pode ter responsável financeiro interno, sem pertencer à corrente dele.
+     *
+     * A origem RENOVAÇÃO ou venda anterior indica renovação; a presença de
+     * outro corretor ou do titular diferente do dono anterior indica
+     * intermediação externa. Não confunde com o responsável pelos repasses.
      */
-    public static function renovacaoExterna($db,int $cliente,int $titular,?array $visita=null,?int $segundo=null,?int $ignorarOperacao=null): bool
-    {
-        $r=$db->table('clientes c')->select('o.nome AS origem_nome,c.dono_corrente_pessoa_id')
+    public static function renovacaoExterna(
+        $db,int $cliente,int $titular,?array $visita=null,
+        ?int $segundo=null,?int $ignorarOperacao=null
+    ): bool {
+        $row=$db->table('clientes c')
+            ->select('c.dono_corrente_pessoa_id,o.nome AS origem_nome')
             ->join('lead_origens o','o.id=c.origem_id','left')
             ->where('c.id',$cliente)->get()->getRowArray();
-        if(!$r)return false;
-        $origin=(int)($visita['corretor_pessoa_id']??0);
-        if($visita && (int)($visita['criado_por_usuario_id']??0)>0){
-            $u=$db->table('pessoas')->select('id')
-                ->where('user_id',(int)$visita['criado_por_usuario_id'])->where('ativo',1)
-                ->get()->getRowArray();
-            if($u)$origin=(int)$u['id'];
-        }
-        if($origin<1)$origin=(int)$r['dono_corrente_pessoa_id'];
-        $owner=self::donoPadrao($db,$origin);
-        $titularCorrente=self::donoPadrao($db,$titular);
-        if($titularCorrente===$owner)return false;
-        $origemRenovacao=mb_stripos((string)($r['origem_nome']??''),'renova')!==false;
-        $previous=$db->table('venda_operacoes')->where('cliente_id',$cliente)->where('situacao','VENDA');
+        if(!$row||$titular<=0)return false;
+
+        $origemRenovacao=mb_stripos((string)($row['origem_nome']??''),'renova')!==false;
+        $previous=$db->table('venda_operacoes')
+            ->where('cliente_id',$cliente)->where('situacao','VENDA');
         if($ignorarOperacao!==null)$previous->where('id !=',$ignorarOperacao);
-        $jaEraCliente=$previous->countAllResults()>0;
-        // Operação entre correntes com segundo corretor captador também é
-        // uma renovação de terceiro, mesmo quando a origem antiga do cliente
-        // não foi alterada para RENOVAÇÃO.
-        $duasCorrentes=$segundo!==null && $segundo>0
-            && self::donoPadrao($db,$segundo)===$owner;
-        return $origemRenovacao || $jaEraCliente || $duasCorrentes;
+        $jaVendido=$previous->countAllResults()>0;
+        if(!$origemRenovacao&&!$jaVendido)return false;
+
+        // Dois corretores diferentes na renovação = intermediário externo;
+        // a configuração "dono padrão" não pode apagar esse vínculo.
+        $temOutroCorretor=$segundo!==null && $segundo>0 && $segundo!==$titular;
+        $donoAnterior=(int)($row['dono_corrente_pessoa_id']??0);
+        $titularOutraCorrente=$donoAnterior>0 && $donoAnterior!==$titular;
+        return $temOutroCorretor||$titularOutraCorrente;
     }
 
     /** Troca de corrente auditable, sem alterar equipe, rateios ou captacao. */
