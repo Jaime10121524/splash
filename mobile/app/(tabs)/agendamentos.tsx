@@ -105,7 +105,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
         const data = peopleResult.value;
         setOptions(data);
         setCaptor(current => current ?? data.minha_pessoa_id
-          ?? (data.corretores.length === 1 ? data.corretores[0].id : null));
+          ?? (data.corretores_agendamento?.length === 1 ? data.corretores_agendamento[0].id : null));
       } else {
         setOptions(null);
       }
