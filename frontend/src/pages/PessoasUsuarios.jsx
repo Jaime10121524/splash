@@ -11,7 +11,7 @@ const papelOptions = [
   { value:'operador', label:'Operador de atendimentos' },
 ]
 const userRoles = papelOptions
-const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],responsavel_pessoa_id:'',ativo:true})
+const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],responsavel_pessoa_id:'',gestor_pessoa_id:'',usa_sistema:false,ativo:true})
 const emptyLogin = () => ({username:'',email:'',password:'',group:'corretor'})
 
 // Todas as rotas passam pelo mesmo cliente HTTP usado no app e no navegador.
@@ -93,7 +93,9 @@ export default function PessoasUsuarios({tab='pessoas'}) {
     setPersonForm(person?{
       nome:person.nome,telefone:person.telefone||'',email:person.email||'',
       observacoes:person.observacoes||'',papeis:[...person.papeis],
-       responsavel_pessoa_id:person.responsavel_pessoa_id?String(person.responsavel_pessoa_id):'',ativo:!!person.ativo,
+       responsavel_pessoa_id:person.responsavel_pessoa_id?String(person.responsavel_pessoa_id):'',
+        gestor_pessoa_id:person.gestor_pessoa_id?String(person.gestor_pessoa_id):'',
+        usa_sistema:!!person.usa_sistema,ativo:!!person.ativo,
     }:emptyPerson())
     setFormError('')
     setModal({kind:'person',person})
@@ -280,6 +282,22 @@ export default function PessoasUsuarios({tab='pessoas'}) {
             ariaLabel="Responsável financeiro"/>
           <small>Exemplo: nas vendas da Marta, o responsável recebe o dinheiro do clube e depois paga a comissão dela. A comissão continua pertencendo à Marta.</small>
         </label>}
+        {personForm.papeis.includes('corretor')&&<label>
+          <span className="field-caption">Gestor comercial responsável (visibilidade da equipe)</span>
+          <FormControl type="select" value={personForm.gestor_pessoa_id||''}
+            onChange={value=>setPersonForm(f=>({...f,gestor_pessoa_id:value}))}
+            options={[{value:'',label:'Sem gestor vinculado'},...persons
+              .filter(p=>p.ativo&&p.papeis.includes('gerente')&&p.id!==modal.person?.id)
+              .map(p=>({value:String(p.id),label:p.nome}))]}
+            ariaLabel="Gestor comercial"/>
+          <small>O gestor consulta visitas, clientes, negociações e vendas deste corretor,
+            mesmo sem participar da comissão. Não altera o responsável financeiro acima.</small>
+        </label>}
+        <label className="pu-switch"><span><strong>Utiliza o sistema / aparece nos agendamentos</strong>
+          <small>Marque apenas corretores que utilizam a plataforma.
+            Os demais continuam disponíveis como participantes de vendas.</small></span>
+          <input type="checkbox" checked={personForm.usa_sistema}
+            onChange={e=>setPersonForm(f=>({...f,usa_sistema:e.target.checked}))}/></label>
         <label>Observações<textarea rows="3" maxLength={3000} value={personForm.observacoes}
           onChange={e=>setPersonForm(f=>({...f,observacoes:e.target.value}))} placeholder="Informações adicionais (opcional)"/></label>
         <label className="pu-switch"><span><strong>Ativo</strong><small>Inativar uma pessoa também bloqueia seu acesso, se houver.</small></span>
