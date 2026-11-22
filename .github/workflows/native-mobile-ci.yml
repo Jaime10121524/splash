@@ -77,6 +77,12 @@ jobs:
           php -l backend/app/Controllers/Api/MidiasSplashController.php
           php -l backend/app/Controllers/Api/MobileRateiosController.php
           php -l backend/app/Controllers/Api/MobileDashboardController.php
+          php -l backend/app/Database/Migrations/2026-11-21-000001_GestoresEUsuariosAtivos.php
+          php -l backend/app/Libraries/GestaoEquipe.php
+          php -l backend/app/Controllers/Api/PessoasController.php
+          php -l backend/app/Controllers/Api/CatalogosController.php
+          php -l backend/app/Controllers/Api/AgendamentosController.php
+          php -l backend/app/Controllers/Api/VendasController.php
           php -l backend/app/Controllers/Api/MobileController.php
           php -l backend/app/Controllers/Api/MobileVisitasController.php
           php -l backend/app/Controllers/Api/MobileClientesController.php
