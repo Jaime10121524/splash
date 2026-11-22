@@ -19,7 +19,7 @@ class CatalogosController extends CommercialBaseController
 
         // Retornamos somente os campos operacionais necessários, nunca credenciais.
         $people=$db->table('pessoas p')
-            ->select('p.id,p.nome,p.ativo,pp.papel')
+            ->select('p.id,p.nome,p.ativo,p.usa_sistema,pp.papel')
             ->join('pessoa_papeis pp','pp.pessoa_id=p.id','inner')
             ->orderBy('p.nome','ASC')->get()->getResultArray();
         $pessoas=[];
