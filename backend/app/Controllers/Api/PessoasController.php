@@ -34,6 +34,9 @@ class PessoasController extends BaseController
         $responsabilidades=[];
         foreach($db->table('fechamento_responsabilidades')->get()->getResultArray() as $rel)
             $responsabilidades[(int)$rel['corretor_pessoa_id']]=(int)$rel['responsavel_pessoa_id'];
+        $gestores=[];
+        foreach($db->table('gestor_corretores')->get()->getResultArray() as $rel)
+            $gestores[(int)$rel['corretor_pessoa_id']]=(int)$rel['gestor_pessoa_id'];
         $roleMap = [];
         foreach ($rows as $role) $roleMap[(int)$role['pessoa_id']][] = $role['papel'];
 
@@ -43,6 +46,8 @@ class PessoasController extends BaseController
             $pessoa['ativo'] = (bool)$pessoa['ativo'];
             $pessoa['papeis'] = $roleMap[$pessoa['id']] ?? [];
             $pessoa['responsavel_pessoa_id'] = $responsabilidades[$pessoa['id']]??null;
+            $pessoa['gestor_pessoa_id']=$gestores[$pessoa['id']]??null;
+            $pessoa['usa_sistema']=(bool)($pessoa['usa_sistema']??false);
         }
         unset($pessoa);
 
@@ -63,13 +68,16 @@ class PessoasController extends BaseController
             $now = date('Y-m-d H:i:s');
             $roles = $clean['papeis'];
             $boss=$clean['responsavel_pessoa_id'];
-            unset($clean['papeis'],$clean['responsavel_pessoa_id']);
+            $gestor=$clean['gestor_pessoa_id'];
+            unset($clean['papeis'],$clean['responsavel_pessoa_id'],$clean['gestor_pessoa_id']);
             $db->table('pessoas')->insert([...$clean, 'criado_em'=>$now]);
             $id = (int)$db->insertID();
             if ($id < 1) throw new \RuntimeException('Pessoa não inserida.');
             $this->saveRoles($db, $id, $roles);
             $this->saveResponsibility($db,$id,$boss);
+            $this->saveManager($db,$id,$gestor);
             $clean['responsavel_pessoa_id']=$boss;
+            $clean['gestor_pessoa_id']=$gestor;
             $this->audit($db, $id, 'CRIAR', null, [...$clean,'papeis'=>$roles]);
             $this->commit($db);
             return $this->ok('Pessoa cadastrada.', 201);
@@ -101,11 +109,15 @@ class PessoasController extends BaseController
             $currentLink=$db->table('fechamento_responsabilidades')
                 ->select('responsavel_pessoa_id')->where('corretor_pessoa_id',$personId)->get()->getRowArray();
             $old['responsavel_pessoa_id']=$currentLink?(int)$currentLink['responsavel_pessoa_id']:null;
+            $managerLink=$db->table('gestor_corretores')->select('gestor_pessoa_id')
+                ->where('corretor_pessoa_id',$personId)->get()->getRowArray();
+            $old['gestor_pessoa_id']=$managerLink?(int)$managerLink['gestor_pessoa_id']:null;
             $old['papeis'] = array_column($db->table('pessoa_papeis')
                 ->where('pessoa_id',$personId)->get()->getResultArray(), 'papel');
             $roles = $clean['papeis'];
             $boss=$clean['responsavel_pessoa_id'];
-            unset($clean['papeis'],$clean['responsavel_pessoa_id']);
+            $gestor=$clean['gestor_pessoa_id'];
+            unset($clean['papeis'],$clean['responsavel_pessoa_id'],$clean['gestor_pessoa_id']);
 
             $user = null;
             // Não permitir inativar o administrador logado.
@@ -129,7 +141,9 @@ class PessoasController extends BaseController
                 ->update([...$clean, 'atualizado_em'=>date('Y-m-d H:i:s')]);
             $this->saveRoles($db, $personId, $roles);
             $this->saveResponsibility($db,$personId,$boss);
+            $this->saveManager($db,$personId,$gestor);
             $clean['responsavel_pessoa_id']=$boss;
+            $clean['gestor_pessoa_id']=$gestor;
             if ($user && $clean['ativo'] === 0) {
                 $user->ban('Pessoa inativada pelo administrador SPLASH.');
             }
@@ -156,6 +170,10 @@ class PessoasController extends BaseController
         $boss=$rawBoss===null||$rawBoss===''?null:
             filter_var($rawBoss,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
         if($boss===false)return ['error'=>'Responsável financeiro inválido.'];
+        $rawManager=$data['gestor_pessoa_id']??null;
+        $manager=$rawManager===null||$rawManager===''?null:
+            filter_var($rawManager,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        if($manager===false)return ['error'=>'Gestor comercial inválido.'];
         if ($name === '' || mb_strlen($name)>160) return ['error'=>'Informe o nome (até 160 caracteres).'];
         if ($email !== '' && (strlen($email)>254 || !filter_var($email,FILTER_VALIDATE_EMAIL))) {
             return ['error'=>'E-mail inválido.'];
@@ -169,8 +187,12 @@ class PessoasController extends BaseController
             || array_diff($roles, ['corretor','vendedor','gerente','operador'])!==[]) {
             return ['error'=>'Marque pelo menos um papel válido: corretor, vendedor, gerente ou operador.'];
         }
+        if($manager!==null && !in_array('corretor',$roles,true))
+            return ['error'=>'O vínculo com gestor só se aplica a corretores.'];
         if($boss!==null && !in_array('corretor',$roles,true))
             return ['error'=>'A responsabilidade financeira se aplica somente à função Corretor.'];
+        if (!array_key_exists('usa_sistema',$data) || !is_bool($data['usa_sistema']))
+            return ['error'=>'Informe se a pessoa utiliza o sistema.'];
         if (!array_key_exists('ativo',$data) || !is_bool($data['ativo'])) {
             return ['error'=>'Informe a situação da pessoa.'];
         }
@@ -178,6 +200,7 @@ class PessoasController extends BaseController
             'nome'=>$name, 'email'=>$email ?: null,
             'telefone'=>$phone ?: null, 'observacoes'=>$note ?: null,
             'papeis'=>array_values($roles),'responsavel_pessoa_id'=>$boss,
+            'gestor_pessoa_id'=>$manager,'usa_sistema'=>$data['usa_sistema'] ? 1 : 0,
             'ativo'=>$data['ativo'] ? 1 : 0,
         ];
     }
@@ -212,6 +235,25 @@ class PessoasController extends BaseController
         $db->table('fechamento_responsabilidades')->where('corretor_pessoa_id',$child)->delete();
         if($boss!==null)$db->table('fechamento_responsabilidades')->insert([
             'corretor_pessoa_id'=>$child,'responsavel_pessoa_id'=>$boss,
+            'criado_em'=>date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /** A relação comercial não altera o responsável financeiro. */
+    private function saveManager($db,int $corretor,?int $gestor): void
+    {
+        $old=$db->table('gestor_corretores')->where('corretor_pessoa_id',$corretor)->get()->getRowArray();
+        if(($old?(int)$old['gestor_pessoa_id']:null)===$gestor)return;
+        if($gestor!==null){
+            if($gestor===$corretor)throw new \DomainException('Uma pessoa não pode ser seu próprio gestor.');
+            if(!$db->table('pessoas')->where('id',$gestor)->where('ativo',1)->countAllResults()
+                || !$db->table('pessoa_papeis')->where('pessoa_id',$gestor)
+                    ->where('papel','gerente')->countAllResults())
+                throw new \DomainException('Escolha uma pessoa ativa com função Gerente.');
+        }
+        $db->table('gestor_corretores')->where('corretor_pessoa_id',$corretor)->delete();
+        if($gestor!==null)$db->table('gestor_corretores')->insert([
+            'corretor_pessoa_id'=>$corretor,'gestor_pessoa_id'=>$gestor,
             'criado_em'=>date('Y-m-d H:i:s'),
         ]);
     }
