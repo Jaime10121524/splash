@@ -138,12 +138,12 @@ final class GestaoEquipe
      * Renovacao externa depende de origem RENOVACAO e de corretor principal
      * pertencente a outra corrente padrao, nao de um checkbox no aplicativo.
      */
-    public static function renovacaoExterna($db,int $cliente,int $titular,?array $visita=null): bool
+    public static function renovacaoExterna($db,int $cliente,int $titular,?array $visita=null,?int $segundo=null,?int $ignorarOperacao=null): bool
     {
         $r=$db->table('clientes c')->select('o.nome AS origem_nome,c.dono_corrente_pessoa_id')
             ->join('lead_origens o','o.id=c.origem_id','left')
             ->where('c.id',$cliente)->get()->getRowArray();
-        if(!$r||mb_stripos((string)($r['origem_nome']??''),'renova')===false)return false;
+        if(!$r)return false;
         $origin=(int)($visita['corretor_pessoa_id']??0);
         if($visita && (int)($visita['criado_por_usuario_id']??0)>0){
             $u=$db->table('pessoas')->select('id')
@@ -153,7 +153,18 @@ final class GestaoEquipe
         }
         if($origin<1)$origin=(int)$r['dono_corrente_pessoa_id'];
         $owner=self::donoPadrao($db,$origin);
-        return self::donoPadrao($db,$titular)!==$owner;
+        $titularCorrente=self::donoPadrao($db,$titular);
+        if($titularCorrente===$owner)return false;
+        $origemRenovacao=mb_stripos((string)($r['origem_nome']??''),'renova')!==false;
+        $previous=$db->table('venda_operacoes')->where('cliente_id',$cliente)->where('situacao','VENDA');
+        if($ignorarOperacao!==null)$previous->where('id !=',$ignorarOperacao);
+        $jaEraCliente=$previous->countAllResults()>0;
+        // Operação entre correntes com segundo corretor captador também é
+        // uma renovação de terceiro, mesmo quando a origem antiga do cliente
+        // não foi alterada para RENOVAÇÃO.
+        $duasCorrentes=$segundo!==null && $segundo>0
+            && self::donoPadrao($db,$segundo)===$owner;
+        return $origemRenovacao || $jaEraCliente || $duasCorrentes;
     }
 
     /** Troca de corrente auditable, sem alterar equipe, rateios ou captacao. */
