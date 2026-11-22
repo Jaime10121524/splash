@@ -23,7 +23,7 @@ final class MobileVendasController extends VendasController
         if (!$u->inGroup('admin','gerente','corretor'))
             return $this->errorResponse(403,'Seu perfil não pode consultar ou registrar vendas comerciais.');
         $admin=$u->inGroup('admin');
-        $manager=!$admin && $u->inGroup('gerente');
+        $manager=!$admin && \App\Libraries\GestaoEquipe::ehGestor(db_connect(),$u);
         $scope=null;
         if (!$admin) {
             $p=db_connect()->table('pessoas')->select('id')->where('user_id',(int)$u->id)
