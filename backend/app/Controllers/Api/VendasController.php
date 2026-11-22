@@ -636,8 +636,7 @@ class VendasController extends CommercialBaseController
                 return $this->errorResponse(422,'O recebimento não pode ultrapassar o saldo a receber.');
             }
             $holder=(string)($data['detentor']??'');
-            if($method['codigo']==='PIX')$holder='CORRETOR';
-            elseif((bool)$method['credito'])$holder='EMPRESA';
+            if((bool)$method['credito'])$holder='EMPRESA';
             elseif(!in_array($holder,['CORRETOR','EMPRESA'],true)){
                 $db->transRollback();
                 return $this->errorResponse(422,'Informe com quem o valor recebido ficou.');
@@ -664,6 +663,108 @@ class VendasController extends CommercialBaseController
         }catch(Throwable $e){
             $db->transRollback();
             return $this->unexpected($e,'receber venda');
+        }
+    }
+
+    /**
+     * Corrige um recebimento sem apagar ou reescrever o extrato.
+     * Um estorno técnico e uma nova entrada são gravados na mesma transação.
+     * As comissões automáticas não pagas são reapuradas e auditadas.
+     */
+    public function corrigirRecebimento(int|string $id): ResponseInterface
+    {
+        if($denied=$this->guard())return $denied;
+        $data=$this->jsonPayload();
+        $entryId=$this->optionalId($data['entrada_id']??null);
+        $formId=$this->optionalId($data['forma_id']??null);
+        $amount=VendaMoney::cents($data['valor']??null);
+        $day=(string)($data['data_movimento']??'');
+        $reason=$this->cleanText($data['justificativa']??null,500,true);
+        if(!$entryId||!$formId||$amount===null||!$this->validateDate($day,false)
+            ||$reason===false||mb_strlen($reason)<5)
+            return $this->errorResponse(422,'Informe recebimento, forma, valor, data e motivo (mínimo 5 caracteres).');
+        $db=db_connect();$db->transBegin();
+        try{
+            $op=$db->query('SELECT * FROM venda_operacoes WHERE id=? FOR UPDATE',[(int)$id])->getRowArray();
+            if(!$op){$db->transRollback();return $this->errorResponse(404,'Venda não encontrada.');}
+            if($blocked=$this->impedeVendaFechada($db,(int)$id)){
+                $db->transRollback();return $blocked;
+            }
+            if($this->temPagamentoTitular($db,(int)$id)){
+                $db->transRollback();return $this->errorResponse(409,'Comissão já movimentada: corrija pelo fechamento.');
+            }
+            $rateIds=array_column($db->table('comissao_rateios')->select('id')
+                ->where('operacao_id',(int)$id)->get()->getResultArray(),'id');
+            if($rateIds && $db->table('comissao_repasses')->whereIn('rateio_id',$rateIds)->countAllResults()>0){
+                $db->transRollback();return $this->errorResponse(409,'Existem repasses de comissão. Estorne primeiro os repasses.');
+            }
+            $audit=$db->table('comissao_auto_apuracoes')->where('operacao_id',(int)$id)->get()->getRowArray();
+            if($audit && $audit['status']==='MANUAL'){
+                $db->transRollback();return $this->errorResponse(409,'Esta venda possui rateio manual. Reavalie as participações antes de corrigir o recebimento.');
+            }
+            if($rateIds && !$audit){
+                $db->transRollback();return $this->errorResponse(409,'Existem participações sem apuração automática. Confira a auditoria antes de corrigir.');
+            }
+            $original=$db->table('venda_recebimentos')->where('id',$entryId)
+                ->where('operacao_id',(int)$id)->where('tipo','ENTRADA')->get()->getRowArray();
+            if(!$original){
+                $db->transRollback();return $this->errorResponse(404,'Recebimento original não encontrado.');
+            }
+            $reversed=$db->table('venda_recebimentos')->selectSum('valor')
+                ->where('referencia_entrada_id',$entryId)
+                ->whereIn('tipo',['ESTORNO','DEVOLUCAO'])->get()->getRowArray();
+            if(VendaMoney::cents((string)($reversed['valor']??'0'),true)>0){
+                $db->transRollback();return $this->errorResponse(409,'Recebimento já estornado ou devolvido parcialmente. Faça ajuste separado.');
+            }
+            $method=$db->table('venda_formas_pagamento')->where('id',$formId)->where('ativo',1)->get()->getRowArray();
+            if(!$method||$method['codigo']==='ABATIMENTO_EMP'){
+                $db->transRollback();return $this->errorResponse(422,'Forma de pagamento inválida.');
+            }
+            if($day<$op['data_negociacao']){
+                $db->transRollback();return $this->errorResponse(422,'Data do recebimento anterior à negociação.');
+            }
+            $oldValue=VendaMoney::cents((string)$original['valor']);
+            if($amount>$this->balance($db,(int)$id,$op)+$oldValue){
+                $db->transRollback();return $this->errorResponse(422,'Novo valor excede o saldo disponível.');
+            }
+            $holder=(bool)$method['credito']?'EMPRESA':(string)($data['detentor']??'');
+            if(!in_array($holder,['CORRETOR','EMPRESA'],true)){
+                $db->transRollback();return $this->errorResponse(422,'Selecione se o valor ficou com o clube ou corretor.');
+            }
+            $now=$this->nowLocal();
+            if($audit){
+                $oldRates=$db->table('comissao_rateios')->where('operacao_id',(int)$id)->get()->getResultArray();
+                $db->table('comissao_rateios_auditoria')->insert([
+                    'operacao_id'=>(int)$id,
+                    'dados_antes'=>json_encode($oldRates,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
+                    'dados_depois'=>'[]',
+                    'justificativa'=>'Reabertura de apuração automática por correção de recebimento: '.$reason,
+                    'usuario_id'=>$this->saleActorId(),'criado_em'=>$now,
+                ]);
+                $db->table('comissao_rateios')->where('operacao_id',(int)$id)->delete();
+                $db->table('comissao_auto_apuracoes')->where('operacao_id',(int)$id)->delete();
+            }
+            $db->table('venda_recebimentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'ESTORNO','referencia_entrada_id'=>$entryId,
+                'forma_id'=>$original['forma_id'],'detentor'=>$original['detentor'],
+                'valor'=>$original['valor'],
+                'data_movimento'=>max(substr($now,0,10),(string)$original['data_movimento']),
+                'observacoes'=>'Correção: '.$reason,
+                'criado_por_usuario_id'=>$this->saleActorId(),'criado_em'=>$now,
+            ]);
+            $db->table('venda_recebimentos')->insert([
+                'operacao_id'=>(int)$id,'tipo'=>'ENTRADA','referencia_entrada_id'=>null,
+                'forma_id'=>$formId,'detentor'=>$holder,
+                'valor'=>VendaMoney::decimal($amount),'data_movimento'=>$day,
+                'observacoes'=>'Substitui entrada #'.$entryId.'. '.$reason,
+                'criado_por_usuario_id'=>$this->saleActorId(),'criado_em'=>$now,
+            ]);
+            $this->updateEstimate($db,(int)$id,$op);
+            RateioAutomatico::sync($db,(int)$id,$this->saleActorId());
+            $this->commitOrFail($db);
+            return $this->responseOK('Recebimento corrigido com estorno técnico, nova entrada e auditoria das comissões.');
+        }catch(Throwable $e){
+            $db->transRollback();return $this->unexpected($e,'correção de recebimento');
         }
     }
 
