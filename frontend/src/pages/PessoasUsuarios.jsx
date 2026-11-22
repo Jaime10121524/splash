@@ -11,7 +11,7 @@ const papelOptions = [
   { value:'operador', label:'Operador de atendimentos' },
 ]
 const userRoles = papelOptions
-const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],responsavel_pessoa_id:'',gestor_pessoa_id:'',usa_sistema:false,ativo:true})
+const emptyPerson = () => ({nome:'',telefone:'',email:'',observacoes:'',papeis:['corretor'],responsavel_pessoa_id:'',gestor_pessoa_id:'',dono_corrente_padrao_pessoa_id:'',usa_sistema:false,ativo:true})
 const emptyLogin = () => ({username:'',email:'',password:'',group:'corretor'})
 
 // Todas as rotas passam pelo mesmo cliente HTTP usado no app e no navegador.
@@ -95,6 +95,7 @@ export default function PessoasUsuarios({tab='pessoas'}) {
       observacoes:person.observacoes||'',papeis:[...person.papeis],
        responsavel_pessoa_id:person.responsavel_pessoa_id?String(person.responsavel_pessoa_id):'',
         gestor_pessoa_id:person.gestor_pessoa_id?String(person.gestor_pessoa_id):'',
+        dono_corrente_padrao_pessoa_id:person.dono_corrente_padrao_pessoa_id?String(person.dono_corrente_padrao_pessoa_id):'',
         usa_sistema:!!person.usa_sistema,ativo:!!person.ativo,
     }:emptyPerson())
     setFormError('')
@@ -292,6 +293,17 @@ export default function PessoasUsuarios({tab='pessoas'}) {
             ariaLabel="Gestor comercial"/>
           <small>O gestor consulta visitas, clientes, negociações e vendas deste corretor,
             mesmo sem participar da comissão. Não altera o responsável financeiro acima.</small>
+        </label>}
+        {personForm.papeis.includes('corretor')&&<label>
+          <span className="field-caption">Dono padrão da corrente dos clientes captados</span>
+          <FormControl type="select" value={personForm.dono_corrente_padrao_pessoa_id||''}
+            onChange={value=>setPersonForm(f=>({...f,dono_corrente_padrao_pessoa_id:value}))}
+            options={[{value:'',label:'O próprio corretor (padrão)'},...persons
+              .filter(p=>p.ativo&&p.papeis.includes('corretor'))
+              .map(p=>({value:String(p.id),label:p.nome}))]}
+            ariaLabel="Dono padrão da corrente"/>
+          <small>Exemplo: configure James como titular padrão para James, Helena e Marta.
+            Este vínculo é independente do gestor e de quem recebe repasses.</small>
         </label>}
         <label className="pu-switch"><span><strong>Utiliza o sistema / aparece nos agendamentos</strong>
           <small>Marque apenas corretores que utilizam a plataforma.
