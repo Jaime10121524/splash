@@ -486,6 +486,7 @@ class FechamentosController extends CommercialBaseController
             }
             return $this->response->setJSON([
                 'inicio'=>$start,'fim'=>$end,'admin'=>$admin,
+                'minha_pessoa_id'=>$ownId,
                 'resumo'=>[
                     'a_pagar'=>$admin?VendaMoney::decimal($teamPayable):null,
                     'a_receber'=>VendaMoney::decimal($ownOpen),
