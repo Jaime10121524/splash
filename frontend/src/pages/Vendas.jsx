@@ -422,7 +422,8 @@ export default function Vendas({tab='vendas',initialVisit=null,onVisitAccepted=n
             {op.fechamento_id&&<span className="com-pill good">Fechamento #{op.fechamento_id} · {op.fechamento_status==='CONCLUIDO'?'Concluído':'Em andamento'}</span>}
           </div>
           <small>{formatPhone(op.cliente_telefone)} · {op.numero_titulo?op.numero_titulo+' ':''}{op.sigla_plano}
-            {' · '}Corretor: {op.corretor_nome}{op.segundo_corretor_nome?' + '+op.segundo_corretor_nome:''}</small>
+</small>
+          <small>Corretores: {op.corretor_nome||'Não informado'}{op.segundo_corretor_nome?' + '+op.segundo_corretor_nome:''}</small>
           <small>Corrente: {op.dono_corrente_nome} · {dateBR(op.data_venda||op.data_negociacao)}</small>
           {op.observacao_comissao&&<span className="vd-soft-note">{op.observacao_comissao}</span>}
         </div>
