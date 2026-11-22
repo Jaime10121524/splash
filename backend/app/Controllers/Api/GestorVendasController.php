@@ -55,7 +55,6 @@ final class GestorVendasController extends VendasController
             ->orderBy('v.id', 'DESC')->limit(200)->get()->getResultArray();
         $managerUser=auth('session')->user();
         $team=\App\Libraries\GestaoEquipe::ids($db,$managerUser);
-        $userIds=\App\Libraries\GestaoEquipe::usuarios($db,$managerUser);
         $visits=array_values(array_filter($visits,static fn($v)=>
             in_array((int)$v['corretor_pessoa_id'],$team,true)
             || in_array((int)($v['segundo_corretor_pessoa_id']??0),$team,true)));
@@ -89,6 +88,7 @@ final class GestorVendasController extends VendasController
             ->orWhereIn('o.criado_por_usuario_id',$users)
             ->orWhereIn('o.corretor_pessoa_id',$team)
             ->orWhereIn('o.segundo_corretor_pessoa_id',$team)
+            ->orWhereIn('o.responsavel_financeiro_pessoa_id',$team)
             ->orWhereIn('v.corretor_pessoa_id',$team)
             ->orWhereIn('v.segundo_corretor_pessoa_id',$team)
             ->orWhereIn('v.criado_por_usuario_id',$users)->groupEnd();
