@@ -241,6 +241,10 @@ final class MobileVisitasController extends BaseController
             ->select('c.id,c.nome,c.telefone')->where('c.ativo', 1);
         $scope = $this->scope(auth('tokens')->user());
         if ($scope !== null) $builder->where('c.dono_corrente_pessoa_id', $scope);
+        $actor=auth('tokens')->user();
+        if($actor->inGroup('gerente')&&!$actor->inGroup('admin'))
+            $builder->whereIn('c.dono_corrente_pessoa_id',
+                \App\Libraries\GestaoEquipe::ids($db,$actor));
         $digits = preg_replace('/\D/', '', $query);
         $builder->groupStart()->like('c.nome', $query);
         if (strlen($digits) >= 3) $builder->orLike('c.telefone', $digits);
@@ -268,8 +272,11 @@ final class MobileVisitasController extends BaseController
         $client = $db->table('clientes')->select('id,dono_corrente_pessoa_id,ativo')
             ->where('id', $clientId)->get()->getRowArray();
         $scope = $this->scope($user);
+        $team=$user->inGroup('gerente')&&!$user->inGroup('admin')
+            ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
         if (! $client || ! (bool) $client['ativo']
-            || ($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope)) {
+            || ($scope !== null && (int) $client['dono_corrente_pessoa_id'] !== $scope)
+            || ($team!==null&&!in_array((int)$client['dono_corrente_pessoa_id'],$team,true))) {
             return $this->error(404, 'Cliente não encontrado.');
         }
 
