@@ -313,7 +313,8 @@ class VendasController extends CommercialBaseController
             }
             $now=$this->nowLocal();
             $external=\App\Libraries\GestaoEquipe::renovacaoExterna(
-                $db,(int)$clientId,(int)$brokers['corretor_pessoa_id'],$visit);
+                $db,(int)$clientId,(int)$brokers['corretor_pessoa_id'],$visit,
+                $brokers['segundo_corretor_pessoa_id']??null);
             $currentOwner=$external
                 ?(int)$brokers['corretor_pessoa_id']
                 :\App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']);
@@ -484,7 +485,8 @@ class VendasController extends CommercialBaseController
             }
             $visit=$op['visita_id']?$db->table('visitas')->where('id',(int)$op['visita_id'])->get()->getRowArray():null;
             $external=\App\Libraries\GestaoEquipe::renovacaoExterna(
-                $db,(int)$op['cliente_id'],(int)$brokers['corretor_pessoa_id'],$visit);
+                $db,(int)$op['cliente_id'],(int)$brokers['corretor_pessoa_id'],$visit,
+                $brokers['segundo_corretor_pessoa_id']??null,(int)$id);
             $currentOwner=$external?(int)$brokers['corretor_pessoa_id']:
                 \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']);
             \App\Libraries\GestaoEquipe::atribuirCorrente($db,(int)$op['cliente_id'],
