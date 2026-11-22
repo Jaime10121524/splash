@@ -1,10 +1,12 @@
 import Constants, {ExecutionEnvironment} from 'expo-constants';
 
 /**
- * Somente o cliente Expo Go, que nao possui FCM remoto no Android.
- * expoGoConfig isoladamente nao discrimina o APK standalone com seguranca.
- * Apps standalone/production SEMPRE habilitam a tentativa de registrar FCM.
+ * Expo Go nao suporta push remoto Android (SDK 53+).
+ * `executionEnvironment` e a identificacao oficial; `appOwnership` fica
+ * apenas como compatibilidade com instalacoes antigas.
+ *
+ * Development builds e APKs standalone permanecem habilitados para FCM.
  */
 export const isExpoGo =
-  Constants.executionEnvironment !== ExecutionEnvironment.Standalone &&
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
   Constants.appOwnership === 'expo';
