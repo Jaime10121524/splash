@@ -147,15 +147,24 @@ final class MobileVendasController extends VendasController
         if($a instanceof ResponseInterface)return $a;
         $db=db_connect();
         $plans=$db->table('plano_versoes')->select('id,plano_id,codigo,valor,duracao_meses,ativo')
-            ->where('ativo',1)->orderBy('duracao_meses','ASC')->get()->getResultArray();
-        foreach($plans as &$plan)$plan['nome']=$plan['codigo'].' · '.$plan['duracao_meses'].' meses';
+            ->orderBy('duracao_meses','ASC')->get()->getResultArray();
+        // Versões desativadas continuam necessárias para identificar planos de vendas antigas.
+        foreach($plans as &$plan){
+            $plan['id']=(int)$plan['id'];
+            $plan['plano_id']=(int)$plan['plano_id'];
+            $plan['duracao_meses']=(int)$plan['duracao_meses'];
+            $plan['ativo']=(bool)$plan['ativo'];
+            $plan['nome']=$plan['codigo'].' · '.$plan['duracao_meses'].' meses';
+        }
         unset($plan);
         $methods=$db->table('venda_formas_pagamento')
             ->select('id,nome,codigo,credito,ativo')
             ->where('ativo',1)->where('codigo !=','ABATIMENTO_EMP')->orderBy('id')->get()->getResultArray();
+        foreach($methods as &$method){$method['id']=(int)$method['id'];$method['credito']=(bool)$method['credito'];}unset($method);
         $managers=$db->table('pessoas p')->select('p.id,p.nome')->join('pessoa_papeis pp','pp.pessoa_id=p.id')
             ->where('pp.papel','gerente')->where('p.ativo',1)->groupBy('p.id,p.nome')
             ->orderBy('p.nome')->get()->getResultArray();
+        foreach($managers as &$manager)$manager['id']=(int)$manager['id'];unset($manager);
         $people=[];
         // Corretor externo não precisa usar o aplicativo para participar
         // como titular/segundo corretor de uma renovacao.
