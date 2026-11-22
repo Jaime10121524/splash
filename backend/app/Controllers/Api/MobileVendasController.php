@@ -319,6 +319,31 @@ final class MobileVendasController extends VendasController
      * Conversao auditada da mesma operacao: nao duplica venda nem recebimentos.
      * O guard() da classe base continua usando a autenticacao token-mobile.
      */
+    /** Custódia e adiantamentos sempre passam pelo escopo da operação. */
+    public function custodiaPendencia(int|string $id): ResponseInterface
+    {
+        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
+        $op=$this->ownedOperation((int)$id,$a);
+        if($op instanceof ResponseInterface)return $op;
+        return parent::custodiaPendencia($id);
+    }
+
+    public function registrarAdiantamento(int|string $id): ResponseInterface
+    {
+        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
+        $op=$this->ownedOperation((int)$id,$a);
+        if($op instanceof ResponseInterface)return $op;
+        return parent::registrarAdiantamento($id);
+    }
+
+    public function estornarAdiantamento(int|string $id): ResponseInterface
+    {
+        $a=$this->actor();if($a instanceof ResponseInterface)return $a;
+        $op=$this->ownedOperation((int)$id,$a);
+        if($op instanceof ResponseInterface)return $op;
+        return parent::estornarAdiantamento($id);
+    }
+
     public function corrigirRecebimento(int|string $id): ResponseInterface
     {
         $a=$this->actor();if($a instanceof ResponseInterface)return $a;
