@@ -181,12 +181,20 @@ final class MobileVisitasController extends BaseController
             ->where('p.ativo', 1)->whereIn('pp.papel', ['corretor', 'vendedor'])
             ->orderBy('p.nome', 'ASC')->get()->getResultArray();
         $brokers = [];
+        $agendaBrokers = [];
         $attendants = [];
         foreach ($people as $row) {
             $id = (int) $row['id'];
             $person = ['id' => $id, 'nome' => (string) $row['nome']];
             $attendants[$id] = $person;
             if ($row['papel'] === 'corretor') $brokers[$id] = $person;
+        }
+        $allowedAgenda=$db->table('pessoas')
+            ->select('id')->where('ativo',1)->where('usa_sistema',1)
+            ->get()->getResultArray();
+        foreach($allowedAgenda as $p){
+            $personId=(int)$p['id'];
+            if(isset($brokers[$personId]))$agendaBrokers[$personId]=$brokers[$personId];
         }
         $reasons = $db->table('motivos_nao_venda')
             ->select('id,descricao')->where('ativo', 1)->orderBy('descricao', 'ASC')
@@ -206,6 +214,7 @@ final class MobileVisitasController extends BaseController
 
         return $this->response->setJSON([
             'corretores' => array_values($brokers),
+            'corretores_agendamento' => array_values($agendaBrokers),
             'atendentes' => array_values($attendants),
             'motivos' => $reasons,
             'origens' => $origins,
