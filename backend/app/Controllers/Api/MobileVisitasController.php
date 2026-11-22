@@ -49,7 +49,8 @@ final class MobileVisitasController extends BaseController
 
     private function scope($user): ?int
     {
-        if (! $user->inGroup('corretor') || $user->inGroup('admin', 'gerente', 'operador')) {
+        if (! $user->inGroup('corretor') || $user->inGroup('admin', 'operador')
+            || \App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)) {
             return null;
         }
         $person = db_connect()->table('pessoas')->select('id')
@@ -60,7 +61,7 @@ final class MobileVisitasController extends BaseController
     private function allowed(array $visit, $user): bool
     {
         if($user->inGroup('admin','operador'))return true;
-        if($user->inGroup('gerente')){
+        if(\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user)){
             $db=db_connect();
             $ids=\App\Libraries\GestaoEquipe::ids($db,$user);
             $users=\App\Libraries\GestaoEquipe::usuarios($db,$user);
@@ -272,7 +273,7 @@ final class MobileVisitasController extends BaseController
         $client = $db->table('clientes')->select('id,dono_corrente_pessoa_id,ativo')
             ->where('id', $clientId)->get()->getRowArray();
         $scope = $this->scope($user);
-        $team=$user->inGroup('gerente')&&!$user->inGroup('admin')
+        $team=\App\Libraries\GestaoEquipe::ehGestor($db,$user)&&!$user->inGroup('admin')
             ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
         if (! $client || ! (bool) $client['ativo']
             || !\App\Libraries\GestaoEquipe::podeVerCliente($db,$user,$clientId)) {
@@ -317,7 +318,7 @@ final class MobileVisitasController extends BaseController
         $db=db_connect();
         $scope=$this->scope($user);
         $admin=$user->inGroup('admin');
-        $manager=$user->inGroup('gerente');
+        $manager=\App\Libraries\GestaoEquipe::ehGestor($db,$user);
         $operator=$user->inGroup('operador') && !$admin && !$manager;
         $team=$manager&&!$admin?\App\Libraries\GestaoEquipe::ids($db,$user):null;
         $teamUsers=$team!==null?\App\Libraries\GestaoEquipe::usuarios($db,$user):null;
@@ -524,7 +525,7 @@ final class MobileVisitasController extends BaseController
             ->where('id',$clientId)->get()->getRowArray();
         if(!$client||!(bool)$client['ativo'])
             return $this->error(404,'Cliente ativo não encontrado.');
-        if($user->inGroup('gerente')&&!$user->inGroup('admin')){
+        if(\App\Libraries\GestaoEquipe::ehGestor($db,$user)&&!$user->inGroup('admin')){
             $ids=\App\Libraries\GestaoEquipe::ids($db,$user);
             if(!\App\Libraries\GestaoEquipe::podeVerCliente($db,$user,$clientId)
                 || (!in_array($broker['corretor_pessoa_id'],$ids,true)
@@ -591,7 +592,8 @@ final class MobileVisitasController extends BaseController
         $arrivalDay=(string)($input['data_visita']??substr($nowRecorded,0,10));
         if(!$this->dateValid($arrivalDay)||$arrivalDay>substr($nowRecorded,0,10))
             return $this->error(422,'A data da chegada deve ser hoje ou um dia anterior.');
-        if($arrivalDay<substr($nowRecorded,0,10) && !$user->inGroup('admin','gerente'))
+        if($arrivalDay<substr($nowRecorded,0,10) && !$user->inGroup('admin')
+            && !\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user))
             return $this->error(403,'Registrar chegada anterior exige permissão de gestor.');
         $db = db_connect();
         $brokers = $this->brokers($db, $input, $user);
@@ -600,7 +602,7 @@ final class MobileVisitasController extends BaseController
         $db->transBegin();
         try {
             $scope = $this->scope($user);
-            $team=$user->inGroup('gerente')&&!$user->inGroup('admin')
+            $team=\App\Libraries\GestaoEquipe::ehGestor($db,$user)&&!$user->inGroup('admin')
                 ?\App\Libraries\GestaoEquipe::ids($db,$user):null;
             if($team!==null &&
                 !in_array((int)$brokers['corretor_pessoa_id'],$team,true) &&
