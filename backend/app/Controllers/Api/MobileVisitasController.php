@@ -239,6 +239,8 @@ final class MobileVisitasController extends BaseController
             'motivos' => $reasons,
             'origens' => $origins,
             'minha_pessoa_id' => \App\Libraries\GestaoEquipe::pessoaId($db,$user),
+            'pode_escolher_dono_corrente'=>$user->inGroup('admin')
+                || \App\Libraries\GestaoEquipe::ehGestor($db,$user),
         ])->setHeader('Cache-Control', 'no-store');
     }
 
@@ -635,6 +637,26 @@ final class MobileVisitasController extends BaseController
                 // quando a conta está limitada a uma corrente.
                 $ownerId=\App\Libraries\GestaoEquipe::donoPadrao(
                     $db,(int)$brokers['corretor_pessoa_id']);
+                $canChooseOwner=$user->inGroup('admin')
+                    || \App\Libraries\GestaoEquipe::ehGestor($db,$user);
+                $requestedOwner=$this->validId($newClient['dono_corrente_pessoa_id']??null);
+                if($canChooseOwner && $requestedOwner!==null
+                    && empty($newClient['indicador_cliente_id'])){
+                    // Gestor escolhe o dono entre os corretores desta venda ou o
+                    // titular padrão. Escolher Marcelino não obriga James a
+                    // ser o dono da corrente nem retira dele acesso operacional.
+                    $permitted=array_filter([
+                        (int)$brokers['corretor_pessoa_id'],
+                        (int)($brokers['segundo_corretor_pessoa_id']??0),
+                        $ownerId,
+                    ]);
+                    if(!in_array($requestedOwner,$permitted,true)
+                        || !$this->personWithRole($db,$requestedOwner,['corretor'])){
+                        $db->transRollback();
+                        return $this->error(422,'Selecione o dono da corrente entre os corretores envolvidos.');
+                    }
+                    $ownerId=$requestedOwner;
+                }
                 $newClient['dono_corrente_pessoa_id'] = $ownerId;
                 $clean = ClienteRules::validate($db, [...$newClient, 'ativo' => true]);
                 if (isset($clean['error'])) {
