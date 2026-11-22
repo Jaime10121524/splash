@@ -93,7 +93,7 @@ export default function Participacoes(){
         </View>
         {rows.map((r,i)=><View key={i} style={[s.card,{backgroundColor:palette.surface,borderColor:palette.line}]}>
           <View style={s.line}><Text style={[s.name,{color:palette.ink}]}>{names(r.beneficiario_pessoa_id)}</Text>
-            <Text style={[s.value,{color:palette.brandDark}]}>{money(r.valor)}</Text></View>
+            <Text style={[s.value,{color:palette.brandDark}]}>{r.valor||money('0')}</Text></View>
           <Text style={{color:palette.muted,fontSize:12}}>{roles[r.papel]||r.papel}</Text>
           {rate.editavel&&<>
             <Text style={[s.label,{color:palette.muted}]}>Função</Text>
