@@ -296,6 +296,10 @@ export default function AtendimentoDetailScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Informações da visita</Text>
+              <DetailRow label="Telefone do cliente" value={visit.cliente_telefone
+                ? String(visit.cliente_telefone).replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3')
+                    .replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3')
+                : 'Não informado'} />
               <DetailRow label="Corretor" value={visit.corretor_nome} />
               <DetailRow label="Segundo corretor" value={visit.segundo_corretor_nome} />
               <DetailRow label="Atendente" value={visit.atendente_nome} />
