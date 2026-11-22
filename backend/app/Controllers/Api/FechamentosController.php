@@ -426,13 +426,19 @@ class FechamentosController extends CommercialBaseController
             }
             // Pendência é negociação financeira, NÃO comissão apurada.
             $pendingQuery=$db->table('venda_operacoes o')
-                ->select('o.id,o.valor_cobrado')
+                ->select('o.id,o.valor_cobrado,o.data_negociacao,o.sigla_plano,
+                    o.corretor_pessoa_id,o.segundo_corretor_pessoa_id,o.gerente_pessoa_id,
+                    o.criado_por_usuario_id,c.nome AS cliente_nome')
+                ->join('clientes c','c.id=o.cliente_id')
                 ->where('o.situacao','PENDENCIA')
                 ->where('o.data_negociacao >=',$start)->where('o.data_negociacao <=',$end);
             if(!$admin){
                 if($team!==null)$pendingQuery->groupStart()
                     ->whereIn('o.corretor_pessoa_id',$team)
-                    ->orWhereIn('o.segundo_corretor_pessoa_id',$team)->groupEnd();
+                    ->orWhereIn('o.segundo_corretor_pessoa_id',$team)
+                    ->orWhereIn('o.gerente_pessoa_id',$team)
+                    ->orWhereIn('o.criado_por_usuario_id',
+                        \App\Libraries\GestaoEquipe::usuarios($db,$user))->groupEnd();
                 else $pendingQuery->groupStart()->where('o.corretor_pessoa_id',$personId)
                     ->orWhere('o.segundo_corretor_pessoa_id',$personId)
                     ->orWhere('o.gerente_pessoa_id',$personId)->groupEnd();
@@ -475,13 +481,32 @@ class FechamentosController extends CommercialBaseController
                         'a_receber'=>$line['pendente'],
                     ];
                 }
+                // Negociacoes abertas aparecem por pessoa/titulo, mas nao somam
+                // comissao antecipadamente. Direitos so existem apos apuracao.
+                $pendingCount=0;
+                foreach($pendingRows as $pending){
+                    if(!in_array($id,[
+                        (int)$pending['corretor_pessoa_id'],
+                        (int)($pending['segundo_corretor_pessoa_id']??0),
+                        (int)($pending['gerente_pessoa_id']??0)],true))continue;
+                    $pendingCount++;
+                    if(count($detail)>=30)continue;
+                    $detail[]=[
+                        'operacao_id'=>(int)$pending['id'],
+                        'titulo'=>'Negociação #'.$pending['id'].' · '.$pending['sigla_plano'],
+                        'data_venda'=>$pending['data_negociacao'],
+                        'descricao'=>'PENDÊNCIA · '.$pending['cliente_nome'],
+                        'tipo'=>'NEGOCIACAO','valor_negociado'=>$pending['valor_cobrado'],
+                        'total'=>'0.00','recebidas'=>'0.00','abatidas'=>'0.00','a_receber'=>'0.00',
+                    ];
+                }
                 $items[]=[
                     'pessoa_id'=>$id,'nome'=>$teamNames[$id]??$account['nome'],
                     'total'=>$x['total'],'a_receber'=>$x['pendente'],
                     'recebidas'=>$x['recebido'],'abatidas'=>$x['abatido'],
-                    'liquidadas'=>$x['pago'],'participacoes'=>count($account['itens']),
+                    'liquidadas'=>$x['pago'],'participacoes'=>count($account['itens'])+$pendingCount,
                     'detalhes'=>$detail,
-                    'detalhes_limitados'=>count($account['itens'])>30,
+                    'detalhes_limitados'=>count($account['itens'])+$pendingCount>30,
                 ];
             }
             return $this->response->setJSON([
