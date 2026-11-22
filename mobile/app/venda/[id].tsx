@@ -18,7 +18,7 @@ import FinanceDatePicker from '../../src/components/FinanceDatePicker';
 import ActionModal from '../../src/components/ActionModal';
 import { colors } from '../../src/theme';
 
-type Plan={id:number;nome:string;codigo:string;valor:string;duracao_meses:number};
+type Plan={id:number;nome:string;codigo:string;valor:string;duracao_meses:number;ativo:boolean};
 type Method={id:number;nome:string;codigo:string;credito:boolean};
 type Person={id:number;nome:string;papeis:string[]};
 type Options={planos:Plan[];formas:Method[];gerentes:{id:number;nome:string}[];pessoas:Person[];pode_corrigir_comissao:boolean};
@@ -59,7 +59,7 @@ function Input({label,value,onChange,placeholder,numeric=false}:{label:string;va
 function Select({label,value,onPress}:{label:string;value:string;onPress:()=>void}){
   const s=useThemedStyles(lightStyles);
   return <Pressable style={s.select} onPress={onPress}><View style={{flex:1}}>
-    <Text style={s.label}>{label}</Text><Text style={s.selectValue}>{value}</Text></View><Text style={s.arrow}>⌄</Text>
+    <Text style={s.label}>{label}</Text><Text style={s.selectValue}>{value}</Text></View><SymbolView name={{ios:"chevron.down",android:"expand_more"}} size={16} tintColor={colors.muted}/>
   </Pressable>;
 }
 function Btn({text,onPress,muted=false,disabled=false}:{text:string;onPress:()=>void;muted?:boolean;disabled?:boolean}){
@@ -434,7 +434,7 @@ export default function VendaMobile(){
     ?salePeople.filter(p=>p.papeis.includes('corretor')).map(p=>({id:p.id,label:p.nome})):
     choice?.field==='editPlan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
     editingField?editingPeople.map(p=>({id:p.id,label:p.nome})):
-    choice?.field==='plan'?(opts?.planos||[]).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
+    choice?.field==='plan'?(opts?.planos||[]).filter(p=>p.ativo).map(p=>({id:p.id,label:p.nome+' · '+money(p.valor)})):
     choice?.field==='method'?(opts?.formas||[]).map(m=>({id:m.id,label:m.nome})):
     choice?.field==='manager'?(opts?.gerentes||[]).map(m=>({id:m.id,label:m.nome})):
     choice?.field==='source'?(opts?.pessoas||[]).map(p=>({id:p.id,label:p.nome})):
