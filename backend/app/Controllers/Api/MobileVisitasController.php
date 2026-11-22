@@ -225,7 +225,7 @@ final class MobileVisitasController extends BaseController
             'atendentes' => array_values($attendants),
             'motivos' => $reasons,
             'origens' => $origins,
-            'minha_pessoa_id' => $this->scope($user),
+            'minha_pessoa_id' => \App\Libraries\GestaoEquipe::pessoaId($db,$user),
         ])->setHeader('Cache-Control', 'no-store');
     }
 
@@ -604,18 +604,18 @@ final class MobileVisitasController extends BaseController
                 // Mesmo validador e regras de corrente utilizados pelo cadastro web.
                 // Nunca confiar em um usuário, status ou dono de corrente enviado pelo celular
                 // quando a conta está limitada a uma corrente.
-                $ownerId = $scope !== null
-                    ? $scope
-                    : ($this->validId($newClient['dono_corrente_pessoa_id'] ?? null)
-                        ?? (int) $brokers['corretor_pessoa_id']);
+                $ownerId=\App\Libraries\GestaoEquipe::donoPadrao(
+                    $db,(int)$brokers['corretor_pessoa_id']);
                 $newClient['dono_corrente_pessoa_id'] = $ownerId;
                 $clean = ClienteRules::validate($db, [...$newClient, 'ativo' => true]);
                 if (isset($clean['error'])) {
                     $db->transRollback();
                     return $this->error(422, $clean['error']);
                 }
-                if (($scope !== null && (int) $clean['dono_corrente_pessoa_id'] !== $scope)
-                    || ($team!==null&&!in_array((int)$clean['dono_corrente_pessoa_id'],$team,true))) {
+                if (($scope !== null && (int)$clean['dono_corrente_pessoa_id'] !==
+                        \App\Libraries\GestaoEquipe::donoPadrao($db,(int)$brokers['corretor_pessoa_id']))
+                    || ($team!==null&&!in_array((int)$brokers['corretor_pessoa_id'],$team,true)
+                        && !in_array((int)($brokers['segundo_corretor_pessoa_id']??0),$team,true))) {
                     $db->transRollback();
                     return $this->error(403, 'Cliente indicado pertence a outra corrente.');
                 }
