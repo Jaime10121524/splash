@@ -437,7 +437,7 @@ export default function AgendamentosScreen({ initialMode = 'list' }: { initialMo
             </Pressable>
           </View>
           {loading && <ActivityIndicator color={colors.brand} />}
-          {select('Corretor que captou *',brokers.find(v=>v.id===captor)?.nome||'',()=>setPicker('captor'))}
+          {select('Corretor que captou *',agendaBrokers.find(v=>v.id===captor)?.nome||'',()=>setPicker('captor'))}
           {!loading&&brokers.length===0&&<Text style={styles.brokerHint}>
             Não há corretores ativos disponíveis. Confira o cadastro de Pessoas e suas funções no sistema do PC.
           </Text>}
