@@ -48,6 +48,7 @@ class PessoasController extends BaseController
             $pessoa['responsavel_pessoa_id'] = $responsabilidades[$pessoa['id']]??null;
             $pessoa['gestor_pessoa_id']=$gestores[$pessoa['id']]??null;
             $pessoa['usa_sistema']=(bool)($pessoa['usa_sistema']??false);
+            $pessoa['gestor_visao_global']=(bool)($pessoa['gestor_visao_global']??false);
             $pessoa['dono_corrente_padrao_pessoa_id']=isset($pessoa['dono_corrente_padrao_pessoa_id'])
                 ?(int)$pessoa['dono_corrente_padrao_pessoa_id']:null;
         }
@@ -205,6 +206,10 @@ class PessoasController extends BaseController
             return ['error'=>'O vínculo com gestor só se aplica a corretores.'];
         if($boss!==null && !in_array('corretor',$roles,true))
             return ['error'=>'A responsabilidade financeira se aplica somente à função Corretor.'];
+        if(array_key_exists('gestor_visao_global',$data) && !is_bool($data['gestor_visao_global']))
+            return ['error'=>'Permissão de visão geral inválida.'];
+        if(!in_array('gerente',$roles,true) && ($data['gestor_visao_global']??false)===true)
+            return ['error'=>'Visão geral somente para pessoas com função Gerente.'];
         if (!array_key_exists('usa_sistema',$data) || !is_bool($data['usa_sistema']))
             return ['error'=>'Informe se a pessoa utiliza o sistema.'];
         if (!array_key_exists('ativo',$data) || !is_bool($data['ativo'])) {
@@ -216,6 +221,7 @@ class PessoasController extends BaseController
             'papeis'=>array_values($roles),'responsavel_pessoa_id'=>$boss,
             'gestor_pessoa_id'=>$manager,'usa_sistema'=>$data['usa_sistema'] ? 1 : 0,
             'dono_corrente_padrao_pessoa_id'=>$owner===null?null:(int)$owner,
+            'gestor_visao_global'=>($data['gestor_visao_global']??false) ? 1 : 0,
             'ativo'=>$data['ativo'] ? 1 : 0,
         ];
     }
