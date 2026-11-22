@@ -12,7 +12,7 @@ import {colors} from '../src/theme';
 type FinanceItem={
   operacao_id:number;titulo:string;data_venda:string;descricao:string;
   total:string;recebidas:string;abatidas:string;a_receber:string;
-  tipo?:'NEGOCIACAO';valor_negociado?:string;
+  tipo?:'NEGOCIACAO';adiantado?:string;
 };
 type FinanceAccount={
   pessoa_id:number;nome:string;total:string;a_receber:string;recebidas:string;
@@ -178,10 +178,13 @@ export default function FinanceiroMobile(){
             {account.detalhes.map((item,index)=><View key={item.operacao_id+'-'+index} style={s.detailItem}>
               <Text style={s.detailTitle}>{item.titulo}</Text>
               <Text style={s.detailMeta}>{formatDate(item.data_venda)} · {item.descricao}</Text>
-              {item.tipo==='NEGOCIACAO'?<View style={s.line}>
-                <Text style={s.lineName}>Em negociação · sem comissão apurada</Text>
-                <Text style={s.lineValue}>{money(item.valor_negociado)}</Text>
-              </View>:<>
+              {item.tipo==='NEGOCIACAO'?<>
+                <Text style={s.pendingHint}>Negociação aberta · comissão ainda não apurada</Text>
+                <View style={s.line}>
+                  <Text style={s.lineName}>Adiantamento recebido por esta pessoa</Text>
+                  <Text style={s.lineValue}>{money(item.adiantado??'0.00')}</Text>
+                </View>
+              </>:<>
               <View style={s.line}><Text style={s.lineName}>Direito</Text>
                 <Text style={s.lineValue}>{money(item.total)}</Text></View>
               <View style={s.line}><Text style={s.lineName}>Recebido</Text>
@@ -232,14 +235,15 @@ const styles=StyleSheet.create({
   metricNumber:{color:colors.brandDark,fontSize:19,fontWeight:'900'},
   metricHint:{color:colors.muted,fontSize:10,lineHeight:15},
   account:{padding:16,borderRadius:18,backgroundColor:'#FFFFFF',gap:12,
-    borderWidth:1,borderColor:colors.line},
+    borderWidth:1,borderColor:colors.line,minWidth:0,width:'100%'},
   accountHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8,
     borderBottomWidth:1,borderBottomColor:colors.line,paddingBottom:12},
   accountName:{flex:1,fontSize:15,fontWeight:'900',color:colors.ink},
-  accountCount:{fontSize:10,color:colors.muted},
-  line:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
-  lineName:{fontSize:12,color:colors.muted},
-  lineValue:{fontWeight:'800',fontSize:13,color:colors.ink},
+  accountCount:{fontSize:10,color:colors.muted,flexShrink:1,textAlign:'right',maxWidth:'48%'},
+  line:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:10,minWidth:0},
+  lineName:{fontSize:12,color:colors.muted,flex:1,flexShrink:1,minWidth:0},
+  lineValue:{fontWeight:'800',fontSize:12,color:colors.ink,maxWidth:'47%',flexShrink:0,
+    textAlign:'right'},
   errorCard:{backgroundColor:'#FFF0E9',borderRadius:12,padding:14,gap:9},
   errorText:{color:colors.danger,fontSize:12},
   retry:{color:colors.brandDark,fontWeight:'900',fontSize:12},
@@ -257,9 +261,11 @@ const styles=StyleSheet.create({
   quickTitle:{fontSize:15,fontWeight:'900',color:colors.ink},
   quickDescription:{fontSize:11,color:colors.muted,lineHeight:17},
   note:{color:colors.muted,fontSize:11,lineHeight:18},
-  detailContainer:{paddingTop:12,borderTopWidth:1,borderTopColor:colors.line,gap:12},
+  detailContainer:{paddingTop:12,borderTopWidth:1,borderTopColor:colors.line,gap:12,minWidth:0},
   detailHeader:{fontSize:13,fontWeight:'900',color:colors.brandDark},
-  detailItem:{padding:12,gap:8,borderRadius:12,backgroundColor:colors.pale},
-  detailTitle:{fontSize:13,fontWeight:'900',color:colors.ink},
-  detailMeta:{fontSize:11,color:colors.muted},
+  detailItem:{padding:12,gap:8,borderRadius:12,backgroundColor:colors.pale,
+    width:'100%',minWidth:0,overflow:'hidden'},
+  detailTitle:{fontSize:13,fontWeight:'900',color:colors.ink,flexShrink:1},
+  detailMeta:{fontSize:11,color:colors.muted,flexShrink:1},
+  pendingHint:{color:colors.muted,fontSize:11,lineHeight:17},
 });
