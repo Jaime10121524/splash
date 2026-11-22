@@ -522,7 +522,7 @@ final class MobileVisitasController extends BaseController
         if(!$client||!(bool)$client['ativo'])
             return $this->error(404,'Cliente ativo não encontrado.');
         if($user->inGroup('gerente')&&!$user->inGroup('admin')){
-            $ids=\\App\\Libraries\\GestaoEquipe::ids($db,$user);
+            $ids=\App\Libraries\GestaoEquipe::ids($db,$user);
             if(!in_array((int)$client['dono_corrente_pessoa_id'],$ids,true)
                 || (!in_array($broker['corretor_pessoa_id'],$ids,true)
                     && !in_array((int)($broker['segundo_corretor_pessoa_id']??0),$ids,true)))
@@ -550,7 +550,7 @@ final class MobileVisitasController extends BaseController
                 'atualizado_em'=>$now,
             ]);
             $id=(int)$db->insertID();
-            if($id<1)throw new \\RuntimeException('Visita não gravada.');
+            if($id<1)throw new \RuntimeException('Visita não gravada.');
             $db->table('visita_sessoes')->insert([
                 'visita_id'=>$id,'inicio_em'=>$times['inicio'],'fim_em'=>$times['fim'],
                 'criado_por_usuario_id'=>(int)$user->id,
@@ -564,7 +564,7 @@ final class MobileVisitasController extends BaseController
             $this->event($db,$id,null,'AGUARDANDO',(int)$user->id,$times['chegada']);
             $this->event($db,$id,'AGUARDANDO','ATENDENDO',(int)$user->id,$times['inicio']);
             $this->event($db,$id,'ATENDENDO',$status,(int)$user->id,$times['fim']);
-            if($db->transStatus()===false)throw new \\RuntimeException('Falha no registro histórico.');
+            if($db->transStatus()===false)throw new \RuntimeException('Falha no registro histórico.');
             $db->transCommit();
             $this->notice($id,$status);
             return $this->ok('Atendimento retroativo registrado com histórico e horários.',
