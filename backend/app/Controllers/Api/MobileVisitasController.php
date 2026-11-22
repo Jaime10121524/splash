@@ -478,6 +478,100 @@ final class MobileVisitasController extends BaseController
             ->setHeader('Cache-Control', 'no-store');
     }
 
+    /**
+     * Registro retroativo auditado: nao cria uma chegada "hoje" para venda antiga.
+     * Permitido somente a administrador ou gestor e exige horarios completos
+     * na data indicada, em ordem cronologica, sem duplicar a visita.
+     */
+    public function historico(): ResponseInterface
+    {
+        if($denied=$this->access())return $denied;
+        $user=auth('tokens')->user();
+        if(!$user->inGroup('admin','gerente'))
+            return $this->error(403,'Registro retroativo permitido somente para gestor ou administrador.');
+        $data=$this->request->getJSON(true);
+        if(!is_array($data))return $this->error(422,'Informe os dados da visita anterior.');
+        $day=(string)($data['data_visita']??'');
+        if(!$this->dateValid($day)||$day>=substr($this->now(),0,10))
+            return $this->error(422,'Selecione uma data anterior a hoje.');
+        $status=(string)($data['status']??'');
+        if(!in_array($status,['VENDA','PENDENCIA'],true))
+            return $this->error(422,'Informe Venda ou Pendência como resultado.');
+        $times=[];
+        foreach(['chegada','inicio','fim'] as $field){
+            $time=(string)($data[$field.'_hora']??'');
+            if(!preg_match('/^(?:[01]\\d|2[0-3]):[0-5]\\d$/D',$time))
+                return $this->error(422,'Informe os três horários no formato HH:MM.');
+            $times[$field]=$day.' '.$time.':00';
+        }
+        if(!($times['chegada']<=$times['inicio']&&$times['inicio']<$times['fim']))
+            return $this->error(422,'Horários inválidos: chegada, início e fim precisam estar em ordem.');
+        $clientId=$this->validId($data['cliente_id']??null);
+        $attendant=$this->validId($data['atendente_pessoa_id']??null);
+        if(!$clientId||!$attendant)
+            return $this->error(422,'Selecione cliente e atendente responsável.');
+        $note=trim((string)($data['observacoes']??''));
+        if(mb_strlen($note)>3000)return $this->error(422,'Observações com mais de 3000 caracteres.');
+        $db=db_connect();
+        $broker=$this->brokers($db,$data,$user);
+        if(isset($broker['error']))return $this->error(422,$broker['error']);
+        if(!$this->personWithRole($db,$attendant,['corretor','vendedor']))
+            return $this->error(422,'Selecione um atendente ativo.');
+        $client=$db->table('clientes')->select('id,dono_corrente_pessoa_id,ativo')
+            ->where('id',$clientId)->get()->getRowArray();
+        if(!$client||!(bool)$client['ativo'])
+            return $this->error(404,'Cliente ativo não encontrado.');
+        if($user->inGroup('gerente')&&!$user->inGroup('admin')){
+            $ids=\\App\\Libraries\\GestaoEquipe::ids($db,$user);
+            if(!in_array((int)$client['dono_corrente_pessoa_id'],$ids,true)
+                || (!in_array($broker['corretor_pessoa_id'],$ids,true)
+                    && !in_array((int)($broker['segundo_corretor_pessoa_id']??0),$ids,true)))
+                return $this->error(403,'Cliente ou corretores fora da equipe do gestor.');
+        }
+        $db->transBegin();
+        try{
+            $existing=$db->table('visitas')->select('id')
+                ->where('cliente_id',$clientId)
+                ->where('chegada_em >=',$day.' 00:00:00')
+                ->where('chegada_em <=',$day.' 23:59:59')
+                ->get()->getRowArray();
+            if($existing){
+                $db->transRollback();
+                return $this->error(409,'Já existe visita desse cliente nesta data. Consulte o atendimento existente.');
+            }
+            $now=$this->now();
+            $db->table('visitas')->insert([
+                'cliente_id'=>$clientId,...$broker,
+                'atendente_pessoa_id'=>$attendant,'atendente_adicional_pessoa_id'=>null,
+                'status'=>$status,'chegada_em'=>$times['chegada'],
+                'inicio_em'=>$times['inicio'],'fim_em'=>$times['fim'],
+                'retorno_previsto'=>null,'motivo_nao_venda_id'=>null,
+                'observacoes'=>$note?:null,'criado_por_usuario_id'=>(int)$user->id,
+                'atualizado_em'=>$now,
+            ]);
+            $id=(int)$db->insertID();
+            if($id<1)throw new \\RuntimeException('Visita não gravada.');
+            $db->table('visita_sessoes')->insert([
+                'visita_id'=>$id,'inicio_em'=>$times['inicio'],'fim_em'=>$times['fim'],
+                'criado_por_usuario_id'=>(int)$user->id,
+            ]);
+            $db->table('visita_resultados_historico')->insert([
+                'visita_id'=>$id,'resultado'=>$status,
+                'motivo_nao_venda_id'=>null,'retorno_previsto'=>null,
+                'observacoes'=>$note?:null,'criado_em'=>$times['fim'],
+                'usuario_id'=>(int)$user->id,
+            ]);
+            $this->event($db,$id,null,'AGUARDANDO',(int)$user->id,$times['chegada']);
+            $this->event($db,$id,'AGUARDANDO','ATENDENDO',(int)$user->id,$times['inicio']);
+            $this->event($db,$id,'ATENDENDO',$status,(int)$user->id,$times['fim']);
+            if($db->transStatus()===false)throw new \\RuntimeException('Falha no registro histórico.');
+            $db->transCommit();
+            $this->notice($id,$status);
+            return $this->ok('Atendimento retroativo registrado com histórico e horários.',
+                ['visita_id'=>$id,'status'=>$status],201);
+        }catch(Throwable $e){return $this->fail($e,'visita retroativa',$db);}
+    }
+
     public function arrival(): ResponseInterface
     {
         if ($denied = $this->access()) return $denied;
