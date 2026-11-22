@@ -29,15 +29,16 @@ final class MobileController extends BaseController
 
     private function safeUser($user): array
     {
+        $manager=\App\Libraries\GestaoEquipe::ehGestor(db_connect(),$user);
         return [
             'id' => (int) $user->id,
             'username' => (string) $user->username,
             'role' => $user->inGroup('admin') ? 'admin'
-                : ($user->inGroup('gerente') ? 'gerente'
+                : ($manager ? 'gerente'
                 : ($user->inGroup('operador') ? 'operador'
                 : ($user->inGroup('corretor') ? 'corretor'
                 : ($user->inGroup('vendedor') ? 'vendedor' : 'restrito')))),
-            'groups' => $user->getGroups(),
+            'groups' => $manager?array_values(array_unique([...$user->getGroups(),'gerente'])):$user->getGroups(),
         ];
     }
 
@@ -143,8 +144,9 @@ final class MobileController extends BaseController
         }
 
         $db = db_connect();
+        $manager=\App\Libraries\GestaoEquipe::ehGestor($db,$user);
         $scope = null;
-        if ($user->inGroup('corretor') && ! $user->inGroup('admin', 'gerente', 'operador')) {
+        if ($user->inGroup('corretor') && !$manager && ! $user->inGroup('admin', 'operador')) {
             $person = $db->table('pessoas')->select('id')
                 ->where('user_id', (int) $user->id)->where('ativo', 1)->get()->getRowArray();
             if (! $person) return $this->error(403, 'Conta sem pessoa ativa vinculada.');
@@ -154,7 +156,7 @@ final class MobileController extends BaseController
         // Gestor consulta apenas os corretores formalmente vinculados,
         // independentemente de participação na comissão.
         $team=null;
-        if($user->inGroup('gerente')&&!$user->inGroup('admin')){
+        if($manager&&!$user->inGroup('admin')){
             $team=\App\Libraries\GestaoEquipe::ids($db,$user);
             if(!$team)return $this->error(403,'Gestor sem equipe/pessoa ativa vinculada.');
         }
